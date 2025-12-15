@@ -22,6 +22,9 @@ class PerfilSerializer(serializers.ModelSerializer):
 class CorridaSerializer(serializers.ModelSerializer):
     cliente = PerfilSerializer(read_only=True)
     motorista = PerfilSerializer(read_only=True)
+    motorista_lat = serializers.SerializerMethodField()
+    motorista_lng = serializers.SerializerMethodField()
+    motorista_ping_em = serializers.SerializerMethodField()
 
     class Meta:
         model = Corrida
@@ -36,10 +39,43 @@ class CorridaSerializer(serializers.ModelSerializer):
             "destino_lat",
             "destino_lng",
             "destino_endereco",
+            "motorista_lat",
+            "motorista_lng",
+            "motorista_ping_em",
             "criado_em",
             "atualizado_em",
         ]
         read_only_fields = ["id", "cliente", "motorista", "status", "criado_em", "atualizado_em"]
+
+    def _ultimo_ping(self, obj):
+        if not obj.motorista:
+            return None
+        from .models import LocalizacaoPing
+
+        return (
+            LocalizacaoPing.objects.filter(perfil=obj.motorista)
+            .order_by("-criado_em")
+            .values("latitude", "longitude", "criado_em")
+            .first()
+        )
+
+    def get_motorista_lat(self, obj):
+        ping = self._ultimo_ping(obj)
+        if not ping:
+            return None
+        return float(ping["latitude"])
+
+    def get_motorista_lng(self, obj):
+        ping = self._ultimo_ping(obj)
+        if not ping:
+            return None
+        return float(ping["longitude"])
+
+    def get_motorista_ping_em(self, obj):
+        ping = self._ultimo_ping(obj)
+        if not ping:
+            return None
+        return ping["criado_em"]
 
 
 class CorridaCreateSerializer(serializers.Serializer):
@@ -62,4 +98,3 @@ class LocalizacaoPingSerializer(serializers.ModelSerializer):
         model = LocalizacaoPing
         fields = ["id", "perfil", "latitude", "longitude", "precisao_m", "criado_em"]
         read_only_fields = ["id", "criado_em"]
-

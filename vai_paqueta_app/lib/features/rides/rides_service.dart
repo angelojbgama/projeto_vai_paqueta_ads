@@ -9,6 +9,9 @@ class CorridaResumo {
   final double? origemLng;
   final double? destinoLat;
   final double? destinoLng;
+  final double? motoristaLat;
+  final double? motoristaLng;
+  final DateTime? motoristaPingEm;
 
   CorridaResumo({
     required this.id,
@@ -17,6 +20,9 @@ class CorridaResumo {
     this.origemLng,
     this.destinoLat,
     this.destinoLng,
+    this.motoristaLat,
+    this.motoristaLng,
+    this.motoristaPingEm,
   });
 
   factory CorridaResumo.fromJson(Map<String, dynamic> json) {
@@ -26,6 +32,12 @@ class CorridaResumo {
       if (v is String) return double.tryParse(v);
       return null;
     }
+    DateTime? _dt(dynamic v) {
+      if (v == null) return null;
+      if (v is DateTime) return v;
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
     return CorridaResumo(
       id: json['id'] as int,
       status: json['status'] as String,
@@ -33,6 +45,9 @@ class CorridaResumo {
       origemLng: _d(json['origem_lng']),
       destinoLat: _d(json['destino_lat']),
       destinoLng: _d(json['destino_lng']),
+      motoristaLat: _d(json['motorista_lat']),
+      motoristaLng: _d(json['motorista_lng']),
+      motoristaPingEm: _dt(json['motorista_ping_em']),
     );
   }
 }
@@ -100,13 +115,14 @@ class RidesService {
   }
 
   Future<CorridaResumo?> buscarCorridaAtiva({required int perfilId}) async {
-    final corridas = await listarCorridas(perfilId: perfilId);
-    for (final c in corridas) {
-      if (c.status != 'concluida' && c.status != 'cancelada' && c.status != 'rejeitada') {
-        return c;
-      }
-    }
-    return null;
+    final resp = await _dio.get(
+      '/corridas/para_passageiro/$perfilId/',
+      options: Options(validateStatus: (_) => true),
+    );
+    if (resp.statusCode != 200 || resp.data is! Map<String, dynamic>) return null;
+    final data = resp.data as Map<String, dynamic>;
+    if (data.isEmpty) return null;
+    return CorridaResumo.fromJson(data);
   }
 
   Future<List<MotoristaProximo>> motoristasProximos({
@@ -132,7 +148,7 @@ class RidesService {
   }
 
   Future<void> cancelarCorrida(int corridaId) async {
-    await _dio.post('/corridas/$corridaId/cancelar');
+    await _dio.post('/corridas/$corridaId/cancelar/');
   }
 
   Future<CorridaResumo?> obterCorrida(int corridaId) async {

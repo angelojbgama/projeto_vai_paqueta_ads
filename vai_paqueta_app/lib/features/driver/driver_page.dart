@@ -21,7 +21,7 @@ class DriverPage extends ConsumerStatefulWidget {
   ConsumerState<DriverPage> createState() => _DriverPageState();
 }
 
-class _DriverPageState extends ConsumerState<DriverPage> {
+class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObserver {
   String? _status;
   bool _enviando = false;
   LatLng? _posicao;
@@ -36,6 +36,8 @@ class _DriverPageState extends ConsumerState<DriverPage> {
   bool _modalAberto = false;
   Map<String, dynamic>? _corridaAtual;
   bool _trocandoPerfil = false;
+  bool _appPausado = false;
+  StateSetter? _modalSetState;
 
   Future<Position?> _posicaoAtual() async {
     try {
@@ -122,6 +124,7 @@ class _DriverPageState extends ConsumerState<DriverPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _configurarFonteTiles();
     _atualizarPosicao();
     _verificarCorrida();
@@ -131,9 +134,25 @@ class _DriverPageState extends ConsumerState<DriverPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pingTimer?.cancel();
     _pollTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      _appPausado = true;
+      _pingTimer?.cancel();
+      _pollTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed && _appPausado) {
+      _appPausado = false;
+      _atualizarPosicao();
+      _iniciarAutoPing();
+      _iniciarPollingCorrida();
+    }
   }
 
   double _round6(double value) => double.parse(value.toStringAsFixed(6));
@@ -190,7 +209,6 @@ class _DriverPageState extends ConsumerState<DriverPage> {
   }
 
   Future<void> _verificarCorrida() async {
-    if (_modalAberto) return;
     final device = ref.read(deviceProvider).valueOrNull;
     if (device == null || device.perfilTipo != 'ecotaxista') return;
     try {
@@ -198,7 +216,13 @@ class _DriverPageState extends ConsumerState<DriverPage> {
       final corrida = await service.corridaAtribuida(device.perfilId);
       if (corrida != null && corrida.isNotEmpty) {
         _corridaAtual = corrida;
-        _mostrarModalCorrida(corrida);
+        if (_modalAberto) {
+          _modalSetState?.call(() {});
+        } else {
+          _mostrarModalCorrida(corrida);
+        }
+      } else {
+        _corridaAtual = null;
       }
     } catch (e) {
       // silencioso para polling
@@ -208,6 +232,7 @@ class _DriverPageState extends ConsumerState<DriverPage> {
 
   Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida) async {
     _modalAberto = true;
+    _corridaAtual = corrida;
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -216,42 +241,114 @@ class _DriverPageState extends ConsumerState<DriverPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.local_taxi, color: Colors.green, size: 24),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Nova corrida',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (corrida['origem_endereco'] != null)
-                Text('Origem: ${corrida['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-              if (corrida['destino_endereco'] != null)
-                Text('Destino: ${corrida['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-              if (corrida['id'] != null) Text('Corrida #${corrida['id']}'),
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
+        return StatefulBuilder(builder: (context, setModalState) {
+          _modalSetState = setModalState;
+          final corridaAtual = _corridaAtual ?? corrida;
+          final status = corridaAtual['status'] as String?;
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.local_taxi, color: Colors.green, size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Corrida',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
+                const SizedBox(height: 12),
+                if (corridaAtual['origem_endereco'] != null)
+                  Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                if (corridaAtual['destino_endereco'] != null)
+                  Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
+                if (status != null) Text('Status: $status'),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (status == 'aguardando')
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.check),
+                        label: const Text('Aceitar'),
+                        onPressed: () => _acaoCorrida('aceitar'),
+                      ),
+                    if (status == 'aceita')
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Iniciar'),
+                        onPressed: () => _acaoCorrida('iniciar'),
+                      ),
+                    if (status == 'em_andamento')
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.flag),
+                        label: const Text('Finalizar'),
+                        onPressed: () => _acaoCorrida('finalizar'),
+                      ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.close),
+                      label: const Text('Rejeitar'),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+                      onPressed: () => _acaoCorrida('rejeitar'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Fechar'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        });
       },
     );
     _modalAberto = false;
+    _modalSetState = null;
+  }
+
+  Future<void> _acaoCorrida(String acao) async {
+    final device = ref.read(deviceProvider).valueOrNull;
+    final corridaId = _corridaAtual?['id'] as int?;
+    if (device == null || corridaId == null) return;
+    try {
+      final service = DriverService();
+      Map<String, dynamic>? nova;
+      switch (acao) {
+        case 'aceitar':
+          nova = await service.aceitarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          break;
+        case 'iniciar':
+          nova = await service.iniciarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          break;
+        case 'finalizar':
+          nova = await service.finalizarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          break;
+        case 'rejeitar':
+          await service.reatribuirCorrida(corridaId, excluirMotoristaId: device.perfilId);
+          break;
+        default:
+          return;
+      }
+      if (nova != null) {
+        _corridaAtual = nova;
+      }
+      _modalSetState?.call(() {});
+      if (!mounted) return;
+      setState(() => _status = 'Status da corrida atualizado.');
+      if (acao == 'rejeitar' || (nova != null && nova['status'] == 'concluida')) {
+        _modalAberto = false;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _status = 'Erro ao atualizar corrida: $e');
+    }
   }
 
   Future<void> _trocarParaPassageiro() async {

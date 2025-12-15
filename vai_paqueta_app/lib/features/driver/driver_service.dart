@@ -32,4 +32,31 @@ class DriverService {
     }
     return null;
   }
+
+  Future<Map<String, dynamic>?> aceitarCorrida({required int corridaId, required int motoristaId}) async {
+    final resp = await _dio.post('/corridas/$corridaId/aceitar/', data: {'motorista_id': motoristaId});
+    return resp.data is Map<String, dynamic> ? resp.data as Map<String, dynamic> : null;
+  }
+
+  Future<Map<String, dynamic>?> iniciarCorrida({required int corridaId, required int motoristaId}) async {
+    final resp = await _dio.post('/corridas/$corridaId/iniciar/', data: {'motorista_id': motoristaId});
+    return resp.data is Map<String, dynamic> ? resp.data as Map<String, dynamic> : null;
+  }
+
+  Future<Map<String, dynamic>?> finalizarCorrida({required int corridaId, required int motoristaId}) async {
+    final resp = await _dio.post('/corridas/$corridaId/finalizar/', data: {'motorista_id': motoristaId});
+    return resp.data is Map<String, dynamic> ? resp.data as Map<String, dynamic> : null;
+  }
+
+  Future<void> cancelarCorrida({required int corridaId, int? perfilId}) async {
+    await _dio.post('/corridas/$corridaId/cancelar/', data: {
+      if (perfilId != null) 'perfil_id': perfilId,
+    });
+  }
+
+  Future<void> reatribuirCorrida(int corridaId, {int? excluirMotoristaId}) async {
+    await _dio.post('/corridas/$corridaId/reatribuir/', data: {
+      if (excluirMotoristaId != null) 'excluir_motorista_id': excluirMotoristaId,
+    });
+  }
 }

@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/map_config.dart';
 import '../../services/geo_service.dart';
@@ -23,12 +24,15 @@ class PassengerPage extends ConsumerStatefulWidget {
   ConsumerState<PassengerPage> createState() => _PassengerPageState();
 }
 
-class _PassengerPageState extends ConsumerState<PassengerPage> {
+class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver {
+  static const _prefsCorridaKey = 'corrida_ativa_id';
   final _origemCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
   LatLng? _origemLatLng;
   LatLng? _destinoLatLng;
+  LatLng? _motoristaLatLng;
   List<LatLng> _rota = [];
+  List<LatLng> _rotaMotorista = [];
   bool _loading = false;
   String? _mensagem;
   bool _corridaAtiva = false;
@@ -51,10 +55,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
   bool _trocandoPerfil = false;
   double _round6(double v) => double.parse(v.toStringAsFixed(6));
   Timer? _corridaTimer;
+  bool _appPausado = false;
+  Duration _corridaPollInterval = const Duration(seconds: 10);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _configurarFonteTiles();
     _carregarEnderecosOffline();
     _carregarCorridaAtiva();
@@ -63,12 +70,28 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _origemCtrl.dispose();
     _destinoCtrl.dispose();
     _debounceOrigem?.cancel();
     _debounceDestino?.cancel();
     _corridaTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      _appPausado = true;
+      _corridaTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed && _appPausado) {
+      _appPausado = false;
+      if (_corridaIdAtual != null) {
+        _atualizarCorridaAtiva();
+        _iniciarPollingCorrida();
+      }
+    }
   }
 
   Future<void> _configurarFonteTiles() async {
@@ -217,21 +240,35 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
     try {
       final device = ref.read(deviceProvider).valueOrNull;
       if (device == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final corridaSalva = prefs.getInt(_prefsCorridaKey);
       final rides = RidesService();
-      final corrida = await rides.buscarCorridaAtiva(perfilId: device.perfilId);
-      if (corrida != null) {
+      CorridaResumo? corrida;
+      if (corridaSalva != null) {
+        corrida = await rides.obterCorrida(corridaSalva);
+      }
+      corrida ??= await rides.buscarCorridaAtiva(perfilId: device.perfilId);
+      final current = corrida;
+      if (current != null) {
         setState(() {
-          _corridaAtiva = true;
-          _corridaIdAtual = corrida.id;
-          _mensagem = 'Corrida ativa (${corrida.status}).';
-          if (corrida.origemLat != null && corrida.origemLng != null) {
-            _origemLatLng = LatLng(corrida.origemLat!, corrida.origemLng!);
+        _corridaAtiva = true;
+        _corridaIdAtual = current.id;
+        _mensagem = 'Corrida ativa (${current.status}).';
+        if (current.origemLat != null && current.origemLng != null) {
+          _origemLatLng = LatLng(current.origemLat!, current.origemLng!);
           }
-          if (corrida.destinoLat != null && corrida.destinoLng != null) {
-            _destinoLatLng = LatLng(corrida.destinoLat!, corrida.destinoLng!);
+          if (current.destinoLat != null && current.destinoLng != null) {
+            _destinoLatLng = LatLng(current.destinoLat!, current.destinoLng!);
+          }
+          if (current.motoristaLat != null && current.motoristaLng != null) {
+            _motoristaLatLng = LatLng(current.motoristaLat!, current.motoristaLng!);
+            _atualizarRotaMotorista(current.status);
           }
         });
+        _salvarCorridaLocal(current.id);
         _iniciarPollingCorrida();
+      } else {
+        _salvarCorridaLocal(null);
       }
     } catch (_) {
       // silencioso
@@ -241,16 +278,42 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
   void _iniciarPollingCorrida() {
     _corridaTimer?.cancel();
     if (_corridaIdAtual == null) return;
-    _corridaTimer = Timer.periodic(const Duration(seconds: 10), (_) => _atualizarCorridaAtiva());
+    _corridaPollInterval = const Duration(seconds: 10);
+    _agendarPoll();
   }
 
-  Future<void> _atualizarCorridaAtiva() async {
-    if (_corridaIdAtual == null) return;
+  void _agendarPoll() {
+    _corridaTimer?.cancel();
+    _corridaTimer = Timer(_corridaPollInterval, () async {
+      final sucesso = await _atualizarCorridaAtiva();
+      if (sucesso) {
+        _corridaPollInterval = const Duration(seconds: 10);
+      } else {
+        final next = _corridaPollInterval.inSeconds * 2;
+        _corridaPollInterval = Duration(seconds: next.clamp(10, 30));
+      }
+      _agendarPoll();
+    });
+  }
+
+  Future<bool> _atualizarCorridaAtiva() async {
+    if (_corridaIdAtual == null) return false;
     try {
       final rides = RidesService();
       final corrida = await rides.obterCorrida(_corridaIdAtual!);
-      if (corrida == null) return;
-      if (!mounted) return;
+      if (corrida == null) {
+        if (!mounted) return false;
+        setState(() {
+          _corridaAtiva = false;
+          _corridaIdAtual = null;
+          _motoristaLatLng = null;
+          _mensagem = 'Corrida não encontrada.';
+        });
+        _salvarCorridaLocal(null);
+        _corridaTimer?.cancel();
+        return false;
+      }
+      if (!mounted) return false;
       setState(() {
         _mensagem = 'Status: ${corrida.status}';
         if (corrida.origemLat != null && corrida.origemLng != null) {
@@ -259,14 +322,53 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
         if (corrida.destinoLat != null && corrida.destinoLng != null) {
           _destinoLatLng = LatLng(corrida.destinoLat!, corrida.destinoLng!);
         }
+        if (corrida.motoristaLat != null && corrida.motoristaLng != null) {
+          _motoristaLatLng = LatLng(corrida.motoristaLat!, corrida.motoristaLng!);
+          _atualizarRotaMotorista(corrida.status);
+        } else {
+          _motoristaLatLng = null;
+          _rotaMotorista = [];
+        }
         if (corrida.status == 'concluida' || corrida.status == 'cancelada' || corrida.status == 'rejeitada') {
           _corridaAtiva = false;
           _corridaIdAtual = null;
+          _motoristaLatLng = null;
+          _rotaMotorista = [];
+          _rota = [];
+          _salvarCorridaLocal(null);
           _corridaTimer?.cancel();
         }
       });
+      return true;
     } catch (_) {
-      // silencioso
+      return false;
+    }
+  }
+
+  void _atualizarRotaMotorista(String status) {
+    if (_motoristaLatLng == null) {
+      _rotaMotorista = [];
+      return;
+    }
+    LatLng? alvo;
+    if (status == 'em_andamento') {
+      alvo = _destinoLatLng;
+    } else {
+      alvo = _origemLatLng;
+    }
+    if (alvo == null) {
+      _rotaMotorista = [];
+      return;
+    }
+    _rotaMotorista = [_motoristaLatLng!, alvo];
+  }
+
+  Future<void> _salvarCorridaLocal(int? corridaId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (corridaId == null) {
+      await prefs.remove(_prefsCorridaKey);
+    } else {
+      await prefs.setInt(_prefsCorridaKey, corridaId);
     }
   }
 
@@ -301,16 +403,19 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+        if (!mounted) return;
         setState(() => _mensagem = 'Permissão de localização negada.');
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
       setState(() {
         _origemLatLng = LatLng(pos.latitude, pos.longitude);
         _posCarregada = true;
       });
       try {
         final res = await _geo.reverse(pos.latitude, pos.longitude);
+        if (!mounted) return;
         setState(() {
           _origemCtrl.text = res.endereco.isNotEmpty ? res.endereco : _origemCtrl.text;
           if (!silencioso) {
@@ -319,15 +424,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
         });
       } catch (_) {
         if (!silencioso) {
-          setState(() => _mensagem = 'Origem definida pelo GPS (sem endereço).');
+          if (!mounted) return;
+          setState(() => _mensagem = 'Origem definida pelo GPS (falha no endereço, use o texto digitado).');
         }
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         if (!silencioso) _mensagem = 'Erro ao obter localização: $e';
       });
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -372,8 +479,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
           _corridaAtiva = false;
           _corridaIdAtual = null;
           _rota = [];
+          _rotaMotorista = [];
+          _motoristaLatLng = null;
           _mensagem = 'Corrida cancelada.';
         });
+        _salvarCorridaLocal(null);
         _corridaTimer?.cancel();
       } catch (e) {
         setState(() => _mensagem = 'Erro ao cancelar: $e');
@@ -439,14 +549,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
           _mensagem = 'Corrida enviada para motorista próximo (perfil ${m.perfilId}).';
           _corridaAtiva = true;
           _corridaIdAtual = corrida.id;
+          _motoristaLatLng = null;
         });
       } else {
         setState(() {
           _mensagem = 'Corrida criada, aguardando motorista.';
           _corridaAtiva = true;
           _corridaIdAtual = corrida.id;
+          _motoristaLatLng = null;
         });
       }
+      _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
     } catch (e) {
       setState(() => _mensagem = 'Erro ao pedir corrida: $e');
@@ -613,6 +726,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
                             ),
                           ],
                         ),
+                      if (_motoristaLatLng != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _motoristaLatLng!,
+                              width: 40,
+                              height: 40,
+                              child: const Icon(Icons.local_taxi, color: Colors.orange, size: 34),
+                            ),
+                          ],
+                        ),
                       if (_rota.length >= 2)
                         PolylineLayer(
                           polylines: [
@@ -620,6 +744,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
                               points: _rota,
                               strokeWidth: 4,
                               color: Colors.blueAccent,
+                            ),
+                          ],
+                        ),
+                      if (_rotaMotorista.length >= 2)
+                        PolylineLayer(
+                          polylines: <Polyline>[
+                            Polyline(
+                              points: _rotaMotorista,
+                              strokeWidth: 3,
+                              color: Colors.orangeAccent,
                             ),
                           ],
                         ),
@@ -711,6 +845,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> {
                       ),
                     const SizedBox(height: 8),
                     if (_mensagem != null) Text(_mensagem!),
+                    if (_corridaAtiva && _corridaIdAtual != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text('Corrida $_corridaIdAtual em andamento'),
+                      ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: _loading ? null : _pedirCorrida,

@@ -18,6 +18,9 @@ from .serializers import (
     PerfilSerializer,
 )
 
+ACTIVE_STATUSES = ["aguardando", "aceita", "em_andamento"]
+PING_MAX_AGE_MINUTES = 5
+
 
 def _haversine_km(lat1, lon1, lat2, lon2):
     # Distância aproximada em km entre dois pontos lat/lng
@@ -85,6 +88,60 @@ class CorridaViewSet(viewsets.ModelViewSet):
         # Bloqueia criação direta; use a ação solicitar
         return Response({"detail": "Use POST /api/corridas/solicitar."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
+    def _corrida_expirada(self, corrida: Corrida) -> bool:
+        """
+        Considera expirada apenas se aguardando por mais de 2 minutos.
+        """
+        if corrida.status != "aguardando":
+            return False
+        referencia = corrida.criado_em
+        if not referencia:
+            return False
+        agora = datetime.now(timezone.utc)
+        if agora - referencia > timedelta(minutes=2):
+            corrida.status = "rejeitada"
+            corrida.motorista = None
+            corrida.save(update_fields=["status", "motorista", "atualizado_em"])
+            self._atribuir_motorista_proximo(corrida)
+            return True
+        return False
+
+    def _atribuir_motorista_proximo(self, corrida: Corrida, excluir_motorista_id: int | None = None):
+        """
+        Seleciona automaticamente um ecotaxista próximo baseado em pings recentes.
+        """
+        if corrida.origem_lat is None or corrida.origem_lng is None:
+            return None
+        limite_tempo = datetime.now(timezone.utc) - timedelta(minutes=PING_MAX_AGE_MINUTES)
+        pings = (
+            LocalizacaoPing.objects.select_related("perfil__device")
+            .filter(perfil__tipo="ecotaxista", criado_em__gte=limite_tempo)
+            .order_by("-criado_em")
+        )
+        vistos = set()
+        candidatos = []
+        for ping in pings:
+            if ping.perfil_id in vistos:
+                continue
+            if excluir_motorista_id and ping.perfil_id == excluir_motorista_id:
+                continue
+            dist = _haversine_km(
+                float(corrida.origem_lat),
+                float(corrida.origem_lng),
+                float(ping.latitude),
+                float(ping.longitude),
+            )
+            vistos.add(ping.perfil_id)
+            candidatos.append((dist, ping.perfil))
+        candidatos.sort(key=lambda x: x[0])
+        if not candidatos:
+            return None
+        novo_motorista = candidatos[0][1]
+        corrida.motorista = novo_motorista
+        corrida.status = "aguardando"
+        corrida.save(update_fields=["motorista", "status", "atualizado_em"])
+        return novo_motorista
+
     @action(detail=False, methods=["post"], url_path="solicitar")
     def solicitar(self, request):
         serializer = CorridaCreateSerializer(data=request.data)
@@ -94,6 +151,17 @@ class CorridaViewSet(viewsets.ModelViewSet):
             perfil = Perfil.objects.get(id=data["perfil_id"], tipo__in=["cliente", "passageiro"])
         except Perfil.DoesNotExist:
             return Response({"detail": "Perfil de passageiro/cliente não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        corrida_existente = (
+            Corrida.objects.filter(cliente=perfil, status__in=ACTIVE_STATUSES)
+            .order_by("-atualizado_em", "-criado_em")
+            .first()
+        )
+        if corrida_existente:
+            return Response(
+                {"detail": "Já existe uma corrida ativa para este perfil.", "corrida": CorridaSerializer(corrida_existente).data},
+                status=status.HTTP_409_CONFLICT,
+            )
 
         corrida = Corrida.objects.create(
             cliente=perfil,
@@ -109,6 +177,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="aceitar")
     def aceitar(self, request, pk=None):
         corrida = self.get_object()
+        if self._corrida_expirada(corrida):
+            return Response({"detail": "Corrida expirada para aceitação."}, status=status.HTTP_409_CONFLICT)
         serializer = CorridaStatusSerializer(data={**request.data, "status": "aceita"})
         serializer.is_valid(raise_exception=True)
         motorista_id = serializer.validated_data.get("motorista_id")
@@ -126,10 +196,16 @@ class CorridaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="iniciar")
     def iniciar(self, request, pk=None):
         corrida = self.get_object()
+        if self._corrida_expirada(corrida):
+            return Response({"detail": "Corrida expirada."}, status=status.HTTP_409_CONFLICT)
         motorista_id = request.data.get("motorista_id")
         if not motorista_id:
             return Response({"detail": "motorista_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-        if not corrida.motorista or corrida.motorista_id != int(motorista_id):
+        try:
+            motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
+        except Perfil.DoesNotExist:
+            return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
         if corrida.status not in ["aceita", "aguardando"]:
             return Response({"detail": f"Corrida não pode ser iniciada no status {corrida.status}."}, status=400)
@@ -140,10 +216,16 @@ class CorridaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="finalizar")
     def finalizar(self, request, pk=None):
         corrida = self.get_object()
+        if self._corrida_expirada(corrida):
+            return Response({"detail": "Corrida expirada."}, status=status.HTTP_409_CONFLICT)
         motorista_id = request.data.get("motorista_id")
         if not motorista_id:
             return Response({"detail": "motorista_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-        if not corrida.motorista or corrida.motorista_id != int(motorista_id):
+        try:
+            motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
+        except Perfil.DoesNotExist:
+            return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
         if corrida.status not in ["em_andamento", "aceita"]:
             return Response({"detail": f"Corrida não pode ser finalizada no status {corrida.status}."}, status=400)
@@ -154,8 +236,29 @@ class CorridaViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="cancelar")
     def cancelar(self, request, pk=None):
         corrida = self.get_object()
+        perfil_id = request.data.get("perfil_id")
+        if perfil_id:
+            try:
+                Perfil.objects.get(id=perfil_id)
+            except Perfil.DoesNotExist:
+                return Response({"detail": "Perfil não encontrado para cancelar."}, status=status.HTTP_404_NOT_FOUND)
         corrida.status = "cancelada"
         corrida.save(update_fields=["status", "atualizado_em"])
+        return Response(CorridaSerializer(corrida).data)
+
+    @action(detail=True, methods=["post"], url_path="reatribuir")
+    def reatribuir(self, request, pk=None):
+        """
+        Libera a corrida para reatribuição após timeout ou rejeição.
+        """
+        corrida = self.get_object()
+        if corrida.status not in ["aguardando", "aceita", "rejeitada"]:
+            return Response({"detail": "Corrida não pode ser reatribuída nesse status."}, status=400)
+        excluir_id = request.data.get("excluir_motorista_id")
+        corrida.motorista = None
+        corrida.status = "aguardando"
+        corrida.save(update_fields=["motorista", "status", "atualizado_em"])
+        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=excluir_id if excluir_id else None)
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="status")
@@ -193,12 +296,51 @@ class CorridaViewSet(viewsets.ModelViewSet):
         corrida = (
             Corrida.objects.filter(
                 motorista_id=motorista_id_int,
-                status__in=["aguardando", "aceita", "em_andamento"],
+                status__in=ACTIVE_STATUSES,
             )
             .order_by("-atualizado_em", "-criado_em")
             .first()
         )
         if not corrida:
+            return Response({}, status=status.HTTP_200_OK)
+        if self._corrida_expirada(corrida):
+            return Response({}, status=status.HTTP_200_OK)
+        # ignora corridas cujo motorista não pingou recentemente
+        ultimo_ping = (
+            LocalizacaoPing.objects.filter(perfil_id=motorista_id_int)
+            .order_by("-criado_em")
+            .values("criado_em")
+            .first()
+        )
+        if not ultimo_ping or ultimo_ping["criado_em"] < datetime.now(timezone.utc) - timedelta(minutes=PING_MAX_AGE_MINUTES):
+            return Response({}, status=status.HTTP_200_OK)
+        return Response(CorridaSerializer(corrida).data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path=r"para_passageiro/(?P<passageiro_id>[^/.]+)",
+    )
+    def para_passageiro(self, request, passageiro_id=None):
+        """
+        Retorna a corrida mais recente deste passageiro em estados ativos.
+        """
+        try:
+            passageiro_id_int = int(passageiro_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "passageiro_id inválido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        corrida = (
+            Corrida.objects.filter(
+                cliente_id=passageiro_id_int,
+                status__in=ACTIVE_STATUSES,
+            )
+            .order_by("-atualizado_em", "-criado_em")
+            .first()
+        )
+        if not corrida:
+            return Response({}, status=status.HTTP_200_OK)
+        if self._corrida_expirada(corrida):
             return Response({}, status=status.HTTP_200_OK)
         return Response(CorridaSerializer(corrida).data)
 
