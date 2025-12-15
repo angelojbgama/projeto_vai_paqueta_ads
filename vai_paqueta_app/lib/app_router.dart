@@ -1,0 +1,36 @@
+import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
+
+import 'features/driver/driver_page.dart';
+import 'features/history/history_page.dart';
+import 'features/home/home_page.dart';
+import 'features/passenger/passenger_page.dart';
+import 'features/splash/splash_page.dart';
+
+GoRouter buildRouter() {
+  return GoRouter(
+    initialLocation: '/splash',
+    routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashPage(),
+      ),
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const HomePage(),
+      ),
+      GoRoute(
+        path: '/historico',
+        builder: (context, state) => const HistoryPage(),
+      ),
+      GoRoute(
+        path: '/motorista',
+        builder: (context, state) => const DriverPage(),
+      ),
+      GoRoute(
+        path: '/passageiro',
+        builder: (context, state) => const PassengerPage(),
+      ),
+    ],
+  );
+}

@@ -1,0 +1,4874 @@
+[
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "52",
+    "lat": -22.7622055,
+    "lng": -43.1077768,
+    "osm_type": "node",
+    "osm_id": 608717188
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "74",
+    "lat": -22.7535198,
+    "lng": -43.1093815,
+    "osm_type": "node",
+    "osm_id": 823942431
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "74",
+    "lat": -22.753538,
+    "lng": -43.1098598,
+    "osm_type": "node",
+    "osm_id": 823950471
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": null,
+    "lat": -22.7635066,
+    "lng": -43.1027879,
+    "osm_type": "node",
+    "osm_id": 2217901449
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "74",
+    "lat": -22.7533552,
+    "lng": -43.1093834,
+    "osm_type": "node",
+    "osm_id": 4348277811
+  },
+  {
+    "street": "Praia de São Roque",
+    "housenumber": "25",
+    "lat": -22.7533359,
+    "lng": -43.1110157,
+    "osm_type": "node",
+    "osm_id": 4605766658
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "70",
+    "lat": -22.7623046,
+    "lng": -43.1081001,
+    "osm_type": "node",
+    "osm_id": 4648754218
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "63",
+    "lat": -22.7615765,
+    "lng": -43.1099925,
+    "osm_type": "node",
+    "osm_id": 4648754219
+  },
+  {
+    "street": "Praça São Roque",
+    "housenumber": "1",
+    "lat": -22.7532645,
+    "lng": -43.1112752,
+    "osm_type": "node",
+    "osm_id": 4648754220
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "314",
+    "lat": -22.7525571,
+    "lng": -43.1071851,
+    "osm_type": "node",
+    "osm_id": 4648754221
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "55",
+    "lat": -22.7597503,
+    "lng": -43.1093915,
+    "osm_type": "node",
+    "osm_id": 9438636877
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "55",
+    "lat": -22.7597339,
+    "lng": -43.1092795,
+    "osm_type": "node",
+    "osm_id": 9438636889
+  },
+  {
+    "street": "Praça Pintor Pedro Bruno",
+    "housenumber": null,
+    "lat": -22.7622195,
+    "lng": -43.1070479,
+    "osm_type": "way",
+    "osm_id": 33762890
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "41",
+    "lat": -22.7505967,
+    "lng": -43.1064063,
+    "osm_type": "way",
+    "osm_id": 1023507207
+  },
+  {
+    "street": "Praça Bom Jesus",
+    "housenumber": null,
+    "lat": -22.7613894,
+    "lng": -43.1085611,
+    "osm_type": "way",
+    "osm_id": 1023507214
+  },
+  {
+    "street": "Praia da Moreninha",
+    "housenumber": null,
+    "lat": -22.7548084,
+    "lng": -43.1115532,
+    "osm_type": "way",
+    "osm_id": 1023507217
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "260",
+    "lat": -22.7524574,
+    "lng": -43.1064725,
+    "osm_type": "way",
+    "osm_id": 1023508043
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "281",
+    "lat": -22.7527999,
+    "lng": -43.1063829,
+    "osm_type": "way",
+    "osm_id": 1023508049
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "259",
+    "lat": -22.7526888,
+    "lng": -43.106228,
+    "osm_type": "way",
+    "osm_id": 1023508060
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "30",
+    "lat": -22.7608913,
+    "lng": -43.1087809,
+    "osm_type": "way",
+    "osm_id": 1023508080
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "44",
+    "lat": -22.7610064,
+    "lng": -43.1093037,
+    "osm_type": "way",
+    "osm_id": 1023508081
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "58",
+    "lat": -22.7612538,
+    "lng": -43.1096943,
+    "osm_type": "way",
+    "osm_id": 1023508082
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "36",
+    "lat": -22.760931,
+    "lng": -43.1089183,
+    "osm_type": "way",
+    "osm_id": 1023508087
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "38",
+    "lat": -22.7609219,
+    "lng": -43.1089845,
+    "osm_type": "way",
+    "osm_id": 1023508088
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "63",
+    "lat": -22.7616175,
+    "lng": -43.1099008,
+    "osm_type": "way",
+    "osm_id": 1023508089
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "52",
+    "lat": -22.7611938,
+    "lng": -43.1095457,
+    "osm_type": "way",
+    "osm_id": 1023508094
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "48",
+    "lat": -22.7611402,
+    "lng": -43.109378,
+    "osm_type": "way",
+    "osm_id": 1023508099
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "38",
+    "lat": -22.7609957,
+    "lng": -43.109127,
+    "osm_type": "way",
+    "osm_id": 1023508103
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "11",
+    "lat": -22.7501855,
+    "lng": -43.1072295,
+    "osm_type": "way",
+    "osm_id": 1023508105
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "181",
+    "lat": -22.7522478,
+    "lng": -43.1055836,
+    "osm_type": "way",
+    "osm_id": 1023508118
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "139",
+    "lat": -22.752058,
+    "lng": -43.1052792,
+    "osm_type": "way",
+    "osm_id": 1023508125
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "19",
+    "lat": -22.7604643,
+    "lng": -43.1087591,
+    "osm_type": "way",
+    "osm_id": 1023508140
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "26",
+    "lat": -22.7602445,
+    "lng": -43.1084285,
+    "osm_type": "way",
+    "osm_id": 1023508150
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "16",
+    "lat": -22.7605856,
+    "lng": -43.1083649,
+    "osm_type": "way",
+    "osm_id": 1023508159
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "35",
+    "lat": -22.7599374,
+    "lng": -43.1087768,
+    "osm_type": "way",
+    "osm_id": 1023508162
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "39",
+    "lat": -22.7598125,
+    "lng": -43.1087831,
+    "osm_type": "way",
+    "osm_id": 1023508166
+  },
+  {
+    "street": "Praça Bom Jesus",
+    "housenumber": "15",
+    "lat": -22.7615646,
+    "lng": -43.1078771,
+    "osm_type": "way",
+    "osm_id": 1023508170
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": null,
+    "lat": -22.7508581,
+    "lng": -43.1064254,
+    "osm_type": "way",
+    "osm_id": 1023508175
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "184",
+    "lat": -22.7515638,
+    "lng": -43.106907,
+    "osm_type": "way",
+    "osm_id": 1023508179
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "161",
+    "lat": -22.7516239,
+    "lng": -43.1066063,
+    "osm_type": "way",
+    "osm_id": 1023508180
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "238",
+    "lat": -22.752086,
+    "lng": -43.1070351,
+    "osm_type": "way",
+    "osm_id": 1023508188
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "268",
+    "lat": -22.7526279,
+    "lng": -43.1067038,
+    "osm_type": "way",
+    "osm_id": 1023508197
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "251",
+    "lat": -22.7524392,
+    "lng": -43.1067826,
+    "osm_type": "way",
+    "osm_id": 1023508198
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "235",
+    "lat": -22.7523092,
+    "lng": -43.1067451,
+    "osm_type": "way",
+    "osm_id": 1023508199
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "278",
+    "lat": -22.7524989,
+    "lng": -43.107125,
+    "osm_type": "way",
+    "osm_id": 1023508202
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "84",
+    "lat": -22.7519267,
+    "lng": -43.1064308,
+    "osm_type": "way",
+    "osm_id": 1023508215
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "63",
+    "lat": -22.7522931,
+    "lng": -43.1064582,
+    "osm_type": "way",
+    "osm_id": 1023508222
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "240",
+    "lat": -22.7523909,
+    "lng": -43.1062429,
+    "osm_type": "way",
+    "osm_id": 1023508223
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "69",
+    "lat": -22.7521602,
+    "lng": -43.1066079,
+    "osm_type": "way",
+    "osm_id": 1023508225
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "67",
+    "lat": -22.75223,
+    "lng": -43.1065664,
+    "osm_type": "way",
+    "osm_id": 1023508226
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "92",
+    "lat": -22.7518619,
+    "lng": -43.1065514,
+    "osm_type": "way",
+    "osm_id": 1023508228
+  },
+  {
+    "street": "Travessa Cerqueira",
+    "housenumber": "9",
+    "lat": -22.7526964,
+    "lng": -43.1053083,
+    "osm_type": "way",
+    "osm_id": 1023508229
+  },
+  {
+    "street": "Travessa Cerqueira",
+    "housenumber": "44",
+    "lat": -22.7527933,
+    "lng": -43.1053767,
+    "osm_type": "way",
+    "osm_id": 1023508230
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "472",
+    "lat": -22.753548,
+    "lng": -43.1081342,
+    "osm_type": "way",
+    "osm_id": 1023508238
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "444",
+    "lat": -22.7534031,
+    "lng": -43.1079175,
+    "osm_type": "way",
+    "osm_id": 1023508241
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "450",
+    "lat": -22.7534769,
+    "lng": -43.1080171,
+    "osm_type": "way",
+    "osm_id": 1023508243
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "209",
+    "lat": -22.7524802,
+    "lng": -43.1057662,
+    "osm_type": "way",
+    "osm_id": 1023508257
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "1",
+    "lat": -22.7563954,
+    "lng": -43.110426,
+    "osm_type": "way",
+    "osm_id": 1023508259
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "3",
+    "lat": -22.7563348,
+    "lng": -43.1104715,
+    "osm_type": "way",
+    "osm_id": 1023508260
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "17",
+    "lat": -22.7559508,
+    "lng": -43.1105636,
+    "osm_type": "way",
+    "osm_id": 1023508262
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "11",
+    "lat": -22.7560535,
+    "lng": -43.1105741,
+    "osm_type": "way",
+    "osm_id": 1023508264
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "9",
+    "lat": -22.7561485,
+    "lng": -43.1105421,
+    "osm_type": "way",
+    "osm_id": 1023508265
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "266",
+    "lat": -22.7525477,
+    "lng": -43.1065603,
+    "osm_type": "way",
+    "osm_id": 1023508269
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "307",
+    "lat": -22.752933,
+    "lng": -43.1065818,
+    "osm_type": "way",
+    "osm_id": 1023508272
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "56",
+    "lat": -22.7612319,
+    "lng": -43.1096367,
+    "osm_type": "way",
+    "osm_id": 1023508282
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "60",
+    "lat": -22.7611763,
+    "lng": -43.1099589,
+    "osm_type": "way",
+    "osm_id": 1023508284
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "57",
+    "lat": -22.761385,
+    "lng": -43.1095222,
+    "osm_type": "way",
+    "osm_id": 1023508289
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "50",
+    "lat": -22.7611073,
+    "lng": -43.1094693,
+    "osm_type": "way",
+    "osm_id": 1023508292
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "46",
+    "lat": -22.7611079,
+    "lng": -43.1093282,
+    "osm_type": "way",
+    "osm_id": 1023508293
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "7",
+    "lat": -22.7501087,
+    "lng": -43.1071474,
+    "osm_type": "way",
+    "osm_id": 1023508294
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "176",
+    "lat": -22.7519874,
+    "lng": -43.1057648,
+    "osm_type": "way",
+    "osm_id": 1023508298
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "165",
+    "lat": -22.7522272,
+    "lng": -43.1054211,
+    "osm_type": "way",
+    "osm_id": 1023508299
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "155",
+    "lat": -22.752133,
+    "lng": -43.1053675,
+    "osm_type": "way",
+    "osm_id": 1023508300
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "164",
+    "lat": -22.7519331,
+    "lng": -43.105672,
+    "osm_type": "way",
+    "osm_id": 1023508301
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "7",
+    "lat": -22.7584894,
+    "lng": -43.1093676,
+    "osm_type": "way",
+    "osm_id": 1023508303
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "9",
+    "lat": -22.7606462,
+    "lng": -43.1087579,
+    "osm_type": "way",
+    "osm_id": 1023508305
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "31",
+    "lat": -22.7601559,
+    "lng": -43.1087803,
+    "osm_type": "way",
+    "osm_id": 1023508306
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "36",
+    "lat": -22.7597678,
+    "lng": -43.1084322,
+    "osm_type": "way",
+    "osm_id": 1023508307
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "30",
+    "lat": -22.7601151,
+    "lng": -43.1084467,
+    "osm_type": "way",
+    "osm_id": 1023508308
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "20",
+    "lat": -22.7603936,
+    "lng": -43.1084005,
+    "osm_type": "way",
+    "osm_id": 1023508310
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "268",
+    "lat": -22.7523808,
+    "lng": -43.1071239,
+    "osm_type": "way",
+    "osm_id": 1023508311
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "74",
+    "lat": -22.7617474,
+    "lng": -43.1078715,
+    "osm_type": "way",
+    "osm_id": 1023508314
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "160",
+    "lat": -22.7513497,
+    "lng": -43.1069112,
+    "osm_type": "way",
+    "osm_id": 1023508315
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "172",
+    "lat": -22.7514296,
+    "lng": -43.1069287,
+    "osm_type": "way",
+    "osm_id": 1023508316
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "172",
+    "lat": -22.7514737,
+    "lng": -43.1069245,
+    "osm_type": "way",
+    "osm_id": 1023508317
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "90",
+    "lat": -22.7516842,
+    "lng": -43.1069217,
+    "osm_type": "way",
+    "osm_id": 1023508319
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "80",
+    "lat": -22.7509307,
+    "lng": -43.1068042,
+    "osm_type": "way",
+    "osm_id": 1023508320
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "92",
+    "lat": -22.7510149,
+    "lng": -43.1068397,
+    "osm_type": "way",
+    "osm_id": 1023508321
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "92",
+    "lat": -22.7510664,
+    "lng": -43.106849,
+    "osm_type": "way",
+    "osm_id": 1023508322
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "258",
+    "lat": -22.7522765,
+    "lng": -43.1071229,
+    "osm_type": "way",
+    "osm_id": 1023508327
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "74",
+    "lat": -22.7520729,
+    "lng": -43.1062104,
+    "osm_type": "way",
+    "osm_id": 1023508329
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "59",
+    "lat": -22.752355,
+    "lng": -43.1063695,
+    "osm_type": "way",
+    "osm_id": 1023508333
+  },
+  {
+    "street": "Travessa Cerqueira",
+    "housenumber": "13",
+    "lat": -22.7525876,
+    "lng": -43.105291,
+    "osm_type": "way",
+    "osm_id": 1023508337
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "398",
+    "lat": -22.7531081,
+    "lng": -43.1076232,
+    "osm_type": "way",
+    "osm_id": 1023508338
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "21",
+    "lat": -22.7558004,
+    "lng": -43.110631,
+    "osm_type": "way",
+    "osm_id": 1023508343
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "5",
+    "lat": -22.756281,
+    "lng": -43.1104954,
+    "osm_type": "way",
+    "osm_id": 1023508344
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "378",
+    "lat": -22.753042,
+    "lng": -43.1073595,
+    "osm_type": "way",
+    "osm_id": 1023508375
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "471",
+    "lat": -22.7537906,
+    "lng": -43.1079701,
+    "osm_type": "way",
+    "osm_id": 1023508382
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "443",
+    "lat": -22.7536166,
+    "lng": -43.1077202,
+    "osm_type": "way",
+    "osm_id": 1023508390
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "415",
+    "lat": -22.7535253,
+    "lng": -43.1075098,
+    "osm_type": "way",
+    "osm_id": 1023508391
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "405",
+    "lat": -22.7534532,
+    "lng": -43.1073964,
+    "osm_type": "way",
+    "osm_id": 1023508392
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "32",
+    "lat": -22.7509604,
+    "lng": -43.1077843,
+    "osm_type": "way",
+    "osm_id": 1023508401
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "43",
+    "lat": -22.7512697,
+    "lng": -43.1074804,
+    "osm_type": "way",
+    "osm_id": 1023508403
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "30",
+    "lat": -22.7508848,
+    "lng": -43.1077816,
+    "osm_type": "way",
+    "osm_id": 1023508407
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "39",
+    "lat": -22.7510472,
+    "lng": -43.1074895,
+    "osm_type": "way",
+    "osm_id": 1023508410
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "35",
+    "lat": -22.7514893,
+    "lng": -43.1079567,
+    "osm_type": "way",
+    "osm_id": 1023508412
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "20",
+    "lat": -22.7518041,
+    "lng": -43.1083187,
+    "osm_type": "way",
+    "osm_id": 1023508425
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": null,
+    "lat": -22.7514807,
+    "lng": -43.1040471,
+    "osm_type": "way",
+    "osm_id": 1023508448
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "1311",
+    "lat": -22.7536173,
+    "lng": -43.1048502,
+    "osm_type": "way",
+    "osm_id": 1023508454
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "1291",
+    "lat": -22.7538016,
+    "lng": -43.1051018,
+    "osm_type": "way",
+    "osm_id": 1023508456
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "13",
+    "lat": -22.7533353,
+    "lng": -43.1051774,
+    "osm_type": "way",
+    "osm_id": 1023508457
+  },
+  {
+    "street": "Rua do Catimbau",
+    "housenumber": "111",
+    "lat": -22.750654,
+    "lng": -43.1050412,
+    "osm_type": "way",
+    "osm_id": 1023508462
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "41",
+    "lat": -22.750567,
+    "lng": -43.1064442,
+    "osm_type": "way",
+    "osm_id": 1023508467
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "56",
+    "lat": -22.751324,
+    "lng": -43.1048208,
+    "osm_type": "way",
+    "osm_id": 1023508468
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "42",
+    "lat": -22.7512619,
+    "lng": -43.1047111,
+    "osm_type": "way",
+    "osm_id": 1023508469
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "24",
+    "lat": -22.7511814,
+    "lng": -43.1045715,
+    "osm_type": "way",
+    "osm_id": 1023508472
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "30",
+    "lat": -22.7512332,
+    "lng": -43.1046071,
+    "osm_type": "way",
+    "osm_id": 1023508473
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "480",
+    "lat": -22.753737,
+    "lng": -43.1083063,
+    "osm_type": "way",
+    "osm_id": 1023508474
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "192",
+    "lat": -22.7536019,
+    "lng": -43.1083951,
+    "osm_type": "way",
+    "osm_id": 1023508475
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "171",
+    "lat": -22.7539535,
+    "lng": -43.1084986,
+    "osm_type": "way",
+    "osm_id": 1023508483
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "9",
+    "lat": -22.7555511,
+    "lng": -43.1105883,
+    "osm_type": "way",
+    "osm_id": 1023508494
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "43",
+    "lat": -22.7541643,
+    "lng": -43.1110822,
+    "osm_type": "way",
+    "osm_id": 1023508498
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7549565,
+    "lng": -43.1108765,
+    "osm_type": "way",
+    "osm_id": 1023508499
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "45",
+    "lat": -22.7549449,
+    "lng": -43.1105344,
+    "osm_type": "way",
+    "osm_id": 1023508500
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "11",
+    "lat": -22.7554447,
+    "lng": -43.1107335,
+    "osm_type": "way",
+    "osm_id": 1023508503
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "281",
+    "lat": -22.7531421,
+    "lng": -43.1092283,
+    "osm_type": "way",
+    "osm_id": 1023508504
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "281",
+    "lat": -22.7531821,
+    "lng": -43.1091049,
+    "osm_type": "way",
+    "osm_id": 1023508505
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "320",
+    "lat": -22.7528168,
+    "lng": -43.1090523,
+    "osm_type": "way",
+    "osm_id": 1023508515
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "69",
+    "lat": -22.7520485,
+    "lng": -43.1078206,
+    "osm_type": "way",
+    "osm_id": 1023508521
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "71",
+    "lat": -22.7519676,
+    "lng": -43.1077744,
+    "osm_type": "way",
+    "osm_id": 1023508524
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "83",
+    "lat": -22.7522997,
+    "lng": -43.1080062,
+    "osm_type": "way",
+    "osm_id": 1023508525
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "85",
+    "lat": -22.7524365,
+    "lng": -43.10805,
+    "osm_type": "way",
+    "osm_id": 1023508530
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "95",
+    "lat": -22.7528562,
+    "lng": -43.1082708,
+    "osm_type": "way",
+    "osm_id": 1023508533
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "99",
+    "lat": -22.75302,
+    "lng": -43.1083232,
+    "osm_type": "way",
+    "osm_id": 1023508534
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "101",
+    "lat": -22.7530836,
+    "lng": -43.1083844,
+    "osm_type": "way",
+    "osm_id": 1023508536
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "105",
+    "lat": -22.7531968,
+    "lng": -43.1084423,
+    "osm_type": "way",
+    "osm_id": 1023508539
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "93",
+    "lat": -22.7526593,
+    "lng": -43.1081853,
+    "osm_type": "way",
+    "osm_id": 1023508544
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "242",
+    "lat": -22.7530985,
+    "lng": -43.1088268,
+    "osm_type": "way",
+    "osm_id": 1023508553
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "68",
+    "lat": -22.752235,
+    "lng": -43.1083397,
+    "osm_type": "way",
+    "osm_id": 1023508555
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "80",
+    "lat": -22.7524119,
+    "lng": -43.1083925,
+    "osm_type": "way",
+    "osm_id": 1023508556
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "54",
+    "lat": -22.7518675,
+    "lng": -43.1081853,
+    "osm_type": "way",
+    "osm_id": 1023508561
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "56",
+    "lat": -22.7519643,
+    "lng": -43.1081855,
+    "osm_type": "way",
+    "osm_id": 1023508563
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "178",
+    "lat": -22.7546909,
+    "lng": -43.1097851,
+    "osm_type": "way",
+    "osm_id": 1023508567
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "172",
+    "lat": -22.7546063,
+    "lng": -43.1096785,
+    "osm_type": "way",
+    "osm_id": 1023508575
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "111",
+    "lat": -22.7537425,
+    "lng": -43.1087851,
+    "osm_type": "way",
+    "osm_id": 1023508577
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "151",
+    "lat": -22.7540021,
+    "lng": -43.1089765,
+    "osm_type": "way",
+    "osm_id": 1023508583
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "32",
+    "lat": -22.7548193,
+    "lng": -43.1102041,
+    "osm_type": "way",
+    "osm_id": 1023508584
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "34",
+    "lat": -22.754694,
+    "lng": -43.1102624,
+    "osm_type": "way",
+    "osm_id": 1023508586
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "40",
+    "lat": -22.7544557,
+    "lng": -43.1102498,
+    "osm_type": "way",
+    "osm_id": 1023508587
+  },
+  {
+    "street": "Rua Vivaldo Coaracy",
+    "housenumber": "28",
+    "lat": -22.7538272,
+    "lng": -43.1107789,
+    "osm_type": "way",
+    "osm_id": 1023508593
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "172",
+    "lat": -22.7541613,
+    "lng": -43.1108615,
+    "osm_type": "way",
+    "osm_id": 1023508594
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "55",
+    "lat": -22.7541648,
+    "lng": -43.1106238,
+    "osm_type": "way",
+    "osm_id": 1023508595
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "59",
+    "lat": -22.7531836,
+    "lng": -43.1102951,
+    "osm_type": "way",
+    "osm_id": 1023508597
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "47",
+    "lat": -22.7518439,
+    "lng": -43.1073364,
+    "osm_type": "way",
+    "osm_id": 1023508605
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "43",
+    "lat": -22.7518521,
+    "lng": -43.1075523,
+    "osm_type": "way",
+    "osm_id": 1023508606
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "55",
+    "lat": -22.7515229,
+    "lng": -43.1075767,
+    "osm_type": "way",
+    "osm_id": 1023508608
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "46",
+    "lat": -22.7514276,
+    "lng": -43.1072125,
+    "osm_type": "way",
+    "osm_id": 1023508609
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "104",
+    "lat": -22.7516013,
+    "lng": -43.1052196,
+    "osm_type": "way",
+    "osm_id": 1023508611
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": null,
+    "lat": -22.751945,
+    "lng": -43.1070252,
+    "osm_type": "way",
+    "osm_id": 1023508630
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "391",
+    "lat": -22.7533948,
+    "lng": -43.1073118,
+    "osm_type": "way",
+    "osm_id": 1023508638
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "425",
+    "lat": -22.7535955,
+    "lng": -43.1075589,
+    "osm_type": "way",
+    "osm_id": 1023508639
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "51",
+    "lat": -22.7513344,
+    "lng": -43.1075684,
+    "osm_type": "way",
+    "osm_id": 1023508641
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "41",
+    "lat": -22.7511724,
+    "lng": -43.1075175,
+    "osm_type": "way",
+    "osm_id": 1023508642
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "52",
+    "lat": -22.7518035,
+    "lng": -43.1081068,
+    "osm_type": "way",
+    "osm_id": 1023508645
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "33",
+    "lat": -22.7514907,
+    "lng": -43.108108,
+    "osm_type": "way",
+    "osm_id": 1023508646
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "31",
+    "lat": -22.7514672,
+    "lng": -43.1083844,
+    "osm_type": "way",
+    "osm_id": 1023508648
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "68",
+    "lat": -22.7514027,
+    "lng": -43.1049269,
+    "osm_type": "way",
+    "osm_id": 1023508673
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "18",
+    "lat": -22.7511922,
+    "lng": -43.1044957,
+    "osm_type": "way",
+    "osm_id": 1023508674
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "184",
+    "lat": -22.7536528,
+    "lng": -43.1083322,
+    "osm_type": "way",
+    "osm_id": 1023508676
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "196",
+    "lat": -22.753419,
+    "lng": -43.1085091,
+    "osm_type": "way",
+    "osm_id": 1023508677
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "222",
+    "lat": -22.7533695,
+    "lng": -43.1085639,
+    "osm_type": "way",
+    "osm_id": 1023508678
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "28",
+    "lat": -22.7546457,
+    "lng": -43.1111008,
+    "osm_type": "way",
+    "osm_id": 1023508684
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "31",
+    "lat": -22.7532833,
+    "lng": -43.1112763,
+    "osm_type": "way",
+    "osm_id": 1023508689
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "29",
+    "lat": -22.7533597,
+    "lng": -43.1111329,
+    "osm_type": "way",
+    "osm_id": 1023508690
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "9",
+    "lat": -22.7554464,
+    "lng": -43.1106549,
+    "osm_type": "way",
+    "osm_id": 1023508691
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "43",
+    "lat": -22.7518564,
+    "lng": -43.1074515,
+    "osm_type": "way",
+    "osm_id": 1023508692
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7551549,
+    "lng": -43.1106306,
+    "osm_type": "way",
+    "osm_id": 1023508694
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7551886,
+    "lng": -43.1105939,
+    "osm_type": "way",
+    "osm_id": 1023508695
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "1",
+    "lat": -22.7552245,
+    "lng": -43.1105682,
+    "osm_type": "way",
+    "osm_id": 1023508696
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "16",
+    "lat": -22.754703,
+    "lng": -43.1110312,
+    "osm_type": "way",
+    "osm_id": 1023508697
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7547373,
+    "lng": -43.1109982,
+    "osm_type": "way",
+    "osm_id": 1023508698
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7547716,
+    "lng": -43.1109685,
+    "osm_type": "way",
+    "osm_id": 1023508699
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7548071,
+    "lng": -43.1109422,
+    "osm_type": "way",
+    "osm_id": 1023508700
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "12",
+    "lat": -22.7548424,
+    "lng": -43.1109106,
+    "osm_type": "way",
+    "osm_id": 1023508701
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "11",
+    "lat": -22.7548769,
+    "lng": -43.1108711,
+    "osm_type": "way",
+    "osm_id": 1023508702
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7549025,
+    "lng": -43.1108345,
+    "osm_type": "way",
+    "osm_id": 1023508703
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "9",
+    "lat": -22.7549481,
+    "lng": -43.1108114,
+    "osm_type": "way",
+    "osm_id": 1023508704
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "8",
+    "lat": -22.7549813,
+    "lng": -43.1107861,
+    "osm_type": "way",
+    "osm_id": 1023508705
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "7",
+    "lat": -22.7550154,
+    "lng": -43.1107556,
+    "osm_type": "way",
+    "osm_id": 1023508706
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "6",
+    "lat": -22.7550517,
+    "lng": -43.1107229,
+    "osm_type": "way",
+    "osm_id": 1023508707
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": null,
+    "lat": -22.7550855,
+    "lng": -43.1106863,
+    "osm_type": "way",
+    "osm_id": 1023508708
+  },
+  {
+    "street": "Travessa Dona Polucena",
+    "housenumber": "4",
+    "lat": -22.7551191,
+    "lng": -43.1106565,
+    "osm_type": "way",
+    "osm_id": 1023508709
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "340",
+    "lat": -22.7527054,
+    "lng": -43.1092046,
+    "osm_type": "way",
+    "osm_id": 1023508711
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "352",
+    "lat": -22.7525353,
+    "lng": -43.1093715,
+    "osm_type": "way",
+    "osm_id": 1023508714
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "59",
+    "lat": -22.7620144,
+    "lng": -43.1101089,
+    "osm_type": "way",
+    "osm_id": 1023508715
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "73",
+    "lat": -22.7521885,
+    "lng": -43.1078211,
+    "osm_type": "way",
+    "osm_id": 1023508716
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "151",
+    "lat": -22.7540966,
+    "lng": -43.1090165,
+    "osm_type": "way",
+    "osm_id": 1023508721
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "155",
+    "lat": -22.7542513,
+    "lng": -43.1091611,
+    "osm_type": "way",
+    "osm_id": 1023508722
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "120",
+    "lat": -22.7540763,
+    "lng": -43.1095871,
+    "osm_type": "way",
+    "osm_id": 1023508723
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "48",
+    "lat": -22.7540332,
+    "lng": -43.1102329,
+    "osm_type": "way",
+    "osm_id": 1023508731
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "78",
+    "lat": -22.7529588,
+    "lng": -43.1097998,
+    "osm_type": "way",
+    "osm_id": 1023508732
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "46",
+    "lat": -22.7538645,
+    "lng": -43.1109853,
+    "osm_type": "way",
+    "osm_id": 1023508733
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": null,
+    "lat": -22.753673,
+    "lng": -43.1105958,
+    "osm_type": "way",
+    "osm_id": 1023508739
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "1",
+    "lat": -22.7535131,
+    "lng": -43.1108273,
+    "osm_type": "way",
+    "osm_id": 1023508741
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "90",
+    "lat": -22.7516583,
+    "lng": -43.1069882,
+    "osm_type": "way",
+    "osm_id": 1023508745
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "65",
+    "lat": -22.751897,
+    "lng": -43.1071972,
+    "osm_type": "way",
+    "osm_id": 1023508746
+  },
+  {
+    "street": "Rua Feliciana Borges",
+    "housenumber": "43",
+    "lat": -22.7518616,
+    "lng": -43.1076052,
+    "osm_type": "way",
+    "osm_id": 1023508747
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "45",
+    "lat": -22.7526065,
+    "lng": -43.1059573,
+    "osm_type": "way",
+    "osm_id": 1023508765
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "64",
+    "lat": -22.7507801,
+    "lng": -43.1067329,
+    "osm_type": "way",
+    "osm_id": 1023508767
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "21",
+    "lat": -22.7504542,
+    "lng": -43.1067273,
+    "osm_type": "way",
+    "osm_id": 1023508777
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "36",
+    "lat": -22.7508816,
+    "lng": -43.1059695,
+    "osm_type": "way",
+    "osm_id": 1023508779
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "42",
+    "lat": -22.7509873,
+    "lng": -43.1058939,
+    "osm_type": "way",
+    "osm_id": 1023508784
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "32",
+    "lat": -22.7507554,
+    "lng": -43.1061199,
+    "osm_type": "way",
+    "osm_id": 1023508785
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "44",
+    "lat": -22.7510675,
+    "lng": -43.1057573,
+    "osm_type": "way",
+    "osm_id": 1023508788
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "75",
+    "lat": -22.7514299,
+    "lng": -43.1050143,
+    "osm_type": "way",
+    "osm_id": 1023508791
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "55",
+    "lat": -22.7509142,
+    "lng": -43.1054874,
+    "osm_type": "way",
+    "osm_id": 1023508793
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "57",
+    "lat": -22.7510258,
+    "lng": -43.1054187,
+    "osm_type": "way",
+    "osm_id": 1023508798
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "71",
+    "lat": -22.7512794,
+    "lng": -43.1050987,
+    "osm_type": "way",
+    "osm_id": 1023508800
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "121",
+    "lat": -22.7542802,
+    "lng": -43.1081225,
+    "osm_type": "way",
+    "osm_id": 1023508817
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "145",
+    "lat": -22.7541979,
+    "lng": -43.1083348,
+    "osm_type": "way",
+    "osm_id": 1023508819
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "103",
+    "lat": -22.7544412,
+    "lng": -43.1080317,
+    "osm_type": "way",
+    "osm_id": 1023508820
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "105",
+    "lat": -22.7543632,
+    "lng": -43.1080796,
+    "osm_type": "way",
+    "osm_id": 1023508823
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "65",
+    "lat": -22.7546821,
+    "lng": -43.1078233,
+    "osm_type": "way",
+    "osm_id": 1023508827
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": null,
+    "lat": -22.7612014,
+    "lng": -43.1105067,
+    "osm_type": "way",
+    "osm_id": 1023508835
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "9",
+    "lat": -22.7595497,
+    "lng": -43.1095999,
+    "osm_type": "way",
+    "osm_id": 1023508840
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "16",
+    "lat": -22.7507596,
+    "lng": -43.1068267,
+    "osm_type": "way",
+    "osm_id": 1023508849
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "10",
+    "lat": -22.750766,
+    "lng": -43.1069595,
+    "osm_type": "way",
+    "osm_id": 1023508850
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "17",
+    "lat": -22.7504283,
+    "lng": -43.1069109,
+    "osm_type": "way",
+    "osm_id": 1023508853
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "19",
+    "lat": -22.7504178,
+    "lng": -43.1067958,
+    "osm_type": "way",
+    "osm_id": 1023508854
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "9",
+    "lat": -22.7503222,
+    "lng": -43.1070651,
+    "osm_type": "way",
+    "osm_id": 1023508858
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "151",
+    "lat": -22.7648397,
+    "lng": -43.1099129,
+    "osm_type": "way",
+    "osm_id": 1023508874
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "219",
+    "lat": -22.7668873,
+    "lng": -43.1106358,
+    "osm_type": "way",
+    "osm_id": 1023508875
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "5",
+    "lat": -22.7671554,
+    "lng": -43.1107921,
+    "osm_type": "way",
+    "osm_id": 1023508877
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "201",
+    "lat": -22.7664887,
+    "lng": -43.1103659,
+    "osm_type": "way",
+    "osm_id": 1023508881
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "143",
+    "lat": -22.764598,
+    "lng": -43.109899,
+    "osm_type": "way",
+    "osm_id": 1023508887
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "149",
+    "lat": -22.764737,
+    "lng": -43.1099033,
+    "osm_type": "way",
+    "osm_id": 1023508890
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "87",
+    "lat": -22.7660253,
+    "lng": -43.1059231,
+    "osm_type": "way",
+    "osm_id": 1023508905
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "63",
+    "lat": -22.7667615,
+    "lng": -43.1060708,
+    "osm_type": "way",
+    "osm_id": 1023508910
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "74",
+    "lat": -22.7663946,
+    "lng": -43.1060326,
+    "osm_type": "way",
+    "osm_id": 1023508911
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "44",
+    "lat": -22.7665475,
+    "lng": -43.1057015,
+    "osm_type": "way",
+    "osm_id": 1023508912
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "123",
+    "lat": -22.7662381,
+    "lng": -43.1063434,
+    "osm_type": "way",
+    "osm_id": 1023508916
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "72",
+    "lat": -22.7661842,
+    "lng": -43.10598,
+    "osm_type": "way",
+    "osm_id": 1023508922
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "83",
+    "lat": -22.766636,
+    "lng": -43.106221,
+    "osm_type": "way",
+    "osm_id": 1023508924
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "25",
+    "lat": -22.7611038,
+    "lng": -43.1086047,
+    "osm_type": "way",
+    "osm_id": 1023508929
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "55",
+    "lat": -22.7613569,
+    "lng": -43.1094374,
+    "osm_type": "way",
+    "osm_id": 1023508933
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "27",
+    "lat": -22.7611276,
+    "lng": -43.1086761,
+    "osm_type": "way",
+    "osm_id": 1023508938
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "52",
+    "lat": -22.7621397,
+    "lng": -43.1077224,
+    "osm_type": "way",
+    "osm_id": 1023508940
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "29",
+    "lat": -22.7652345,
+    "lng": -43.1051478,
+    "osm_type": "way",
+    "osm_id": 1023508942
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "35",
+    "lat": -22.764855,
+    "lng": -43.1058226,
+    "osm_type": "way",
+    "osm_id": 1023508946
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "34",
+    "lat": -22.7647394,
+    "lng": -43.1062351,
+    "osm_type": "way",
+    "osm_id": 1023508947
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "28",
+    "lat": -22.7646943,
+    "lng": -43.106147,
+    "osm_type": "way",
+    "osm_id": 1023508948
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "29",
+    "lat": -22.7646513,
+    "lng": -43.1058049,
+    "osm_type": "way",
+    "osm_id": 1023508954
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "86",
+    "lat": -22.7584331,
+    "lng": -43.1091241,
+    "osm_type": "way",
+    "osm_id": 1023508963
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "89",
+    "lat": -22.7586241,
+    "lng": -43.1093388,
+    "osm_type": "way",
+    "osm_id": 1023508967
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "7",
+    "lat": -22.7584625,
+    "lng": -43.1093245,
+    "osm_type": "way",
+    "osm_id": 1023508969
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "73",
+    "lat": -22.7590956,
+    "lng": -43.1091202,
+    "osm_type": "way",
+    "osm_id": 1023508970
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "75",
+    "lat": -22.7589921,
+    "lng": -43.1091682,
+    "osm_type": "way",
+    "osm_id": 1023508976
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "17",
+    "lat": -22.7642379,
+    "lng": -43.1058558,
+    "osm_type": "way",
+    "osm_id": 1023508977
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "51",
+    "lat": -22.76234,
+    "lng": -43.1082483,
+    "osm_type": "way",
+    "osm_id": 1023508983
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "61",
+    "lat": -22.7619836,
+    "lng": -43.1082902,
+    "osm_type": "way",
+    "osm_id": 1023508985
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "59",
+    "lat": -22.7620967,
+    "lng": -43.1082735,
+    "osm_type": "way",
+    "osm_id": 1023508990
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "67",
+    "lat": -22.7617883,
+    "lng": -43.1082487,
+    "osm_type": "way",
+    "osm_id": 1023508993
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "69",
+    "lat": -22.7617193,
+    "lng": -43.1082532,
+    "osm_type": "way",
+    "osm_id": 1023508996
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "82",
+    "lat": -22.7587193,
+    "lng": -43.1089928,
+    "osm_type": "way",
+    "osm_id": 1023508997
+  },
+  {
+    "street": "Praia Doutor Aristão",
+    "housenumber": "18",
+    "lat": -22.7580681,
+    "lng": -43.1092934,
+    "osm_type": "way",
+    "osm_id": 1023509008
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "588",
+    "lat": -22.7545196,
+    "lng": -43.1092846,
+    "osm_type": "way",
+    "osm_id": 1023509019
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "46",
+    "lat": -22.752662,
+    "lng": -43.1054293,
+    "osm_type": "way",
+    "osm_id": 1023509025
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "35",
+    "lat": -22.7529364,
+    "lng": -43.1056768,
+    "osm_type": "way",
+    "osm_id": 1023509032
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "584",
+    "lat": -22.7543785,
+    "lng": -43.1090727,
+    "osm_type": "way",
+    "osm_id": 1023509034
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "595",
+    "lat": -22.7545655,
+    "lng": -43.1087907,
+    "osm_type": "way",
+    "osm_id": 1023509035
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "641",
+    "lat": -22.7547735,
+    "lng": -43.1091148,
+    "osm_type": "way",
+    "osm_id": 1023509037
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "615",
+    "lat": -22.7546667,
+    "lng": -43.1089718,
+    "osm_type": "way",
+    "osm_id": 1023509038
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "581",
+    "lat": -22.754454,
+    "lng": -43.1087131,
+    "osm_type": "way",
+    "osm_id": 1023509041
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "565",
+    "lat": -22.754376,
+    "lng": -43.1085535,
+    "osm_type": "way",
+    "osm_id": 1023509043
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "274",
+    "lat": -22.7668295,
+    "lng": -43.1101275,
+    "osm_type": "way",
+    "osm_id": 1023509077
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "165",
+    "lat": -22.7652901,
+    "lng": -43.1099234,
+    "osm_type": "way",
+    "osm_id": 1023509080
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "7",
+    "lat": -22.7671945,
+    "lng": -43.1107428,
+    "osm_type": "way",
+    "osm_id": 1023509081
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "223",
+    "lat": -22.7670673,
+    "lng": -43.110854,
+    "osm_type": "way",
+    "osm_id": 1023509086
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "221",
+    "lat": -22.76697,
+    "lng": -43.1107544,
+    "osm_type": "way",
+    "osm_id": 1023509089
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "109",
+    "lat": -22.7659225,
+    "lng": -43.106145,
+    "osm_type": "way",
+    "osm_id": 1023509095
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "24",
+    "lat": -22.7667594,
+    "lng": -43.1056305,
+    "osm_type": "way",
+    "osm_id": 1023509097
+  },
+  {
+    "street": "Rua Frei Leopoldo",
+    "housenumber": "64",
+    "lat": -22.7664277,
+    "lng": -43.1058309,
+    "osm_type": "way",
+    "osm_id": 1023509099
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "35",
+    "lat": -22.7611959,
+    "lng": -43.1089176,
+    "osm_type": "way",
+    "osm_id": 1023509104
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "35",
+    "lat": -22.7652655,
+    "lng": -43.1049259,
+    "osm_type": "way",
+    "osm_id": 1023509109
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "12",
+    "lat": -22.7642087,
+    "lng": -43.1062299,
+    "osm_type": "way",
+    "osm_id": 1023509111
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "31",
+    "lat": -22.764739,
+    "lng": -43.1058209,
+    "osm_type": "way",
+    "osm_id": 1023509114
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "14",
+    "lat": -22.7643185,
+    "lng": -43.1061481,
+    "osm_type": "way",
+    "osm_id": 1023509115
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "20",
+    "lat": -22.7644555,
+    "lng": -43.1059958,
+    "osm_type": "way",
+    "osm_id": 1023509116
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "5",
+    "lat": -22.7503265,
+    "lng": -43.1072353,
+    "osm_type": "way",
+    "osm_id": 1023509119
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "78",
+    "lat": -22.7588635,
+    "lng": -43.1089055,
+    "osm_type": "way",
+    "osm_id": 1023509120
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "84",
+    "lat": -22.7585853,
+    "lng": -43.1090323,
+    "osm_type": "way",
+    "osm_id": 1023509123
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "61",
+    "lat": -22.7593261,
+    "lng": -43.1089192,
+    "osm_type": "way",
+    "osm_id": 1023509126
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "76",
+    "lat": -22.7590226,
+    "lng": -43.1087922,
+    "osm_type": "way",
+    "osm_id": 1023509128
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "71",
+    "lat": -22.7616662,
+    "lng": -43.1082292,
+    "osm_type": "way",
+    "osm_id": 1023509130
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "23",
+    "lat": -22.7645934,
+    "lng": -43.1056178,
+    "osm_type": "way",
+    "osm_id": 1023509131
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "65",
+    "lat": -22.7618785,
+    "lng": -43.1083254,
+    "osm_type": "way",
+    "osm_id": 1023509132
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "73",
+    "lat": -22.7615916,
+    "lng": -43.1082223,
+    "osm_type": "way",
+    "osm_id": 1023509133
+  },
+  {
+    "street": "Praia Doutor Aristão",
+    "housenumber": "48",
+    "lat": -22.7573451,
+    "lng": -43.1096936,
+    "osm_type": "way",
+    "osm_id": 1023509136
+  },
+  {
+    "street": "Praia Doutor Aristão",
+    "housenumber": "24",
+    "lat": -22.7577697,
+    "lng": -43.1094988,
+    "osm_type": "way",
+    "osm_id": 1023509138
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "586",
+    "lat": -22.7544239,
+    "lng": -43.1091879,
+    "osm_type": "way",
+    "osm_id": 1023509143
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "110",
+    "lat": -22.7515802,
+    "lng": -43.1054121,
+    "osm_type": "way",
+    "osm_id": 1023509146
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "90",
+    "lat": -22.7512839,
+    "lng": -43.1055609,
+    "osm_type": "way",
+    "osm_id": 1023509148
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "90",
+    "lat": -22.7513081,
+    "lng": -43.1055262,
+    "osm_type": "way",
+    "osm_id": 1023509149
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "67",
+    "lat": -22.7511208,
+    "lng": -43.1052547,
+    "osm_type": "way",
+    "osm_id": 1023509150
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "53",
+    "lat": -22.7507867,
+    "lng": -43.105488,
+    "osm_type": "way",
+    "osm_id": 1023509151
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "131",
+    "lat": -22.7542805,
+    "lng": -43.1082772,
+    "osm_type": "way",
+    "osm_id": 1023509158
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "55",
+    "lat": -22.754727,
+    "lng": -43.1075787,
+    "osm_type": "way",
+    "osm_id": 1023509159
+  },
+  {
+    "street": "Rua Maestro Anacleto",
+    "housenumber": "98",
+    "lat": -22.7542197,
+    "lng": -43.1077576,
+    "osm_type": "way",
+    "osm_id": 1023509160
+  },
+  {
+    "street": "Travessa do Pescador",
+    "housenumber": "15",
+    "lat": -22.7503422,
+    "lng": -43.1069683,
+    "osm_type": "way",
+    "osm_id": 1023509165
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "54",
+    "lat": -22.7525377,
+    "lng": -43.1055765,
+    "osm_type": "way",
+    "osm_id": 1023509166
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "52",
+    "lat": -22.752601,
+    "lng": -43.1055353,
+    "osm_type": "way",
+    "osm_id": 1023509167
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "598",
+    "lat": -22.7543057,
+    "lng": -43.1090067,
+    "osm_type": "way",
+    "osm_id": 1023509172
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "590",
+    "lat": -22.7546059,
+    "lng": -43.1093761,
+    "osm_type": "way",
+    "osm_id": 1023509176
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "39",
+    "lat": -22.7653207,
+    "lng": -43.1088123,
+    "osm_type": "way",
+    "osm_id": 1023509178
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "10",
+    "lat": -22.7605498,
+    "lng": -43.1080682,
+    "osm_type": "way",
+    "osm_id": 1023509218
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "48",
+    "lat": -22.7640056,
+    "lng": -43.1080162,
+    "osm_type": "way",
+    "osm_id": 1023509221
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "34",
+    "lat": -22.7639175,
+    "lng": -43.1081867,
+    "osm_type": "way",
+    "osm_id": 1023509223
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": null,
+    "lat": -22.760883,
+    "lng": -43.1080132,
+    "osm_type": "way",
+    "osm_id": 1023509224
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "15",
+    "lat": -22.7608915,
+    "lng": -43.107917,
+    "osm_type": "way",
+    "osm_id": 1023509225
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "92",
+    "lat": -22.7609749,
+    "lng": -43.1080773,
+    "osm_type": "way",
+    "osm_id": 1023509226
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "16",
+    "lat": -22.7652608,
+    "lng": -43.1057818,
+    "osm_type": "way",
+    "osm_id": 1023509233
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "26",
+    "lat": -22.7653933,
+    "lng": -43.1057419,
+    "osm_type": "way",
+    "osm_id": 1023509236
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "37",
+    "lat": -22.7649313,
+    "lng": -43.1058946,
+    "osm_type": "way",
+    "osm_id": 1023509240
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "248",
+    "lat": -22.7557251,
+    "lng": -43.1101937,
+    "osm_type": "way",
+    "osm_id": 1023509243
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "252",
+    "lat": -22.7626681,
+    "lng": -43.1096731,
+    "osm_type": "way",
+    "osm_id": 1023509249
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "145",
+    "lat": -22.7626627,
+    "lng": -43.1087036,
+    "osm_type": "way",
+    "osm_id": 1023509257
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "213",
+    "lat": -22.7628877,
+    "lng": -43.1092967,
+    "osm_type": "way",
+    "osm_id": 1023509260
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "239",
+    "lat": -22.7629514,
+    "lng": -43.109572,
+    "osm_type": "way",
+    "osm_id": 1023509267
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": null,
+    "lat": -22.7629696,
+    "lng": -43.1096856,
+    "osm_type": "way",
+    "osm_id": 1023509271
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "162",
+    "lat": -22.7624092,
+    "lng": -43.1088313,
+    "osm_type": "way",
+    "osm_id": 1023509277
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "152",
+    "lat": -22.7623192,
+    "lng": -43.1087814,
+    "osm_type": "way",
+    "osm_id": 1023509284
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "127",
+    "lat": -22.7639957,
+    "lng": -43.1097386,
+    "osm_type": "way",
+    "osm_id": 1023509286
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "129",
+    "lat": -22.7641455,
+    "lng": -43.109785,
+    "osm_type": "way",
+    "osm_id": 1023509289
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "340",
+    "lat": -22.764811,
+    "lng": -43.107974,
+    "osm_type": "way",
+    "osm_id": 1023509296
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "358",
+    "lat": -22.7648675,
+    "lng": -43.1081582,
+    "osm_type": "way",
+    "osm_id": 1023509300
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "306",
+    "lat": -22.7649698,
+    "lng": -43.1077405,
+    "osm_type": "way",
+    "osm_id": 1023509305
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "264",
+    "lat": -22.7650798,
+    "lng": -43.1072912,
+    "osm_type": "way",
+    "osm_id": 1023509306
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "250",
+    "lat": -22.7651129,
+    "lng": -43.1071645,
+    "osm_type": "way",
+    "osm_id": 1023509309
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "327",
+    "lat": -22.7652335,
+    "lng": -43.1078464,
+    "osm_type": "way",
+    "osm_id": 1023509312
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "347",
+    "lat": -22.7652445,
+    "lng": -43.1081006,
+    "osm_type": "way",
+    "osm_id": 1023509327
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "351",
+    "lat": -22.7651937,
+    "lng": -43.1081473,
+    "osm_type": "way",
+    "osm_id": 1023509328
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "357",
+    "lat": -22.7651552,
+    "lng": -43.1082005,
+    "osm_type": "way",
+    "osm_id": 1023509335
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "363",
+    "lat": -22.7651476,
+    "lng": -43.1082603,
+    "osm_type": "way",
+    "osm_id": 1023509339
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "377",
+    "lat": -22.7651425,
+    "lng": -43.1083402,
+    "osm_type": "way",
+    "osm_id": 1023509342
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "303",
+    "lat": -22.7652991,
+    "lng": -43.1076512,
+    "osm_type": "way",
+    "osm_id": 1023509346
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "283",
+    "lat": -22.7653101,
+    "lng": -43.1075734,
+    "osm_type": "way",
+    "osm_id": 1023509349
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "419",
+    "lat": -22.7650235,
+    "lng": -43.1087162,
+    "osm_type": "way",
+    "osm_id": 1023509352
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "7",
+    "lat": -22.7635574,
+    "lng": -43.1082123,
+    "osm_type": "way",
+    "osm_id": 1023509356
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "31",
+    "lat": -22.7631548,
+    "lng": -43.1083505,
+    "osm_type": "way",
+    "osm_id": 1023509357
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "30",
+    "lat": -22.7632409,
+    "lng": -43.1083626,
+    "osm_type": "way",
+    "osm_id": 1023509359
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "32",
+    "lat": -22.7633119,
+    "lng": -43.1083286,
+    "osm_type": "way",
+    "osm_id": 1023509362
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "46",
+    "lat": -22.765088,
+    "lng": -43.1069294,
+    "osm_type": "way",
+    "osm_id": 1023509367
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "48",
+    "lat": -22.7652271,
+    "lng": -43.1069262,
+    "osm_type": "way",
+    "osm_id": 1023509368
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "37",
+    "lat": -22.7649546,
+    "lng": -43.106569,
+    "osm_type": "way",
+    "osm_id": 1023509369
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "43",
+    "lat": -22.7651878,
+    "lng": -43.1066298,
+    "osm_type": "way",
+    "osm_id": 1023509372
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "210",
+    "lat": -22.7648205,
+    "lng": -43.1068378,
+    "osm_type": "way",
+    "osm_id": 1023509374
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "49",
+    "lat": -22.7661769,
+    "lng": -43.1054822,
+    "osm_type": "way",
+    "osm_id": 1023509375
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "33",
+    "lat": -22.7647863,
+    "lng": -43.1066308,
+    "osm_type": "way",
+    "osm_id": 1023509378
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "29",
+    "lat": -22.7646587,
+    "lng": -43.1066247,
+    "osm_type": "way",
+    "osm_id": 1023509379
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "16",
+    "lat": -22.7642703,
+    "lng": -43.1068269,
+    "osm_type": "way",
+    "osm_id": 1023509388
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "23",
+    "lat": -22.7643889,
+    "lng": -43.1065512,
+    "osm_type": "way",
+    "osm_id": 1023509390
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "33",
+    "lat": -22.7630827,
+    "lng": -43.1083158,
+    "osm_type": "way",
+    "osm_id": 1023509396
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "34",
+    "lat": -22.7626011,
+    "lng": -43.1080935,
+    "osm_type": "way",
+    "osm_id": 1023509398
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "14",
+    "lat": -22.7638503,
+    "lng": -43.1075477,
+    "osm_type": "way",
+    "osm_id": 1023509407
+  },
+  {
+    "street": "Ladeira do Vicente",
+    "housenumber": "477",
+    "lat": -22.7579957,
+    "lng": -43.1087431,
+    "osm_type": "way",
+    "osm_id": 1023509414
+  },
+  {
+    "street": "Ladeira do Vicente",
+    "housenumber": "94",
+    "lat": -22.7582797,
+    "lng": -43.1091639,
+    "osm_type": "way",
+    "osm_id": 1023509418
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "19",
+    "lat": -22.7633905,
+    "lng": -43.1079005,
+    "osm_type": "way",
+    "osm_id": 1023509424
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "170",
+    "lat": -22.7647499,
+    "lng": -43.1073189,
+    "osm_type": "way",
+    "osm_id": 1023509430
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "182",
+    "lat": -22.7647673,
+    "lng": -43.1071781,
+    "osm_type": "way",
+    "osm_id": 1023509433
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "145",
+    "lat": -22.7643347,
+    "lng": -43.1072111,
+    "osm_type": "way",
+    "osm_id": 1023509434
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "150",
+    "lat": -22.7644629,
+    "lng": -43.1073798,
+    "osm_type": "way",
+    "osm_id": 1023509436
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "175",
+    "lat": -22.7645274,
+    "lng": -43.1069739,
+    "osm_type": "way",
+    "osm_id": 1023509443
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": null,
+    "lat": -22.7646013,
+    "lng": -43.1068443,
+    "osm_type": "way",
+    "osm_id": 1023509445
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "30",
+    "lat": -22.7629869,
+    "lng": -43.1079984,
+    "osm_type": "way",
+    "osm_id": 1023509451
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "20",
+    "lat": -22.7627951,
+    "lng": -43.1078301,
+    "osm_type": "way",
+    "osm_id": 1023509455
+  },
+  {
+    "street": "Praia Grossa",
+    "housenumber": "26",
+    "lat": -22.7632215,
+    "lng": -43.1074305,
+    "osm_type": "way",
+    "osm_id": 1023509456
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "76",
+    "lat": -22.7637209,
+    "lng": -43.1054351,
+    "osm_type": "way",
+    "osm_id": 1023509464
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "166",
+    "lat": -22.7634868,
+    "lng": -43.1046894,
+    "osm_type": "way",
+    "osm_id": 1023509473
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "710",
+    "lat": -22.7648757,
+    "lng": -43.1030609,
+    "osm_type": "way",
+    "osm_id": 1023509483
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "428",
+    "lat": -22.7646859,
+    "lng": -43.1087532,
+    "osm_type": "way",
+    "osm_id": 1023509494
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "135",
+    "lat": -22.7642353,
+    "lng": -43.1096852,
+    "osm_type": "way",
+    "osm_id": 1023509500
+  },
+  {
+    "street": "Praia Doutor Aristão",
+    "housenumber": "108",
+    "lat": -22.7568502,
+    "lng": -43.1099257,
+    "osm_type": "way",
+    "osm_id": 1023509508
+  },
+  {
+    "street": "Praia Doutor Aristão",
+    "housenumber": "88",
+    "lat": -22.7570197,
+    "lng": -43.1098421,
+    "osm_type": "way",
+    "osm_id": 1023509509
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "36",
+    "lat": -22.7658364,
+    "lng": -43.1052677,
+    "osm_type": "way",
+    "osm_id": 1023509510
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "63",
+    "lat": -22.7661366,
+    "lng": -43.105709,
+    "osm_type": "way",
+    "osm_id": 1023509511
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "14",
+    "lat": -22.7605926,
+    "lng": -43.1081865,
+    "osm_type": "way",
+    "osm_id": 1023509513
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "18",
+    "lat": -22.7607171,
+    "lng": -43.1083193,
+    "osm_type": "way",
+    "osm_id": 1023509514
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "39",
+    "lat": -22.7636283,
+    "lng": -43.1079822,
+    "osm_type": "way",
+    "osm_id": 1023509516
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "10",
+    "lat": -22.7638863,
+    "lng": -43.1083025,
+    "osm_type": "way",
+    "osm_id": 1023509518
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "90",
+    "lat": -22.7610453,
+    "lng": -43.1080463,
+    "osm_type": "way",
+    "osm_id": 1023509522
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "14",
+    "lat": -22.7653009,
+    "lng": -43.1058992,
+    "osm_type": "way",
+    "osm_id": 1023509523
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": "25",
+    "lat": -22.7650883,
+    "lng": -43.1052662,
+    "osm_type": "way",
+    "osm_id": 1023509524
+  },
+  {
+    "street": "Rua Guimarães Passos",
+    "housenumber": null,
+    "lat": -22.7653447,
+    "lng": -43.1055968,
+    "osm_type": "way",
+    "osm_id": 1023509525
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": null,
+    "lat": -22.7561645,
+    "lng": -43.1102189,
+    "osm_type": "way",
+    "osm_id": 1023509527
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "206",
+    "lat": -22.7562408,
+    "lng": -43.1101867,
+    "osm_type": "way",
+    "osm_id": 1023509528
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "187",
+    "lat": -22.7628155,
+    "lng": -43.1090567,
+    "osm_type": "way",
+    "osm_id": 1023509534
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "175",
+    "lat": -22.7627689,
+    "lng": -43.1089159,
+    "osm_type": "way",
+    "osm_id": 1023509535
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "198",
+    "lat": -22.7623855,
+    "lng": -43.1091695,
+    "osm_type": "way",
+    "osm_id": 1023509539
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "180",
+    "lat": -22.7623959,
+    "lng": -43.1090864,
+    "osm_type": "way",
+    "osm_id": 1023509540
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "110",
+    "lat": -22.762231,
+    "lng": -43.1086894,
+    "osm_type": "way",
+    "osm_id": 1023509541
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "129",
+    "lat": -22.7626366,
+    "lng": -43.1084868,
+    "osm_type": "way",
+    "osm_id": 1023509542
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "118",
+    "lat": -22.7635695,
+    "lng": -43.1050061,
+    "osm_type": "way",
+    "osm_id": 1023509545
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "324",
+    "lat": -22.7648558,
+    "lng": -43.107799,
+    "osm_type": "way",
+    "osm_id": 1023509548
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "300",
+    "lat": -22.7649929,
+    "lng": -43.1075444,
+    "osm_type": "way",
+    "osm_id": 1023509550
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "304",
+    "lat": -22.7649152,
+    "lng": -43.1076337,
+    "osm_type": "way",
+    "osm_id": 1023509551
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "280",
+    "lat": -22.7650689,
+    "lng": -43.1074117,
+    "osm_type": "way",
+    "osm_id": 1023509552
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "240",
+    "lat": -22.7651722,
+    "lng": -43.1070473,
+    "osm_type": "way",
+    "osm_id": 1023509553
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "406",
+    "lat": -22.7647421,
+    "lng": -43.108469,
+    "osm_type": "way",
+    "osm_id": 1023509555
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "408",
+    "lat": -22.7647278,
+    "lng": -43.1085653,
+    "osm_type": "way",
+    "osm_id": 1023509557
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "343",
+    "lat": -22.7652905,
+    "lng": -43.1080491,
+    "osm_type": "way",
+    "osm_id": 1023509558
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "339",
+    "lat": -22.7652775,
+    "lng": -43.1079843,
+    "osm_type": "way",
+    "osm_id": 1023509560
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "333",
+    "lat": -22.7652816,
+    "lng": -43.1079162,
+    "osm_type": "way",
+    "osm_id": 1023509562
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "317",
+    "lat": -22.7652737,
+    "lng": -43.1077698,
+    "osm_type": "way",
+    "osm_id": 1023509578
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "42",
+    "lat": -22.7634544,
+    "lng": -43.1084385,
+    "osm_type": "way",
+    "osm_id": 1023509579
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "40",
+    "lat": -22.7633867,
+    "lng": -43.108394,
+    "osm_type": "way",
+    "osm_id": 1023509581
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "27",
+    "lat": -22.7633812,
+    "lng": -43.1081136,
+    "osm_type": "way",
+    "osm_id": 1023509582
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "40",
+    "lat": -22.7649755,
+    "lng": -43.1068751,
+    "osm_type": "way",
+    "osm_id": 1023509583
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "35",
+    "lat": -22.7629925,
+    "lng": -43.1084468,
+    "osm_type": "way",
+    "osm_id": 1023509586
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "43",
+    "lat": -22.7626789,
+    "lng": -43.1083457,
+    "osm_type": "way",
+    "osm_id": 1023509588
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "115",
+    "lat": -22.7625829,
+    "lng": -43.1083557,
+    "osm_type": "way",
+    "osm_id": 1023509589
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "153",
+    "lat": -22.7627658,
+    "lng": -43.1087988,
+    "osm_type": "way",
+    "osm_id": 1023509591
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "37",
+    "lat": -22.7628718,
+    "lng": -43.1084644,
+    "osm_type": "way",
+    "osm_id": 1023509592
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "15",
+    "lat": -22.7635277,
+    "lng": -43.1078493,
+    "osm_type": "way",
+    "osm_id": 1023509594
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "25",
+    "lat": -22.7633836,
+    "lng": -43.1080448,
+    "osm_type": "way",
+    "osm_id": 1023509595
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "20",
+    "lat": -22.7637077,
+    "lng": -43.1074457,
+    "osm_type": "way",
+    "osm_id": 1023509596
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "10",
+    "lat": -22.7639877,
+    "lng": -43.1076581,
+    "osm_type": "way",
+    "osm_id": 1023509598
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "41",
+    "lat": -22.7627547,
+    "lng": -43.1083783,
+    "osm_type": "way",
+    "osm_id": 1023509601
+  },
+  {
+    "street": "Ladeira do Vicente",
+    "housenumber": "11",
+    "lat": -22.7580932,
+    "lng": -43.1089945,
+    "osm_type": "way",
+    "osm_id": 1023509602
+  },
+  {
+    "street": "Ladeira do Vicente",
+    "housenumber": "467",
+    "lat": -22.7582152,
+    "lng": -43.108966,
+    "osm_type": "way",
+    "osm_id": 1023509603
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "165",
+    "lat": -22.7644885,
+    "lng": -43.1070422,
+    "osm_type": "way",
+    "osm_id": 1023509604
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "105",
+    "lat": -22.7640476,
+    "lng": -43.1075624,
+    "osm_type": "way",
+    "osm_id": 1023509605
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "109",
+    "lat": -22.7641368,
+    "lng": -43.1074712,
+    "osm_type": "way",
+    "osm_id": 1023509606
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "121",
+    "lat": -22.7641798,
+    "lng": -43.1073874,
+    "osm_type": "way",
+    "osm_id": 1023509608
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "90",
+    "lat": -22.7642808,
+    "lng": -43.1077989,
+    "osm_type": "way",
+    "osm_id": 1023509614
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "82",
+    "lat": -22.7642225,
+    "lng": -43.1078555,
+    "osm_type": "way",
+    "osm_id": 1023509615
+  },
+  {
+    "street": "Rua Maria Freire",
+    "housenumber": "45",
+    "lat": -22.7653335,
+    "lng": -43.1065385,
+    "osm_type": "way",
+    "osm_id": 1023509636
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "429",
+    "lat": -22.7649449,
+    "lng": -43.1088869,
+    "osm_type": "way",
+    "osm_id": 1023509644
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "42",
+    "lat": -22.7668465,
+    "lng": -43.1055056,
+    "osm_type": "way",
+    "osm_id": 1023509659
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "46",
+    "lat": -22.7670348,
+    "lng": -43.1057054,
+    "osm_type": "way",
+    "osm_id": 1023509660
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "61",
+    "lat": -22.7685642,
+    "lng": -43.1099959,
+    "osm_type": "way",
+    "osm_id": 1023509679
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "302",
+    "lat": -22.763638,
+    "lng": -43.1035075,
+    "osm_type": "way",
+    "osm_id": 1023509732
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "84",
+    "lat": -22.7656816,
+    "lng": -43.1057601,
+    "osm_type": "way",
+    "osm_id": 1023509735
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "98",
+    "lat": -22.765644,
+    "lng": -43.1058855,
+    "osm_type": "way",
+    "osm_id": 1023509737
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "90",
+    "lat": -22.7657093,
+    "lng": -43.1058274,
+    "osm_type": "way",
+    "osm_id": 1023509738
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "75",
+    "lat": -22.7660174,
+    "lng": -43.1057868,
+    "osm_type": "way",
+    "osm_id": 1023509740
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "97",
+    "lat": -22.76415,
+    "lng": -43.1087671,
+    "osm_type": "way",
+    "osm_id": 1023509742
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": null,
+    "lat": -22.7635976,
+    "lng": -43.1085854,
+    "osm_type": "way",
+    "osm_id": 1023509747
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "52",
+    "lat": -22.7636821,
+    "lng": -43.1086619,
+    "osm_type": "way",
+    "osm_id": 1023509748
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "56",
+    "lat": -22.7641716,
+    "lng": -43.1089767,
+    "osm_type": "way",
+    "osm_id": 1023509751
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "62",
+    "lat": -22.7643558,
+    "lng": -43.1090746,
+    "osm_type": "way",
+    "osm_id": 1023509763
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "66",
+    "lat": -22.764438,
+    "lng": -43.1089455,
+    "osm_type": "way",
+    "osm_id": 1023509764
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "101",
+    "lat": -22.7643875,
+    "lng": -43.1086857,
+    "osm_type": "way",
+    "osm_id": 1023509769
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "83",
+    "lat": -22.7626071,
+    "lng": -43.1100021,
+    "osm_type": "way",
+    "osm_id": 1023509773
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "71",
+    "lat": -22.7622856,
+    "lng": -43.1099744,
+    "osm_type": "way",
+    "osm_id": 1023509774
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "110",
+    "lat": -22.7656295,
+    "lng": -43.1060057,
+    "osm_type": "way",
+    "osm_id": 1023509775
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "126",
+    "lat": -22.7655193,
+    "lng": -43.1061012,
+    "osm_type": "way",
+    "osm_id": 1023509777
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "118",
+    "lat": -22.7655572,
+    "lng": -43.1060398,
+    "osm_type": "way",
+    "osm_id": 1023509779
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "104",
+    "lat": -22.76566,
+    "lng": -43.105952,
+    "osm_type": "way",
+    "osm_id": 1023509781
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "121",
+    "lat": -22.7658213,
+    "lng": -43.106235,
+    "osm_type": "way",
+    "osm_id": 1023509782
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "28",
+    "lat": -22.754919,
+    "lng": -43.1101932,
+    "osm_type": "way",
+    "osm_id": 1023509786
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "28",
+    "lat": -22.7549758,
+    "lng": -43.1102089,
+    "osm_type": "way",
+    "osm_id": 1023509787
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "28",
+    "lat": -22.7666258,
+    "lng": -43.1053928,
+    "osm_type": "way",
+    "osm_id": 1023509788
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "24",
+    "lat": -22.7665075,
+    "lng": -43.1053612,
+    "osm_type": "way",
+    "osm_id": 1023509789
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "45",
+    "lat": -22.7678995,
+    "lng": -43.1101056,
+    "osm_type": "way",
+    "osm_id": 1023509800
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "38",
+    "lat": -22.7678038,
+    "lng": -43.1104839,
+    "osm_type": "way",
+    "osm_id": 1023509805
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "47",
+    "lat": -22.7679842,
+    "lng": -43.110101,
+    "osm_type": "way",
+    "osm_id": 1023509808
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "49",
+    "lat": -22.768073,
+    "lng": -43.1100601,
+    "osm_type": "way",
+    "osm_id": 1023509810
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": null,
+    "lat": -22.7681533,
+    "lng": -43.1100363,
+    "osm_type": "way",
+    "osm_id": 1023509812
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "88",
+    "lat": -22.7688613,
+    "lng": -43.1102085,
+    "osm_type": "way",
+    "osm_id": 1023509817
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "46",
+    "lat": -22.7652087,
+    "lng": -43.1064054,
+    "osm_type": "way",
+    "osm_id": 1023509822
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "57",
+    "lat": -22.7652958,
+    "lng": -43.1061548,
+    "osm_type": "way",
+    "osm_id": 1023509823
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "57",
+    "lat": -22.7651648,
+    "lng": -43.1060868,
+    "osm_type": "way",
+    "osm_id": 1023509825
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "54",
+    "lat": -22.7672039,
+    "lng": -43.1058635,
+    "osm_type": "way",
+    "osm_id": 1023509829
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "50",
+    "lat": -22.7671333,
+    "lng": -43.1057603,
+    "osm_type": "way",
+    "osm_id": 1023509830
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "649",
+    "lat": -22.7549749,
+    "lng": -43.1094816,
+    "osm_type": "way",
+    "osm_id": 1023509835
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": null,
+    "lat": -22.7550226,
+    "lng": -43.1095483,
+    "osm_type": "way",
+    "osm_id": 1023509836
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "675",
+    "lat": -22.756385,
+    "lng": -43.1082068,
+    "osm_type": "way",
+    "osm_id": 1023509843
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "567",
+    "lat": -22.7571073,
+    "lng": -43.1088297,
+    "osm_type": "way",
+    "osm_id": 1023509859
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "641",
+    "lat": -22.7566038,
+    "lng": -43.1083622,
+    "osm_type": "way",
+    "osm_id": 1023509860
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "611",
+    "lat": -22.7566955,
+    "lng": -43.1085171,
+    "osm_type": "way",
+    "osm_id": 1023509862
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "759",
+    "lat": -22.7555629,
+    "lng": -43.1076251,
+    "osm_type": "way",
+    "osm_id": 1023509863
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "735",
+    "lat": -22.7558737,
+    "lng": -43.1077285,
+    "osm_type": "way",
+    "osm_id": 1023509865
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "561",
+    "lat": -22.7573969,
+    "lng": -43.1089053,
+    "osm_type": "way",
+    "osm_id": 1023509867
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": null,
+    "lat": -22.7686767,
+    "lng": -43.110231,
+    "osm_type": "way",
+    "osm_id": 1023509872
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "70",
+    "lat": -22.7657338,
+    "lng": -43.10566,
+    "osm_type": "way",
+    "osm_id": 1023509873
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "15",
+    "lat": -22.7624675,
+    "lng": -43.1076322,
+    "osm_type": "way",
+    "osm_id": 1023509874
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "177",
+    "lat": -22.7658877,
+    "lng": -43.1096847,
+    "osm_type": "way",
+    "osm_id": 1023509882
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "177",
+    "lat": -22.7659492,
+    "lng": -43.1099485,
+    "osm_type": "way",
+    "osm_id": 1023509887
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "36",
+    "lat": -22.7676247,
+    "lng": -43.1105367,
+    "osm_type": "way",
+    "osm_id": 1023509888
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "78",
+    "lat": -22.7621959,
+    "lng": -43.1080759,
+    "osm_type": "way",
+    "osm_id": 1023509889
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "89",
+    "lat": -22.7627777,
+    "lng": -43.1098838,
+    "osm_type": "way",
+    "osm_id": 1023509890
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "452",
+    "lat": -22.7691025,
+    "lng": -43.1080148,
+    "osm_type": "way",
+    "osm_id": 1023509920
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "200",
+    "lat": -22.7635121,
+    "lng": -43.1042973,
+    "osm_type": "way",
+    "osm_id": 1023509923
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "298",
+    "lat": -22.7636181,
+    "lng": -43.1036476,
+    "osm_type": "way",
+    "osm_id": 1023509925
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "58",
+    "lat": -22.7642012,
+    "lng": -43.10915,
+    "osm_type": "way",
+    "osm_id": 1023509927
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "85",
+    "lat": -22.7640338,
+    "lng": -43.1085601,
+    "osm_type": "way",
+    "osm_id": 1023509929
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "60",
+    "lat": -22.7642937,
+    "lng": -43.1090272,
+    "osm_type": "way",
+    "osm_id": 1023509930
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "456",
+    "lat": -22.76452,
+    "lng": -43.1090321,
+    "osm_type": "way",
+    "osm_id": 1023509931
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "99",
+    "lat": -22.7642704,
+    "lng": -43.1086754,
+    "osm_type": "way",
+    "osm_id": 1023509932
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": null,
+    "lat": -22.7626794,
+    "lng": -43.1098953,
+    "osm_type": "way",
+    "osm_id": 1023509934
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "67",
+    "lat": -22.7621486,
+    "lng": -43.1101316,
+    "osm_type": "way",
+    "osm_id": 1023509936
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "77",
+    "lat": -22.7624779,
+    "lng": -43.1099426,
+    "osm_type": "way",
+    "osm_id": 1023509937
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "75",
+    "lat": -22.7624062,
+    "lng": -43.1100192,
+    "osm_type": "way",
+    "osm_id": 1023509938
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "186",
+    "lat": -22.7548941,
+    "lng": -43.1098863,
+    "osm_type": "way",
+    "osm_id": 1023509942
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "36",
+    "lat": -22.7667222,
+    "lng": -43.105471,
+    "osm_type": "way",
+    "osm_id": 1023509943
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "789",
+    "lat": -22.7556262,
+    "lng": -43.1100945,
+    "osm_type": "way",
+    "osm_id": 1023509945
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "717",
+    "lat": -22.7552035,
+    "lng": -43.1096648,
+    "osm_type": "way",
+    "osm_id": 1023509947
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "38",
+    "lat": -22.7649169,
+    "lng": -43.1062534,
+    "osm_type": "way",
+    "osm_id": 1023509950
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "42",
+    "lat": -22.7650184,
+    "lng": -43.1063433,
+    "osm_type": "way",
+    "osm_id": 1023509951
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "93",
+    "lat": -22.7641421,
+    "lng": -43.1086203,
+    "osm_type": "way",
+    "osm_id": 1023509954
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "663",
+    "lat": -22.7548999,
+    "lng": -43.1094237,
+    "osm_type": "way",
+    "osm_id": 1023509955
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "689",
+    "lat": -22.7561889,
+    "lng": -43.1080144,
+    "osm_type": "way",
+    "osm_id": 1023509956
+  },
+  {
+    "street": "Rua Luiz de Andrade",
+    "housenumber": "36",
+    "lat": -22.7676929,
+    "lng": -43.1105024,
+    "osm_type": "way",
+    "osm_id": 1023509963
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "723",
+    "lat": -22.7560141,
+    "lng": -43.1079003,
+    "osm_type": "way",
+    "osm_id": 1023509964
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "60",
+    "lat": -22.7621605,
+    "lng": -43.1078736,
+    "osm_type": "way",
+    "osm_id": 1023509966
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "70",
+    "lat": -22.7621769,
+    "lng": -43.1079664,
+    "osm_type": "way",
+    "osm_id": 1023509967
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": null,
+    "lat": -22.7625564,
+    "lng": -43.1079321,
+    "osm_type": "way",
+    "osm_id": 1023509970
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "505",
+    "lat": -22.7647515,
+    "lng": -43.1095632,
+    "osm_type": "way",
+    "osm_id": 1023509972
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "491",
+    "lat": -22.764759,
+    "lng": -43.1094317,
+    "osm_type": "way",
+    "osm_id": 1023509974
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "494",
+    "lat": -22.7644301,
+    "lng": -43.1094376,
+    "osm_type": "way",
+    "osm_id": 1023509978
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "468",
+    "lat": -22.7645257,
+    "lng": -43.1091215,
+    "osm_type": "way",
+    "osm_id": 1023509980
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "476",
+    "lat": -22.764488,
+    "lng": -43.1092303,
+    "osm_type": "way",
+    "osm_id": 1023509981
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "521",
+    "lat": -22.7646039,
+    "lng": -43.1097465,
+    "osm_type": "way",
+    "osm_id": 1023509983
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "531",
+    "lat": -22.7646114,
+    "lng": -43.1098356,
+    "osm_type": "way",
+    "osm_id": 1023509984
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": null,
+    "lat": -22.7643683,
+    "lng": -43.1095742,
+    "osm_type": "way",
+    "osm_id": 1023509986
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "477",
+    "lat": -22.7647849,
+    "lng": -43.1092321,
+    "osm_type": "way",
+    "osm_id": 1023510000
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "49",
+    "lat": -22.765441,
+    "lng": -43.1089727,
+    "osm_type": "way",
+    "osm_id": 1023510018
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "51",
+    "lat": -22.76552,
+    "lng": -43.1089873,
+    "osm_type": "way",
+    "osm_id": 1023510019
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "113",
+    "lat": -22.7659913,
+    "lng": -43.1091639,
+    "osm_type": "way",
+    "osm_id": 1023510034
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "271",
+    "lat": -22.7668771,
+    "lng": -43.1097678,
+    "osm_type": "way",
+    "osm_id": 1023510041
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "275",
+    "lat": -22.7669884,
+    "lng": -43.1098245,
+    "osm_type": "way",
+    "osm_id": 1023510042
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "150",
+    "lat": -22.7658363,
+    "lng": -43.1094303,
+    "osm_type": "way",
+    "osm_id": 1023510046
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "160",
+    "lat": -22.7660615,
+    "lng": -43.1095854,
+    "osm_type": "way",
+    "osm_id": 1023510047
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "84",
+    "lat": -22.7655276,
+    "lng": -43.1093052,
+    "osm_type": "way",
+    "osm_id": 1023510051
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "98",
+    "lat": -22.7656459,
+    "lng": -43.1093479,
+    "osm_type": "way",
+    "osm_id": 1023510054
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "27",
+    "lat": -22.7651166,
+    "lng": -43.1088759,
+    "osm_type": "way",
+    "osm_id": 1023510074
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "212",
+    "lat": -22.7666723,
+    "lng": -43.1099935,
+    "osm_type": "way",
+    "osm_id": 1023510078
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "276",
+    "lat": -22.7669045,
+    "lng": -43.1101991,
+    "osm_type": "way",
+    "osm_id": 1023510083
+  },
+  {
+    "street": "Rua Manuel de Macedo",
+    "housenumber": "461",
+    "lat": -22.7648802,
+    "lng": -43.1091395,
+    "osm_type": "way",
+    "osm_id": 1023510092
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "210",
+    "lat": -22.7665942,
+    "lng": -43.1099543,
+    "osm_type": "way",
+    "osm_id": 1023510100
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "177",
+    "lat": -22.7660107,
+    "lng": -43.1096938,
+    "osm_type": "way",
+    "osm_id": 1023510102
+  },
+  {
+    "street": "Rua Comandante Guedes de Carvalho",
+    "housenumber": "143",
+    "lat": -22.7661431,
+    "lng": -43.1092331,
+    "osm_type": "way",
+    "osm_id": 1023510105
+  },
+  {
+    "street": "Praça Bom Jesus",
+    "housenumber": null,
+    "lat": -22.7615798,
+    "lng": -43.1075538,
+    "osm_type": "way",
+    "osm_id": 1023510124
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "2",
+    "lat": -22.7498776,
+    "lng": -43.1070567,
+    "osm_type": "way",
+    "osm_id": 1023510125
+  },
+  {
+    "street": "Rua Dois Irmãos",
+    "housenumber": "3",
+    "lat": -22.7499662,
+    "lng": -43.1071806,
+    "osm_type": "way",
+    "osm_id": 1023510126
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": null,
+    "lat": -22.7537315,
+    "lng": -43.1045238,
+    "osm_type": "way",
+    "osm_id": 1023510135
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": null,
+    "lat": -22.750938,
+    "lng": -43.1030218,
+    "osm_type": "way",
+    "osm_id": 1023510137
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "1222",
+    "lat": -22.7543464,
+    "lng": -43.1051591,
+    "osm_type": "way",
+    "osm_id": 1023510139
+  },
+  {
+    "street": "Rua do Catimbau",
+    "housenumber": "177",
+    "lat": -22.7502639,
+    "lng": -43.1054726,
+    "osm_type": "way",
+    "osm_id": 1023510142
+  },
+  {
+    "street": "Rua do Catimbau",
+    "housenumber": "73",
+    "lat": -22.7508876,
+    "lng": -43.1048076,
+    "osm_type": "way",
+    "osm_id": 1023510143
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "81",
+    "lat": -22.7525871,
+    "lng": -43.1099339,
+    "osm_type": "way",
+    "osm_id": 1023510146
+  },
+  {
+    "street": "Rua Padre Juvenal",
+    "housenumber": "73",
+    "lat": -22.7528601,
+    "lng": -43.1101239,
+    "osm_type": "way",
+    "osm_id": 1023510149
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "21",
+    "lat": -22.7597266,
+    "lng": -43.1098937,
+    "osm_type": "way",
+    "osm_id": 1023510155
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "191",
+    "lat": -22.7661575,
+    "lng": -43.1103573,
+    "osm_type": "way",
+    "osm_id": 1023510156
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "181",
+    "lat": -22.765914,
+    "lng": -43.1101422,
+    "osm_type": "way",
+    "osm_id": 1023510157
+  },
+  {
+    "street": "Praia Pintor Castagnetto",
+    "housenumber": "156",
+    "lat": -22.7514013,
+    "lng": -43.1086831,
+    "osm_type": "way",
+    "osm_id": 1023510162
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "187",
+    "lat": -22.7660039,
+    "lng": -43.1102245,
+    "osm_type": "way",
+    "osm_id": 1023510164
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "173",
+    "lat": -22.7655557,
+    "lng": -43.1100651,
+    "osm_type": "way",
+    "osm_id": 1023510165
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "169",
+    "lat": -22.765451,
+    "lng": -43.1100615,
+    "osm_type": "way",
+    "osm_id": 1023510166
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "13",
+    "lat": -22.7596379,
+    "lng": -43.1096522,
+    "osm_type": "way",
+    "osm_id": 1023510168
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "17",
+    "lat": -22.7597001,
+    "lng": -43.109768,
+    "osm_type": "way",
+    "osm_id": 1023510169
+  },
+  {
+    "street": "Praia José Bonifácio",
+    "housenumber": "23",
+    "lat": -22.7597747,
+    "lng": -43.1099813,
+    "osm_type": "way",
+    "osm_id": 1023510170
+  },
+  {
+    "street": "Praia Grossa",
+    "housenumber": "44",
+    "lat": -22.7636396,
+    "lng": -43.1069394,
+    "osm_type": "way",
+    "osm_id": 1023510179
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "836",
+    "lat": -22.7656215,
+    "lng": -43.104258,
+    "osm_type": "way",
+    "osm_id": 1023510189
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "246",
+    "lat": -22.7634253,
+    "lng": -43.1039993,
+    "osm_type": "way",
+    "osm_id": 1023510192
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "864",
+    "lat": -22.7657232,
+    "lng": -43.1044653,
+    "osm_type": "way",
+    "osm_id": 1023510193
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "161",
+    "lat": -22.7608027,
+    "lng": -43.1077792,
+    "osm_type": "way",
+    "osm_id": 1023510195
+  },
+  {
+    "street": "Ladeira do Vicente",
+    "housenumber": "505",
+    "lat": -22.7577918,
+    "lng": -43.1087531,
+    "osm_type": "way",
+    "osm_id": 1023510196
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "14",
+    "lat": -22.7626533,
+    "lng": -43.1075621,
+    "osm_type": "way",
+    "osm_id": 1023510197
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": null,
+    "lat": -22.7633621,
+    "lng": -43.1053945,
+    "osm_type": "way",
+    "osm_id": 1023510198
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "234",
+    "lat": -22.7634969,
+    "lng": -43.1040988,
+    "osm_type": "way",
+    "osm_id": 1023510202
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "182",
+    "lat": -22.7694056,
+    "lng": -43.1090955,
+    "osm_type": "way",
+    "osm_id": 1023510205
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "149",
+    "lat": -22.760866,
+    "lng": -43.1077679,
+    "osm_type": "way",
+    "osm_id": 1023510208
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "190",
+    "lat": -22.7635292,
+    "lng": -43.1044091,
+    "osm_type": "way",
+    "osm_id": 1023510212
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "137",
+    "lat": -22.7609882,
+    "lng": -43.1077784,
+    "osm_type": "way",
+    "osm_id": 1023510214
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "20",
+    "lat": -22.7664232,
+    "lng": -43.1052485,
+    "osm_type": "way",
+    "osm_id": 1023510215
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "837",
+    "lat": -22.7550873,
+    "lng": -43.1074002,
+    "osm_type": "way",
+    "osm_id": 1023510222
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "789",
+    "lat": -22.7554366,
+    "lng": -43.107501,
+    "osm_type": "way",
+    "osm_id": 1023510224
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "135",
+    "lat": -22.7516438,
+    "lng": -43.1062917,
+    "osm_type": "relation",
+    "osm_id": 13704897
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "3",
+    "lat": -22.7608732,
+    "lng": -43.108604,
+    "osm_type": "relation",
+    "osm_id": 13704900
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "98",
+    "lat": -22.7511375,
+    "lng": -43.1068555,
+    "osm_type": "relation",
+    "osm_id": 13704901
+  },
+  {
+    "street": "Rua Cerqueira",
+    "housenumber": "216",
+    "lat": -22.7521676,
+    "lng": -43.1059406,
+    "osm_type": "relation",
+    "osm_id": 13704902
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "476",
+    "lat": -22.7536599,
+    "lng": -43.108213,
+    "osm_type": "relation",
+    "osm_id": 13704904
+  },
+  {
+    "street": "Rua Tomaz Cerqueira",
+    "housenumber": "84",
+    "lat": -22.752464,
+    "lng": -43.1084398,
+    "osm_type": "relation",
+    "osm_id": 13704907
+  },
+  {
+    "street": "Praia Jose Bonifácio",
+    "housenumber": "53",
+    "lat": -22.76178,
+    "lng": -43.110152,
+    "osm_type": "relation",
+    "osm_id": 13704908
+  },
+  {
+    "street": "Rua Adelaide Alambari",
+    "housenumber": "19",
+    "lat": -22.7504452,
+    "lng": -43.10642,
+    "osm_type": "relation",
+    "osm_id": 13704909
+  },
+  {
+    "street": "Praia Jose Bonifácio",
+    "housenumber": "157",
+    "lat": -22.7649266,
+    "lng": -43.1099368,
+    "osm_type": "relation",
+    "osm_id": 13704913
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "74",
+    "lat": -22.7592235,
+    "lng": -43.1086437,
+    "osm_type": "relation",
+    "osm_id": 13704914
+  },
+  {
+    "street": "Praia da Moreninha",
+    "housenumber": null,
+    "lat": -22.7553544,
+    "lng": -43.1111942,
+    "osm_type": "relation",
+    "osm_id": 13704915
+  },
+  {
+    "street": "Praia Jose Bonifácio",
+    "housenumber": "9",
+    "lat": -22.7671854,
+    "lng": -43.1106523,
+    "osm_type": "relation",
+    "osm_id": 13704916
+  },
+  {
+    "street": "Praia Jose Bonifácio",
+    "housenumber": "3",
+    "lat": -22.7671653,
+    "lng": -43.1108938,
+    "osm_type": "relation",
+    "osm_id": 13704917
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "19",
+    "lat": -22.76109,
+    "lng": -43.1084165,
+    "osm_type": "relation",
+    "osm_id": 13704919
+  },
+  {
+    "street": "Rua Doutor Lacerda",
+    "housenumber": "59",
+    "lat": -22.7616583,
+    "lng": -43.1096072,
+    "osm_type": "relation",
+    "osm_id": 13704920
+  },
+  {
+    "street": "Rua Príncipe Regente",
+    "housenumber": "87",
+    "lat": -22.7587505,
+    "lng": -43.1093001,
+    "osm_type": "relation",
+    "osm_id": 13704921
+  },
+  {
+    "street": "Praia Grossa",
+    "housenumber": "58",
+    "lat": -22.7641405,
+    "lng": -43.1064435,
+    "osm_type": "relation",
+    "osm_id": 13704922
+  },
+  {
+    "street": "Rua Pinheiro Freire",
+    "housenumber": "40",
+    "lat": -22.7614082,
+    "lng": -43.1085623,
+    "osm_type": "relation",
+    "osm_id": 13704923
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "199",
+    "lat": -22.7628798,
+    "lng": -43.1091373,
+    "osm_type": "relation",
+    "osm_id": 13704928
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "110",
+    "lat": -22.7623671,
+    "lng": -43.1084432,
+    "osm_type": "relation",
+    "osm_id": 13704929
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "59",
+    "lat": -22.7638088,
+    "lng": -43.1078913,
+    "osm_type": "relation",
+    "osm_id": 13704931
+  },
+  {
+    "street": "Rua Coelho Rodrigues",
+    "housenumber": "129",
+    "lat": -22.7641935,
+    "lng": -43.1072914,
+    "osm_type": "relation",
+    "osm_id": 13704932
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "176",
+    "lat": -22.7634554,
+    "lng": -43.1046204,
+    "osm_type": "relation",
+    "osm_id": 13704934
+  },
+  {
+    "street": "Praia Jose Bonifácio",
+    "housenumber": "47",
+    "lat": -22.7613816,
+    "lng": -43.1102719,
+    "osm_type": "relation",
+    "osm_id": 13704936
+  },
+  {
+    "street": "Rua Comendador Lage",
+    "housenumber": "75",
+    "lat": -22.7639527,
+    "lng": -43.1084492,
+    "osm_type": "relation",
+    "osm_id": 13704938
+  },
+  {
+    "street": "Rua Alambari Luz",
+    "housenumber": "705",
+    "lat": -22.7551038,
+    "lng": -43.1096261,
+    "osm_type": "relation",
+    "osm_id": 13704939
+  },
+  {
+    "street": "Rua Domingos Olímpio",
+    "housenumber": "44",
+    "lat": -22.7651354,
+    "lng": -43.1063742,
+    "osm_type": "relation",
+    "osm_id": 13704942
+  },
+  {
+    "street": "Praia dos Tamoios",
+    "housenumber": "705",
+    "lat": -22.7560652,
+    "lng": -43.1079857,
+    "osm_type": "relation",
+    "osm_id": 13704943
+  },
+  {
+    "street": "Rua Furquim Werneck",
+    "housenumber": "31",
+    "lat": -22.7625286,
+    "lng": -43.1077924,
+    "osm_type": "relation",
+    "osm_id": 13704944
+  },
+  {
+    "street": "Praia das Gaivotas",
+    "housenumber": "796",
+    "lat": -22.7651987,
+    "lng": -43.1038872,
+    "osm_type": "relation",
+    "osm_id": 13704948
+  },
+  {
+    "street": "Praia Bom Jesus",
+    "housenumber": "12",
+    "lat": -22.7611401,
+    "lng": -43.1077602,
+    "osm_type": "relation",
+    "osm_id": 13704949
+  }
+]
