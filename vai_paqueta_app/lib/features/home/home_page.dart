@@ -59,7 +59,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _loading ? null : () => _escolherPerfil('cliente'),
+                  onPressed: _loading ? null : () => _escolherPerfil('passageiro'),
                   icon: const Icon(Icons.person),
                   label: Text(_loading ? 'Aguarde...' : 'Entrar como Passageiro'),
                   style: ElevatedButton.styleFrom(

@@ -534,31 +534,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         destinoEndereco: _destinoCtrl.text,
       );
 
-      final proximos = await rides.motoristasProximos(
-        lat: _origemLatLng!.latitude,
-        lng: _origemLatLng!.longitude,
-        raioKm: 5,
-        minutos: 15,
-        limite: 5,
-      );
-
-      if (proximos.isNotEmpty) {
-        final m = proximos.first;
-        await rides.atribuirMotorista(corridaId: corrida.id, motoristaId: m.perfilId);
-        setState(() {
-          _mensagem = 'Corrida enviada para motorista próximo (perfil ${m.perfilId}).';
-          _corridaAtiva = true;
-          _corridaIdAtual = corrida.id;
-          _motoristaLatLng = null;
-        });
-      } else {
-        setState(() {
-          _mensagem = 'Corrida criada, aguardando motorista.';
-          _corridaAtiva = true;
-          _corridaIdAtual = corrida.id;
-          _motoristaLatLng = null;
-        });
-      }
+      setState(() {
+        _mensagem = 'Corrida criada, aguardando motorista aceitar.';
+        _corridaAtiva = true;
+        _corridaIdAtual = corrida.id;
+        _motoristaLatLng = null;
+      });
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
     } catch (e) {

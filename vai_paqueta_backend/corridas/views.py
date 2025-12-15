@@ -43,6 +43,12 @@ class DeviceRegisterView(APIView):
         tipo = request.data.get("tipo", "passageiro")
         nome = request.data.get("nome", "")
 
+        if tipo == "cliente":
+            tipo = "passageiro"
+        tipos_validos = {choice[0] for choice in Perfil.TIPO_CHOICES}
+        if tipo not in tipos_validos:
+            return Response({"detail": "tipo inválido. Use 'passageiro' ou 'ecotaxista'."}, status=status.HTTP_400_BAD_REQUEST)
+
         device = None
         if payload_uuid:
             try:
@@ -188,6 +194,10 @@ class CorridaViewSet(viewsets.ModelViewSet):
             motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
         except Perfil.DoesNotExist:
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if corrida.status != "aguardando":
+            return Response({"detail": f"Corrida não pode ser aceita no status {corrida.status}."}, status=status.HTTP_409_CONFLICT)
+        if corrida.motorista and corrida.motorista_id != motorista.id:
+            return Response({"detail": "Corrida já atribuída a outro motorista."}, status=status.HTTP_409_CONFLICT)
         corrida.status = "aceita"
         corrida.motorista = motorista
         corrida.save(update_fields=["status", "motorista", "atualizado_em"])
@@ -207,8 +217,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
         if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
-        if corrida.status not in ["aceita", "aguardando"]:
-            return Response({"detail": f"Corrida não pode ser iniciada no status {corrida.status}."}, status=400)
+        if corrida.status != "aceita":
+            return Response({"detail": f"Corrida não pode ser iniciada no status {corrida.status}."}, status=status.HTTP_409_CONFLICT)
         corrida.status = "em_andamento"
         corrida.save(update_fields=["status", "atualizado_em"])
         return Response(CorridaSerializer(corrida).data)
@@ -227,8 +237,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
         if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
-        if corrida.status not in ["em_andamento", "aceita"]:
-            return Response({"detail": f"Corrida não pode ser finalizada no status {corrida.status}."}, status=400)
+        if corrida.status != "em_andamento":
+            return Response({"detail": f"Corrida não pode ser finalizada no status {corrida.status}."}, status=status.HTTP_409_CONFLICT)
         corrida.status = "concluida"
         corrida.save(update_fields=["status", "atualizado_em"])
         return Response(CorridaSerializer(corrida).data)
@@ -380,22 +390,26 @@ class MotoristasProximosView(APIView):
             .order_by("-criado_em")
         )
 
-        resposta = []
+        vistos: dict[int, tuple[float, LocalizacaoPing]] = {}
         for ping in pings:
+            if ping.perfil_id in vistos:
+                continue
             dist = _haversine_km(lat, lng, float(ping.latitude), float(ping.longitude))
             if dist <= raio_km:
-                resposta.append(
-                    {
-                        "perfil_id": ping.perfil_id,
-                        "device_uuid": str(ping.perfil.device.device_uuid),
-                        "latitude": float(ping.latitude),
-                        "longitude": float(ping.longitude),
-                        "precisao_m": ping.precisao_m,
-                        "dist_km": round(dist, 3),
-                        "ping_em": ping.criado_em,
-                    }
-                )
-            if len(resposta) >= limite:
-                break
+                vistos[ping.perfil_id] = (dist, ping)
+
+        resposta = []
+        for dist, ping in sorted(vistos.values(), key=lambda item: item[0])[:limite]:
+            resposta.append(
+                {
+                    "perfil_id": ping.perfil_id,
+                    "device_uuid": str(ping.perfil.device.device_uuid),
+                    "latitude": float(ping.latitude),
+                    "longitude": float(ping.longitude),
+                    "precisao_m": ping.precisao_m,
+                    "dist_km": round(dist, 3),
+                    "ping_em": ping.criado_em,
+                }
+            )
 
         return Response(resposta)
