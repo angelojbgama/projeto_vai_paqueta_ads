@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/auth/auth_page.dart';
 import 'features/driver/driver_page.dart';
 import 'features/history/history_page.dart';
 import 'features/home/home_page.dart';
@@ -18,6 +19,10 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/home',
         builder: (context, state) => const HomePage(),
+      ),
+      GoRoute(
+        path: '/auth',
+        builder: (context, state) => const AuthPage(),
       ),
       GoRoute(
         path: '/historico',

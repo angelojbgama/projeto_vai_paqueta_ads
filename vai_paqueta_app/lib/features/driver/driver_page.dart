@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/map_config.dart';
+import '../auth/auth_provider.dart';
 import '../device/device_provider.dart';
 import 'driver_service.dart';
 
@@ -38,6 +39,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _trocandoPerfil = false;
   bool _appPausado = false;
   StateSetter? _modalSetState;
+  Future<void> _logout() async {
+    await ref.read(authProvider.notifier).logout();
+    if (!mounted) return;
+    context.go('/auth');
+  }
 
   Future<Position?> _posicaoAtual() async {
     try {
@@ -370,10 +376,38 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final device = ref.watch(deviceProvider);
+    final auth = ref.watch(authProvider);
+    final loggedIn = auth.valueOrNull != null;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ecotaxista'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Ecotaxista'),
+            auth.when(
+              data: (user) => Text(
+                user != null ? 'Conta: ${user.email}' : 'Não autenticado',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              loading: () => Text(
+                'Verificando conta...',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              error: (_, __) => Text(
+                'Erro na conta',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ),
+          ],
+        ),
         actions: [
+          if (loggedIn)
+            IconButton(
+              tooltip: 'Sair',
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -406,6 +440,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               ),
               loading: () => const Text('Registrando dispositivo...'),
               error: (e, _) => Text('Erro: $e'),
+            ),
+            const SizedBox(height: 8),
+            auth.when(
+              data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+              loading: () => const Text('Verificando conta...'),
+              error: (e, _) => Text('Erro na conta: $e'),
             ),
             const SizedBox(height: 16),
             if (_status != null) Text(_status!),

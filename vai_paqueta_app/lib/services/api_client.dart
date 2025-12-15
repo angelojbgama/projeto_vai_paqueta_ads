@@ -5,6 +5,7 @@ import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/api_config.dart';
+import 'auth_storage.dart';
 
 class ApiClient {
   ApiClient._internal() {
@@ -26,6 +27,18 @@ class ApiClient {
         ),
       );
     }
+
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await AuthStorage.getToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Token $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
 
     // Permite certificados do loca.lt (self-signed) apenas em ambiente não-web.
     if (!kIsWeb) {

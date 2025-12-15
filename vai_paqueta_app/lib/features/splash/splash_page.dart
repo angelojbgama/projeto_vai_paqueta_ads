@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_config.dart';
+import '../auth/auth_provider.dart';
 import '../device/device_provider.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -27,6 +28,22 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   Future<void> _bootstrap() async {
     if (_started) return;
     _started = true;
+    try {
+      // Garante que o usuário esteja autenticado antes de registrar device.
+      final user = await ref.read(authProvider.future);
+      if (!mounted) return;
+      if (user == null) {
+        context.go('/auth');
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _erro = 'Falha ao verificar login.';
+        _detalhe = e.toString();
+      });
+      return;
+    }
     final notifier = ref.read(deviceProvider.notifier);
     try {
       final info = await notifier.ensureRegistrado();

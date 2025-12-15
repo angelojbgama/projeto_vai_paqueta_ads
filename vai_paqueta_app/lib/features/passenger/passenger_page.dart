@@ -16,6 +16,7 @@ import '../../core/map_config.dart';
 import '../../services/geo_service.dart';
 import '../device/device_provider.dart';
 import '../rides/rides_service.dart';
+import '../auth/auth_provider.dart';
 
 class PassengerPage extends ConsumerStatefulWidget {
   const PassengerPage({super.key});
@@ -57,6 +58,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Timer? _corridaTimer;
   bool _appPausado = false;
   Duration _corridaPollInterval = const Duration(seconds: 10);
+  Future<void> _logout() async {
+    await ref.read(authProvider.notifier).logout();
+    if (!mounted) return;
+    context.go('/auth');
+  }
 
   @override
   void initState() {
@@ -632,10 +638,38 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     final device = ref.watch(deviceProvider);
+    final auth = ref.watch(authProvider);
+    final loggedIn = auth.valueOrNull != null;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Passageiro'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Passageiro'),
+            auth.when(
+              data: (user) => Text(
+                user != null ? 'Conta: ${user.email}' : 'Não autenticado',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              loading: () => Text(
+                'Verificando conta...',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+              error: (_, __) => Text(
+                'Erro na conta',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            ),
+          ],
+        ),
         actions: [
+          if (loggedIn)
+            IconButton(
+              tooltip: 'Sair',
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -663,6 +697,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                 data: (info) => Text('UUID: ${info?.deviceUuid ?? "registrando..."}'),
                 loading: () => const Text('Registrando dispositivo...'),
                 error: (e, _) => Text('Erro: $e'),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: auth.when(
+                data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+                loading: () => const Text('Verificando conta...'),
+                error: (e, _) => Text('Erro na conta: $e'),
               ),
             ),
             Expanded(
