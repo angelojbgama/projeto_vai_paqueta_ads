@@ -5,15 +5,16 @@ from datetime import datetime, timedelta, timezone
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Corrida, Device, LocalizacaoPing, Perfil
+from .models import Corrida, LocalizacaoPing, Perfil
 from .serializers import (
     CorridaCreateSerializer,
     CorridaSerializer,
     CorridaStatusSerializer,
-    DeviceSerializer,
     LocalizacaoPingSerializer,
     PerfilSerializer,
 )
@@ -34,14 +35,21 @@ def _haversine_km(lat1, lon1, lat2, lon2):
 
 class DeviceRegisterView(APIView):
     """
-    Registra ou recupera um device e garante um perfil padrão.
+    Atualiza o modo do usuário (passageiro/ecotaxista) e associa dados do device ao próprio usuário.
+    Requer autenticação.
     """
 
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"detail": "Autenticação obrigatória."}, status=status.HTTP_401_UNAUTHORIZED)
+
         payload_uuid = request.data.get("device_uuid")
         plataforma = request.data.get("plataforma", "")
         tipo = request.data.get("tipo", "passageiro")
-        nome = request.data.get("nome", "")
+        nome = (request.data.get("nome") or "").strip() or user.first_name
 
         if tipo == "cliente":
             tipo = "passageiro"
@@ -49,45 +57,41 @@ class DeviceRegisterView(APIView):
         if tipo not in tipos_validos:
             return Response({"detail": "tipo inválido. Use 'passageiro' ou 'ecotaxista'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        device = None
+        perfil, _created = Perfil.objects.get_or_create(
+            user=user, defaults={"tipo": tipo, "plataforma": plataforma, "nome": nome}
+        )
         if payload_uuid:
             try:
-                payload_uuid = uuid.UUID(str(payload_uuid))
-                device, created = Device.objects.get_or_create(
-                    device_uuid=payload_uuid, defaults={"plataforma": plataforma}
-                )
-                if not created and plataforma:
-                    device.plataforma = plataforma
-                    device.save(update_fields=["plataforma"])
-            except (ValueError, Device.DoesNotExist):
-                device = None
+                perfil.device_uuid = uuid.UUID(str(payload_uuid))
+            except ValueError:
+                return Response({"detail": "device_uuid inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        perfil.tipo = tipo
+        if plataforma:
+            perfil.plataforma = plataforma
+        if nome:
+            perfil.nome = nome
+        perfil.save()
 
-        if device is None:
-            device = Device.objects.create(plataforma=plataforma)
-
-        perfil, _created = Perfil.objects.get_or_create(device=device, tipo=tipo, defaults={"nome": nome})
-        serializer = DeviceSerializer(device)
         return Response(
-            {"device": serializer.data, "perfil": PerfilSerializer(perfil).data},
-            status=status.HTTP_201_CREATED,
+            {
+                "device": {"device_uuid": str(perfil.device_uuid), "plataforma": perfil.plataforma},
+                "perfil": PerfilSerializer(perfil).data,
+            },
+            status=status.HTTP_200_OK,
         )
 
 
 class CorridaViewSet(viewsets.ModelViewSet):
-    queryset = Corrida.objects.select_related("cliente__device", "motorista__device").all()
+    queryset = Corrida.objects.select_related("cliente__user", "motorista__user").all()
     serializer_class = CorridaSerializer
     http_method_names = ["get", "post", "patch"]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
         perfil_id = self.request.query_params.get("perfil_id")
-        device_uuid = self.request.query_params.get("device_uuid")
         if perfil_id:
             qs = qs.filter(Q(cliente_id=perfil_id) | Q(motorista_id=perfil_id))
-        if device_uuid:
-            qs = qs.filter(
-                Q(cliente__device__device_uuid=device_uuid) | Q(motorista__device__device_uuid=device_uuid)
-            )
         return qs.order_by("-criado_em")
 
     def create(self, request, *args, **kwargs):
@@ -105,10 +109,14 @@ class CorridaViewSet(viewsets.ModelViewSet):
             return False
         agora = datetime.now(timezone.utc)
         if agora - referencia > timedelta(minutes=2):
-            corrida.status = "rejeitada"
+            if corrida.motorista_id:
+                tentativa_lista = set(corrida.motoristas_tentados or [])
+                tentativa_lista.add(corrida.motorista_id)
+                corrida.motoristas_tentados = list(tentativa_lista)
+            corrida.status = "aguardando"
             corrida.motorista = None
-            corrida.save(update_fields=["status", "motorista", "atualizado_em"])
-            self._atribuir_motorista_proximo(corrida)
+            corrida.save(update_fields=["status", "motorista", "atualizado_em", "motoristas_tentados"])
+            self._atribuir_motorista_proximo(corrida, excluir_motorista_id=corrida.motorista_id)
             return True
         return False
 
@@ -120,16 +128,19 @@ class CorridaViewSet(viewsets.ModelViewSet):
             return None
         limite_tempo = datetime.now(timezone.utc) - timedelta(minutes=PING_MAX_AGE_MINUTES)
         pings = (
-            LocalizacaoPing.objects.select_related("perfil__device")
+            LocalizacaoPing.objects.select_related("perfil__user")
             .filter(perfil__tipo="ecotaxista", criado_em__gte=limite_tempo)
             .order_by("-criado_em")
         )
         vistos = set()
         candidatos = []
+        excluidos = set(corrida.motoristas_tentados or [])
         for ping in pings:
             if ping.perfil_id in vistos:
                 continue
             if excluir_motorista_id and ping.perfil_id == excluir_motorista_id:
+                continue
+            if ping.perfil_id in excluidos:
                 continue
             dist = _haversine_km(
                 float(corrida.origem_lat),
@@ -145,7 +156,10 @@ class CorridaViewSet(viewsets.ModelViewSet):
         novo_motorista = candidatos[0][1]
         corrida.motorista = novo_motorista
         corrida.status = "aguardando"
-        corrida.save(update_fields=["motorista", "status", "atualizado_em"])
+        tentativa_lista = set(corrida.motoristas_tentados or [])
+        tentativa_lista.add(novo_motorista.id)
+        corrida.motoristas_tentados = list(tentativa_lista)
+        corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
         return novo_motorista
 
     @action(detail=False, methods=["post"], url_path="solicitar")
@@ -157,6 +171,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             perfil = Perfil.objects.get(id=data["perfil_id"], tipo__in=["cliente", "passageiro"])
         except Perfil.DoesNotExist:
             return Response({"detail": "Perfil de passageiro/cliente não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if perfil.user_id and request.user and request.user.is_authenticated and perfil.user_id != request.user.id:
+            raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
 
         corrida_existente = (
             Corrida.objects.filter(cliente=perfil, status__in=ACTIVE_STATUSES)
@@ -178,6 +194,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             origem_endereco=data.get("origem_endereco", ""),
             destino_endereco=data.get("destino_endereco", ""),
         )
+        self._atribuir_motorista_proximo(corrida)
         return Response(CorridaSerializer(corrida).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="aceitar")
@@ -194,6 +211,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
         except Perfil.DoesNotExist:
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if motorista.user_id and request.user and request.user.is_authenticated and motorista.user_id != request.user.id:
+            raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
         if corrida.status != "aguardando":
             return Response({"detail": f"Corrida não pode ser aceita no status {corrida.status}."}, status=status.HTTP_409_CONFLICT)
         if corrida.motorista and corrida.motorista_id != motorista.id:
@@ -215,6 +234,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
         except Perfil.DoesNotExist:
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if motorista.user_id and request.user and request.user.is_authenticated and motorista.user_id != request.user.id:
+            raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
         if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
         if corrida.status != "aceita":
@@ -235,6 +256,8 @@ class CorridaViewSet(viewsets.ModelViewSet):
             motorista = Perfil.objects.get(id=motorista_id, tipo="ecotaxista")
         except Perfil.DoesNotExist:
             return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if motorista.user_id and request.user and request.user.is_authenticated and motorista.user_id != request.user.id:
+            raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
         if not corrida.motorista or corrida.motorista_id != motorista.id:
             return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
         if corrida.status != "em_andamento":
@@ -267,8 +290,12 @@ class CorridaViewSet(viewsets.ModelViewSet):
         excluir_id = request.data.get("excluir_motorista_id")
         corrida.motorista = None
         corrida.status = "aguardando"
-        corrida.save(update_fields=["motorista", "status", "atualizado_em"])
-        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=excluir_id if excluir_id else None)
+        if excluir_id:
+            tentativa_lista = set(corrida.motoristas_tentados or [])
+            tentativa_lista.add(int(excluir_id))
+            corrida.motoristas_tentados = list(tentativa_lista)
+        corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
+        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=int(excluir_id) if excluir_id else None)
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="status")
@@ -284,8 +311,10 @@ class CorridaViewSet(viewsets.ModelViewSet):
                 corrida.motorista = motorista
             except Perfil.DoesNotExist:
                 return Response({"detail": "Motorista não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+        if corrida.motorista_id and corrida.motorista_id not in (corrida.motoristas_tentados or []):
+            corrida.motoristas_tentados = list(set(corrida.motoristas_tentados or []) | {corrida.motorista_id})
         corrida.status = novo_status
-        corrida.save(update_fields=["status", "motorista", "atualizado_em"])
+        corrida.save(update_fields=["status", "motorista", "atualizado_em", "motoristas_tentados"])
         return Response(CorridaSerializer(corrida).data)
 
     @action(
@@ -313,6 +342,12 @@ class CorridaViewSet(viewsets.ModelViewSet):
         )
         if not corrida:
             return Response({}, status=status.HTTP_200_OK)
+        try:
+            perfil = Perfil.objects.get(id=motorista_id_int)
+            if perfil.user_id and request.user and request.user.is_authenticated and perfil.user_id != request.user.id:
+                return Response({}, status=status.HTTP_403_FORBIDDEN)
+        except Perfil.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
         if self._corrida_expirada(corrida):
             return Response({}, status=status.HTTP_200_OK)
         # ignora corridas cujo motorista não pingou recentemente
@@ -350,28 +385,41 @@ class CorridaViewSet(viewsets.ModelViewSet):
         )
         if not corrida:
             return Response({}, status=status.HTTP_200_OK)
+        try:
+            perfil = Perfil.objects.get(id=passageiro_id_int)
+            if perfil.user_id and request.user and request.user.is_authenticated and perfil.user_id != request.user.id:
+                return Response({}, status=status.HTTP_403_FORBIDDEN)
+        except Perfil.DoesNotExist:
+            return Response({}, status=status.HTTP_404_NOT_FOUND)
         if self._corrida_expirada(corrida):
             return Response({}, status=status.HTTP_200_OK)
         return Response(CorridaSerializer(corrida).data)
 
 
 class LocalizacaoPingViewSet(viewsets.ModelViewSet):
-    queryset = LocalizacaoPing.objects.select_related("perfil__device").all()
+    queryset = LocalizacaoPing.objects.select_related("perfil__user").all()
     serializer_class = LocalizacaoPingSerializer
     http_method_names = ["get", "post"]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
         perfil_id = self.request.query_params.get("perfil_id")
-        device_uuid = self.request.query_params.get("device_uuid")
         if perfil_id:
             qs = qs.filter(perfil_id=perfil_id)
-        if device_uuid:
-            qs = qs.filter(perfil__device__device_uuid=device_uuid)
         return qs.order_by("-criado_em")
+
+    def perform_create(self, serializer):
+        perfil = serializer.validated_data.get("perfil")
+        user = self.request.user
+        if perfil and perfil.user_id and user and user.is_authenticated and perfil.user_id != user.id:
+            raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
+        serializer.save()
 
 
 class MotoristasProximosView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         try:
             lat = float(request.query_params.get("lat"))
@@ -403,7 +451,7 @@ class MotoristasProximosView(APIView):
             resposta.append(
                 {
                     "perfil_id": ping.perfil_id,
-                    "device_uuid": str(ping.perfil.device.device_uuid),
+                    "device_uuid": str(ping.perfil.device_uuid),
                     "latitude": float(ping.latitude),
                     "longitude": float(ping.longitude),
                     "precisao_m": ping.precisao_m,

@@ -14,7 +14,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/map_config.dart';
 import '../../services/geo_service.dart';
-import '../device/device_provider.dart';
 import '../rides/rides_service.dart';
 import '../auth/auth_provider.dart';
 
@@ -244,8 +243,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Future<void> _carregarCorridaAtiva() async {
     try {
-      final device = ref.read(deviceProvider).valueOrNull;
-      if (device == null) return;
+      final user = ref.read(authProvider).valueOrNull;
+      final perfilId = user?.perfilId ?? 0;
+      if (perfilId == 0) return;
       final prefs = await SharedPreferences.getInstance();
       final corridaSalva = prefs.getInt(_prefsCorridaKey);
       final rides = RidesService();
@@ -253,15 +253,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       if (corridaSalva != null) {
         corrida = await rides.obterCorrida(corridaSalva);
       }
-      corrida ??= await rides.buscarCorridaAtiva(perfilId: device.perfilId);
+      corrida ??= await rides.buscarCorridaAtiva(perfilId: perfilId);
       final current = corrida;
       if (current != null) {
         setState(() {
-        _corridaAtiva = true;
-        _corridaIdAtual = current.id;
-        _mensagem = 'Corrida ativa (${current.status}).';
-        if (current.origemLat != null && current.origemLng != null) {
-          _origemLatLng = LatLng(current.origemLat!, current.origemLng!);
+          _corridaAtiva = true;
+          _corridaIdAtual = current.id;
+          _mensagem = 'Corrida ativa (${current.status}).';
+          if (current.origemLat != null && current.origemLng != null) {
+            _origemLatLng = LatLng(current.origemLat!, current.origemLng!);
           }
           if (current.destinoLat != null && current.destinoLng != null) {
             _destinoLatLng = LatLng(current.destinoLat!, current.destinoLng!);
@@ -384,7 +384,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _mensagem = null;
     });
     try {
-      await ref.read(deviceProvider.notifier).ensureRegistrado(tipo: 'ecotaxista');
+      await ref.read(authProvider.notifier).atualizarPerfil(tipo: 'ecotaxista');
       if (!mounted) return;
       context.go('/motorista');
     } catch (e) {
@@ -504,9 +504,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _mensagem = null;
     });
     try {
-      final device = ref.read(deviceProvider).valueOrNull;
-      if (device == null) {
-        setState(() => _mensagem = 'Dispositivo não registrado.');
+      final user = ref.read(authProvider).valueOrNull;
+      final perfilId = user?.perfilId ?? 0;
+      if (perfilId == 0) {
+        setState(() => _mensagem = 'Perfil do usuário não encontrado.');
         return;
       }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
@@ -531,7 +532,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
       final rides = RidesService();
       final corrida = await rides.solicitar(
-        perfilId: device.perfilId,
+        perfilId: perfilId,
         origemLat: _round6(_origemLatLng!.latitude),
         origemLng: _round6(_origemLatLng!.longitude),
         destinoLat: _round6(_destinoLatLng!.latitude),
@@ -637,7 +638,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
-    final device = ref.watch(deviceProvider);
     final auth = ref.watch(authProvider);
     final loggedIn = auth.valueOrNull != null;
     return Scaffold(
@@ -693,16 +693,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: device.when(
-                data: (info) => Text('UUID: ${info?.deviceUuid ?? "registrando..."}'),
-                loading: () => const Text('Registrando dispositivo...'),
-                error: (e, _) => Text('Erro: $e'),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: auth.when(
-                data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+                data: (user) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+                    if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
+                  ],
+                ),
                 loading: () => const Text('Verificando conta...'),
                 error: (e, _) => Text('Erro na conta: $e'),
               ),

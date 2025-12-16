@@ -34,10 +34,39 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     }
   }
 
-  Future<AuthUser?> register(String email, String password, {String nome = ''}) async {
+  Future<AuthUser?> register(String email, String password, {String nome = '', String telefone = ''}) async {
     state = const AsyncLoading();
     try {
-      final user = await _service.register(email: email, password: password, nome: nome);
+      final user = await _service.register(
+        email: email,
+        password: password,
+        nome: nome,
+        telefone: telefone,
+      );
+      state = AsyncData(user);
+      return user;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+
+  Future<AuthUser?> atualizarPerfil({
+    String? nome,
+    String? telefone,
+    String? tipo,
+    String? deviceUuid,
+    String? plataforma,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      final user = await _service.atualizarPerfil(
+        nome: nome,
+        telefone: telefone,
+        tipo: tipo,
+        deviceUuid: deviceUuid,
+        plataforma: plataforma,
+      );
       state = AsyncData(user);
       return user;
     } catch (e, st) {

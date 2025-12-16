@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api_config.dart';
 import '../auth/auth_provider.dart';
-import '../device/device_provider.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -36,29 +35,15 @@ class _SplashPageState extends ConsumerState<SplashPage> {
         context.go('/auth');
         return;
       }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _erro = 'Falha ao verificar login.';
-        _detalhe = e.toString();
-      });
-      return;
-    }
-    final notifier = ref.read(deviceProvider.notifier);
-    try {
-      final info = await notifier.ensureRegistrado();
-      if (!mounted) return;
-      if (info?.perfilTipo == 'passageiro') {
-        context.go('/passageiro');
-      } else if (info?.perfilTipo == 'ecotaxista') {
+      if (user.perfilTipo == 'ecotaxista') {
         context.go('/motorista');
       } else {
-        context.go('/home');
+        context.go('/passageiro');
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _erro = 'Falha ao registrar dispositivo. Verifique a API.';
+        _erro = 'Falha ao verificar login.';
         _detalhe = e.toString();
       });
     }

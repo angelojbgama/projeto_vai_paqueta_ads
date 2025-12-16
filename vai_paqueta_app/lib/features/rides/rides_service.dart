@@ -84,10 +84,9 @@ class MotoristaProximo {
 class RidesService {
   final Dio _dio = ApiClient.client;
 
-  Future<List<CorridaResumo>> listarCorridas({int? perfilId, String? deviceUuid}) async {
+  Future<List<CorridaResumo>> listarCorridas({int? perfilId}) async {
     final resp = await _dio.get('/corridas/', queryParameters: {
       if (perfilId != null) 'perfil_id': perfilId,
-      if (deviceUuid != null) 'device_uuid': deviceUuid,
     });
     final data = resp.data as List<dynamic>;
     return data.map((e) => CorridaResumo.fromJson(e as Map<String, dynamic>)).toList();

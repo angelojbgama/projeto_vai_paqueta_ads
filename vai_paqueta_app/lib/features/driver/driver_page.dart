@@ -12,7 +12,6 @@ import 'package:latlong2/latlong.dart';
 
 import '../../core/map_config.dart';
 import '../auth/auth_provider.dart';
-import '../device/device_provider.dart';
 import 'driver_service.dart';
 
 class DriverPage extends ConsumerStatefulWidget {
@@ -165,8 +164,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<void> _enviarPing({bool silencioso = false}) async {
     if (_enviando) return;
-    final device = ref.read(deviceProvider).valueOrNull;
-    if (device == null || device.perfilTipo != 'ecotaxista') {
+    final user = ref.read(authProvider).valueOrNull;
+    final perfilId = user?.perfilId ?? 0;
+    final perfilTipo = user?.perfilTipo;
+    if (perfilId == 0 || perfilTipo != 'ecotaxista') {
       if (mounted) setState(() => _status = 'Use um perfil de ecotaxista para enviar pings.');
       return;
     }
@@ -187,7 +188,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     try {
       final service = DriverService();
       await service.enviarPing(
-        perfilId: device.perfilId,
+        perfilId: perfilId,
         latitude: _round6(pos.latitude),
         longitude: _round6(pos.longitude),
         precisao: pos.accuracy,
@@ -215,11 +216,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   Future<void> _verificarCorrida() async {
-    final device = ref.read(deviceProvider).valueOrNull;
-    if (device == null || device.perfilTipo != 'ecotaxista') return;
+    final user = ref.read(authProvider).valueOrNull;
+    final perfilId = user?.perfilId ?? 0;
+    if (perfilId == 0 || user?.perfilTipo != 'ecotaxista') return;
     try {
       final service = DriverService();
-      final corrida = await service.corridaAtribuida(device.perfilId);
+      final corrida = await service.corridaAtribuida(perfilId);
       if (corrida != null && corrida.isNotEmpty) {
         _corridaAtual = corrida;
         if (_modalAberto) {
@@ -243,76 +245,81 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) {
-        return StatefulBuilder(builder: (context, setModalState) {
-          _modalSetState = setModalState;
-          final corridaAtual = _corridaAtual ?? corrida;
-          final status = corridaAtual['status'] as String?;
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.local_taxi, color: Colors.green, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Corrida',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (corridaAtual['origem_endereco'] != null)
-                  Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                if (corridaAtual['destino_endereco'] != null)
-                  Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
-                if (status != null) Text('Status: $status'),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (status == 'aguardando')
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.check),
-                        label: const Text('Aceitar'),
-                        onPressed: () => _acaoCorrida('aceitar'),
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: StatefulBuilder(builder: (context, setModalState) {
+            _modalSetState = setModalState;
+            final corridaAtual = _corridaAtual ?? corrida;
+            final status = corridaAtual['status'] as String?;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.local_taxi, color: Colors.green, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Corrida',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                       ),
-                    if (status == 'aceita')
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (corridaAtual['origem_endereco'] != null)
+                    Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                  if (corridaAtual['destino_endereco'] != null)
+                    Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                  if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
+                  if (status != null) Text('Status: $status'),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (status == 'aguardando')
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.check),
+                          label: const Text('Aceitar'),
+                          onPressed: () => _acaoCorrida('aceitar'),
+                        ),
+                      if (status == 'aceita')
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Iniciar'),
+                          onPressed: () => _acaoCorrida('iniciar'),
+                        ),
+                      if (status == 'em_andamento')
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.flag),
+                          label: const Text('Finalizar'),
+                          onPressed: () => _acaoCorrida('finalizar'),
+                        ),
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Iniciar'),
-                        onPressed: () => _acaoCorrida('iniciar'),
+                        icon: const Icon(Icons.close),
+                        label: const Text('Rejeitar'),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+                        onPressed: () => _acaoCorrida('rejeitar'),
                       ),
-                    if (status == 'em_andamento')
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.flag),
-                        label: const Text('Finalizar'),
-                        onPressed: () => _acaoCorrida('finalizar'),
+                      ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Fechar'),
                       ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.close),
-                      label: const Text('Rejeitar'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
-                      onPressed: () => _acaoCorrida('rejeitar'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Fechar'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        });
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        );
       },
     );
     _modalAberto = false;
@@ -320,24 +327,25 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   Future<void> _acaoCorrida(String acao) async {
-    final device = ref.read(deviceProvider).valueOrNull;
+    final user = ref.read(authProvider).valueOrNull;
     final corridaId = _corridaAtual?['id'] as int?;
-    if (device == null || corridaId == null) return;
+    final perfilId = user?.perfilId ?? 0;
+    if (perfilId == 0 || corridaId == null) return;
     try {
       final service = DriverService();
       Map<String, dynamic>? nova;
       switch (acao) {
         case 'aceitar':
-          nova = await service.aceitarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          nova = await service.aceitarCorrida(corridaId: corridaId, motoristaId: perfilId);
           break;
         case 'iniciar':
-          nova = await service.iniciarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          nova = await service.iniciarCorrida(corridaId: corridaId, motoristaId: perfilId);
           break;
         case 'finalizar':
-          nova = await service.finalizarCorrida(corridaId: corridaId, motoristaId: device.perfilId);
+          nova = await service.finalizarCorrida(corridaId: corridaId, motoristaId: perfilId);
           break;
         case 'rejeitar':
-          await service.reatribuirCorrida(corridaId, excluirMotoristaId: device.perfilId);
+          await service.reatribuirCorrida(corridaId, excluirMotoristaId: perfilId);
           break;
         default:
           return;
@@ -363,7 +371,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _status = null;
     });
     try {
-      await ref.read(deviceProvider.notifier).ensureRegistrado(tipo: 'passageiro');
+      await ref.read(authProvider.notifier).atualizarPerfil(tipo: 'passageiro');
       if (!mounted) return;
       context.go('/passageiro');
     } catch (e) {
@@ -375,7 +383,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
-    final device = ref.watch(deviceProvider);
     final auth = ref.watch(authProvider);
     final loggedIn = auth.valueOrNull != null;
     return Scaffold(
@@ -430,20 +437,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            device.when(
-              data: (info) => Column(
+            auth.when(
+              data: (user) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('UUID: ${info?.deviceUuid ?? "-"}'),
-                  Text('Perfil: ${info?.perfilTipo ?? "-"}'),
+                  Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+                  if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
                 ],
               ),
-              loading: () => const Text('Registrando dispositivo...'),
-              error: (e, _) => Text('Erro: $e'),
-            ),
-            const SizedBox(height: 8),
-            auth.when(
-              data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
               loading: () => const Text('Verificando conta...'),
               error: (e, _) => Text('Erro na conta: $e'),
             ),

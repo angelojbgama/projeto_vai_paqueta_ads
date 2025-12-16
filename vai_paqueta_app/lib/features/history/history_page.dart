@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../device/device_provider.dart';
+import '../auth/auth_provider.dart';
 import '../rides/rides_service.dart';
 
 class HistoryPage extends ConsumerStatefulWidget {
@@ -23,9 +23,14 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   }
 
   Future<void> _carregar() async {
-    final device = ref.read(deviceProvider).valueOrNull;
-    if (device == null) {
-      setState(() => _erro = 'Dispositivo não registrado.');
+    final authState = ref.read(authProvider);
+    if (authState.isLoading) {
+      await ref.read(authProvider.future);
+    }
+    final user = ref.read(authProvider).valueOrNull;
+    final perfilId = user?.perfilId ?? 0;
+    if (perfilId == 0) {
+      setState(() => _erro = 'Perfil não encontrado.');
       return;
     }
     setState(() {
@@ -34,7 +39,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     });
     try {
       final service = RidesService();
-      final dados = await service.listarCorridas(perfilId: device.perfilId);
+      final dados = await service.listarCorridas(perfilId: perfilId);
       setState(() => _corridas = dados);
     } catch (e) {
       setState(() => _erro = 'Erro ao carregar histórico: $e');

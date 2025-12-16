@@ -1,22 +1,13 @@
 from rest_framework import serializers
 
-from .models import Corrida, Device, LocalizacaoPing, Perfil
-
-
-class DeviceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Device
-        fields = ["id", "device_uuid", "plataforma", "criado_em", "ultimo_ping"]
-        read_only_fields = ["id", "device_uuid", "criado_em", "ultimo_ping"]
+from .models import Corrida, LocalizacaoPing, Perfil
 
 
 class PerfilSerializer(serializers.ModelSerializer):
-    device_uuid = serializers.UUIDField(source="device.device_uuid", read_only=True)
-
     class Meta:
         model = Perfil
-        fields = ["id", "device", "device_uuid", "tipo", "nome", "criado_em"]
-        read_only_fields = ["id", "device_uuid", "criado_em"]
+        fields = ["id", "user", "device_uuid", "plataforma", "tipo", "nome", "criado_em", "atualizado_em"]
+        read_only_fields = ["id", "user", "device_uuid", "criado_em", "atualizado_em"]
 
 
 class CorridaSerializer(serializers.ModelSerializer):

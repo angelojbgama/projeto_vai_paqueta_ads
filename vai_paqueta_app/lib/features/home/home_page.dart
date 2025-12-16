@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
-import '../device/device_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -23,12 +22,17 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _escolherPerfil(String tipo) async {
+    final user = ref.read(authProvider).valueOrNull;
+    if (user == null) {
+      if (mounted) context.go('/auth');
+      return;
+    }
     setState(() {
       _loading = true;
       _mensagem = null;
     });
     try {
-      await ref.read(deviceProvider.notifier).ensureRegistrado(tipo: tipo);
+      await ref.read(authProvider.notifier).atualizarPerfil(tipo: tipo);
       setState(() => _mensagem = 'Entrou como ${tipo == "passageiro" ? "Passageiro" : "EcoTaxista"}');
       if (!mounted) return;
       if (tipo == 'passageiro') {
@@ -45,7 +49,6 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final device = ref.watch(deviceProvider);
     final auth = ref.watch(authProvider);
     final loggedIn = auth.valueOrNull != null;
 
@@ -93,12 +96,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              device.when(
-                data: (info) => Text('UUID: ${info?.deviceUuid ?? "registrando..."}'),
-                loading: () => const Text('Registrando dispositivo...'),
-                error: (e, _) => Text('Erro: $e'),
-              ),
-              const SizedBox(height: 8),
               auth.when(
                 data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Não autenticado'),
                 loading: () => const Text('Verificando conta...'),
