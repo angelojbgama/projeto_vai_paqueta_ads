@@ -664,6 +664,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Editar dados',
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.goNamed('perfil'),
+          ),
           if (loggedIn)
             IconButton(
               tooltip: 'Sair',
@@ -694,13 +699,18 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: auth.when(
-                data: (user) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
-                    if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
-                  ],
-                ),
+              data: (user) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
+                  if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
+                  TextButton.icon(
+                    onPressed: () => context.goNamed('perfil'),
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Editar dados'),
+                  ),
+                ],
+              ),
                 loading: () => const Text('Verificando conta...'),
                 error: (e, _) => Text('Erro na conta: $e'),
               ),

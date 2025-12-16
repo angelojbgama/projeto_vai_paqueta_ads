@@ -162,6 +162,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   double _round6(double value) => double.parse(value.toStringAsFixed(6));
 
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   Future<void> _enviarPing({bool silencioso = false}) async {
     if (_enviando) return;
     final user = ref.read(authProvider).valueOrNull;
@@ -231,6 +237,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         }
       } else {
         _corridaAtual = null;
+        if (_modalAberto && mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          _modalAberto = false;
+          _modalSetState = null;
+        }
       }
     } catch (e) {
       // silencioso para polling
@@ -239,91 +250,205 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida) async {
+    if (_modalAberto) return;
     _modalAberto = true;
     _corridaAtual = corrida;
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: false,
-      enableDrag: false,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) {
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: StatefulBuilder(builder: (context, setModalState) {
-            _modalSetState = setModalState;
-            final corridaAtual = _corridaAtual ?? corrida;
-            final status = corridaAtual['status'] as String?;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.local_taxi, color: Colors.green, size: 24),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Corrida',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (corridaAtual['origem_endereco'] != null)
-                    Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                  if (corridaAtual['destino_endereco'] != null)
-                    Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                  if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
-                  if (status != null) Text('Status: $status'),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      if (status == 'aguardando')
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.check),
-                          label: const Text('Aceitar'),
-                          onPressed: () => _acaoCorrida('aceitar'),
+    if (!mounted) {
+      _modalAberto = false;
+      return;
+    }
+    await Future<void>.delayed(Duration.zero);
+    try {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierLabel: 'Corrida',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, anim, __) {
+          return SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Material(
+                  color: Theme.of(context).dialogBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  child: StatefulBuilder(builder: (dialogContext, setModalState) {
+                    _modalSetState = setModalState;
+                    final corridaAtual = _corridaAtual ?? corrida;
+                    final status = corridaAtual['status'] as String?;
+                    final origem = (() {
+                      final lat = _asDouble(corridaAtual['origem_lat']);
+                      final lng = _asDouble(corridaAtual['origem_lng']);
+                      if (lat == null || lng == null) return null;
+                      return LatLng(lat, lng);
+                    })();
+                    final destino = (() {
+                      final lat = _asDouble(corridaAtual['destino_lat']);
+                      final lng = _asDouble(corridaAtual['destino_lng']);
+                      if (lat == null || lng == null) return null;
+                      return LatLng(lat, lng);
+                    })();
+                    final passageiroNome = (() {
+                      final cliente = corridaAtual['cliente'];
+                      if (cliente is Map<String, dynamic>) {
+                        final nome = (cliente['nome'] as String?)?.trim();
+                        if (nome != null && nome.isNotEmpty) return nome;
+                        final id = cliente['id'];
+                        if (id != null) return 'Passageiro #$id';
+                      }
+                      return null;
+                    })();
+                    final motoristaPos = _posicao ?? (() {
+                      final lat = _asDouble(corridaAtual['motorista_lat']);
+                      final lng = _asDouble(corridaAtual['motorista_lng']);
+                      if (lat == null || lng == null) return null;
+                      return LatLng(lat, lng);
+                    })();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.local_taxi, color: Colors.green, size: 24),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Corrida',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            if (passageiroNome != null)
+                              Text('Passageiro: $passageiroNome', style: Theme.of(context).textTheme.bodyMedium),
+                            if (corridaAtual['origem_endereco'] != null)
+                              Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                            if (corridaAtual['destino_endereco'] != null)
+                              Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
+                            if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
+                            if (status != null) Text('Status: $status'),
+                            const SizedBox(height: 12),
+                            if (origem != null || destino != null || motoristaPos != null)
+                              SizedBox(
+                                height: 220,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: FlutterMap(
+                                    options: MapOptions(
+                                      initialCenter: origem ?? motoristaPos ?? destino ?? const LatLng(-22.763, -43.106),
+                                      initialZoom: 14,
+                                      interactionOptions: const InteractionOptions(flags: ~InteractiveFlag.rotate),
+                                    ),
+                                    children: [
+                                      TileLayer(
+                                        urlTemplate: _tileUrl,
+                                        tileProvider: _tileProvider,
+                                        userAgentPackageName: 'com.example.vai_paqueta_app',
+                                        minZoom: _tileMinZoom ?? 0,
+                                        maxZoom: _tileMaxZoom ?? double.infinity,
+                                        minNativeZoom: _tileMinNativeZoom ?? 0,
+                                        maxNativeZoom: _tileMaxNativeZoom ?? 19,
+                                      ),
+                                      MarkerLayer(
+                                        markers: [
+                                          if (origem != null)
+                                            Marker(
+                                              point: origem,
+                                              width: 36,
+                                              height: 36,
+                                              child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                            ),
+                                          if (destino != null)
+                                            Marker(
+                                              point: destino,
+                                              width: 36,
+                                              height: 36,
+                                              child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                                            ),
+                                          if (motoristaPos != null)
+                                            Marker(
+                                              point: motoristaPos,
+                                              width: 36,
+                                              height: 36,
+                                              child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                            ),
+                                        ],
+                                      ),
+                                      if (origem != null && motoristaPos != null)
+                                        PolylineLayer(
+                                          polylines: [
+                                            Polyline(points: [motoristaPos, origem], strokeWidth: 3, color: Colors.orangeAccent),
+                                          ],
+                                        ),
+                                      if (origem != null && destino != null)
+                                        PolylineLayer(
+                                          polylines: [
+                                            Polyline(points: [origem, destino], strokeWidth: 3, color: Colors.blueAccent),
+                                          ],
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                if (status == 'aguardando')
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.check),
+                                    label: const Text('Aceitar'),
+                                    onPressed: () => _acaoCorrida('aceitar'),
+                                  ),
+                                if (status == 'aceita')
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.play_arrow),
+                                    label: const Text('Iniciar'),
+                                    onPressed: () => _acaoCorrida('iniciar'),
+                                  ),
+                                if (status == 'em_andamento')
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.flag),
+                                    label: const Text('Finalizar'),
+                                    onPressed: () => _acaoCorrida('finalizar'),
+                                  ),
+                                ElevatedButton.icon(
+                                  icon: const Icon(Icons.close),
+                                  label: const Text('Rejeitar'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+                                  onPressed: () => _acaoCorrida('rejeitar'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
-                      if (status == 'aceita')
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Iniciar'),
-                          onPressed: () => _acaoCorrida('iniciar'),
-                        ),
-                      if (status == 'em_andamento')
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.flag),
-                          label: const Text('Finalizar'),
-                          onPressed: () => _acaoCorrida('finalizar'),
-                        ),
-                      ElevatedButton.icon(
-                        icon: const Icon(Icons.close),
-                        label: const Text('Rejeitar'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
-                        onPressed: () => _acaoCorrida('rejeitar'),
                       ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Fechar'),
-                      ),
-                    ],
-                  ),
-                ],
+                    );
+                  }),
+                ),
               ),
-            );
-          }),
-        );
-      },
-    );
-    _modalAberto = false;
-    _modalSetState = null;
+            ),
+          );
+        },
+        transitionBuilder: (ctx, anim, secondary, child) {
+          return FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
+        },
+      );
+    } finally {
+      _modalAberto = false;
+      _modalSetState = null;
+    }
   }
 
   Future<void> _acaoCorrida(String acao) async {
@@ -346,7 +471,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           break;
         case 'rejeitar':
           await service.reatribuirCorrida(corridaId, excluirMotoristaId: perfilId);
-          break;
+          _corridaAtual = null;
+          _modalSetState?.call(() {});
+          if (_modalAberto && mounted) {
+            Navigator.of(context, rootNavigator: true).pop();
+            _modalAberto = false;
+          }
+          if (mounted) {
+            setState(() => _status = 'Corrida enviada para outro motorista.');
+          }
+          _verificarCorrida();
+          return;
         default:
           return;
       }
@@ -356,7 +491,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _modalSetState?.call(() {});
       if (!mounted) return;
       setState(() => _status = 'Status da corrida atualizado.');
-      if (acao == 'rejeitar' || (nova != null && nova['status'] == 'concluida')) {
+      if (acao == 'finalizar' || (nova != null && nova['status'] == 'concluida')) {
+        if (_modalAberto) {
+          Navigator.of(context, rootNavigator: true).pop();
+          _modalAberto = false;
+          _modalSetState = null;
+        }
+      }
+      if (nova != null && nova['status'] == 'em_andamento' && !_modalAberto) {
+        _mostrarModalCorrida(nova);
+      }
+      if (_modalAberto && nova == null && acao != 'rejeitar') {
         _modalAberto = false;
       }
     } catch (e) {
@@ -409,6 +554,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'Editar dados',
+            icon: const Icon(Icons.settings),
+            onPressed: () => context.goNamed('perfil'),
+          ),
           if (loggedIn)
             IconButton(
               tooltip: 'Sair',
@@ -443,6 +593,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                 children: [
                   Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
                   if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
+                  TextButton.icon(
+                    onPressed: () => context.goNamed('perfil'),
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Editar dados'),
+                  ),
                 ],
               ),
               loading: () => const Text('Verificando conta...'),

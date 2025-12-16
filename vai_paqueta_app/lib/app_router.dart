@@ -6,6 +6,7 @@ import 'features/driver/driver_page.dart';
 import 'features/history/history_page.dart';
 import 'features/home/home_page.dart';
 import 'features/passenger/passenger_page.dart';
+import 'features/profile/profile_edit_page.dart';
 import 'features/splash/splash_page.dart';
 
 GoRouter buildRouter() {
@@ -35,6 +36,11 @@ GoRouter buildRouter() {
       GoRoute(
         path: '/passageiro',
         builder: (context, state) => const PassengerPage(),
+      ),
+      GoRoute(
+        name: 'perfil',
+        path: '/perfil',
+        builder: (context, state) => const ProfileEditPage(),
       ),
     ],
   );
