@@ -1,13 +1,23 @@
 from rest_framework import serializers
 
-from .models import Corrida, LocalizacaoPing, Perfil
+from .models import Corrida, LocalizacaoPing, Perfil, UserContato
 
 
 class PerfilSerializer(serializers.ModelSerializer):
+    telefone = serializers.SerializerMethodField()
+
     class Meta:
         model = Perfil
-        fields = ["id", "user", "device_uuid", "plataforma", "tipo", "nome", "criado_em", "atualizado_em"]
+        fields = ["id", "user", "device_uuid", "plataforma", "tipo", "nome", "telefone", "criado_em", "atualizado_em"]
         read_only_fields = ["id", "user", "device_uuid", "criado_em", "atualizado_em"]
+
+    def get_telefone(self, obj):
+        if not obj.user:
+            return None
+        try:
+            return obj.user.contato.telefone
+        except UserContato.DoesNotExist:
+            return None
 
 
 class CorridaSerializer(serializers.ModelSerializer):

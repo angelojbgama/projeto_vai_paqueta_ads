@@ -132,7 +132,11 @@ class CorridaViewSet(viewsets.ModelViewSet):
             corrida.status = "aguardando"
             corrida.motorista = None
             corrida.save(update_fields=["status", "motorista", "atualizado_em", "motoristas_tentados"])
-            self._atribuir_motorista_proximo(corrida, excluir_motorista_id=motorista_expirado_id)
+            self._atribuir_motorista_proximo(
+                corrida,
+                excluir_motorista_id=motorista_expirado_id,
+                allow_reset=False,
+            )
             return True
         return False
 
@@ -390,7 +394,11 @@ class CorridaViewSet(viewsets.ModelViewSet):
                 (corrida.motoristas_tentados or []) + [int(excluir_id)]
             )
         corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
-        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=int(excluir_id) if excluir_id else None)
+        self._atribuir_motorista_proximo(
+            corrida,
+            excluir_motorista_id=int(excluir_id) if excluir_id else None,
+            allow_reset=False,
+        )
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="rejeitar")
@@ -417,7 +425,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             (corrida.motoristas_tentados or []) + [motorista.id]
         )
         corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
-        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=motorista.id)
+        self._atribuir_motorista_proximo(corrida, excluir_motorista_id=motorista.id, allow_reset=False)
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="status")
@@ -514,7 +522,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             corrida.refresh_from_db()
         if corrida.status == "aguardando" and not corrida.motorista_id:
             # tenta reatribuir periodicamente até encontrar alguém
-            self._atribuir_motorista_proximo(corrida)
+            self._atribuir_motorista_proximo(corrida, allow_reset=False)
             corrida.refresh_from_db()
         return Response(CorridaSerializer(corrida).data)
 

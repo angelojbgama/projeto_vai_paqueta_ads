@@ -111,6 +111,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     return zooms;
   }
 
+  String _normalizarStatus(String? status) {
+    final raw = (status ?? '').trim().toLowerCase();
+    if (raw.isEmpty) return '';
+    final normalized = raw.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    if (normalized == 'aguardando_motorista') return 'aguardando';
+    return normalized;
+  }
+
   Future<void> _atualizarPosicao() async {
     if (!mounted) return;
     setState(() {
@@ -276,7 +284,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   child: StatefulBuilder(builder: (dialogContext, setModalState) {
                     _modalSetState = setModalState;
                     final corridaAtual = _corridaAtual ?? corrida;
-                    final status = corridaAtual['status'] as String?;
+                    final statusRaw = corridaAtual['status'] as String?;
+                    final status = _normalizarStatus(statusRaw);
                     final origem = (() {
                       final lat = _asDouble(corridaAtual['origem_lat']);
                       final lng = _asDouble(corridaAtual['origem_lng']);
@@ -330,7 +339,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                             if (corridaAtual['destino_endereco'] != null)
                               Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
                             if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
-                            if (status != null) Text('Status: $status'),
+                            if (statusRaw != null) Text('Status: $statusRaw'),
                             const SizedBox(height: 12),
                             if (origem != null || destino != null || motoristaPos != null)
                               SizedBox(
@@ -405,6 +414,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                     label: const Text('Aceitar'),
                                     onPressed: () => _acaoCorrida('aceitar'),
                                   ),
+                                if (status == 'aguardando' || status == 'aceita')
+                                  ElevatedButton.icon(
+                                    icon: const Icon(Icons.close),
+                                    label: const Text('Rejeitar'),
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
+                                    onPressed: () => _acaoCorrida('rejeitar'),
+                                  ),
                                 if (status == 'aceita')
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.play_arrow),
@@ -417,12 +433,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                     label: const Text('Finalizar'),
                                     onPressed: () => _acaoCorrida('finalizar'),
                                   ),
-                                ElevatedButton.icon(
-                                  icon: const Icon(Icons.close),
-                                  label: const Text('Rejeitar'),
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
-                                  onPressed: () => _acaoCorrida('rejeitar'),
-                                ),
                               ],
                             ),
                           ],

@@ -37,6 +37,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   String? _mensagem;
   bool _corridaAtiva = false;
   int? _corridaIdAtual;
+  String? _statusCorrida;
   TileProvider _tileProvider = NetworkTileProvider();
   String _tileUrl = MapTileConfig.networkTemplate;
   double? _tileMinZoom;
@@ -57,6 +58,38 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Timer? _corridaTimer;
   bool _appPausado = false;
   Duration _corridaPollInterval = const Duration(seconds: 10);
+  bool get _podeCancelarCorrida {
+    return _corridaAtiva &&
+        _corridaIdAtual != null &&
+        _normalizarStatus(_statusCorrida) == 'aguardando';
+  }
+
+  String _normalizarStatus(String? status) {
+    final raw = (status ?? '').trim().toLowerCase();
+    if (raw.isEmpty) return '';
+    final normalized = raw.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    if (normalized == 'aguardando_motorista') return 'aguardando';
+    return normalized;
+  }
+
+  void _encerrarCorrida({bool limparEnderecos = false}) {
+    _corridaAtiva = false;
+    _corridaIdAtual = null;
+    _statusCorrida = null;
+    _motoristaLatLng = null;
+    _rotaMotorista = [];
+    _rota = [];
+    if (limparEnderecos) {
+      _origemCtrl.clear();
+      _destinoCtrl.clear();
+      _origemLatLng = null;
+      _destinoLatLng = null;
+      _sugestoesOrigem = [];
+      _sugestoesDestino = [];
+    }
+    _salvarCorridaLocal(null);
+    _corridaTimer?.cancel();
+  }
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
@@ -259,6 +292,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         setState(() {
           _corridaAtiva = true;
           _corridaIdAtual = current.id;
+          _statusCorrida = current.status;
           _mensagem = 'Corrida ativa (${current.status}).';
           if (current.origemLat != null && current.origemLng != null) {
             _origemLatLng = LatLng(current.origemLat!, current.origemLng!);
@@ -310,18 +344,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       if (corrida == null) {
         if (!mounted) return false;
         setState(() {
-          _corridaAtiva = false;
-          _corridaIdAtual = null;
-          _motoristaLatLng = null;
+          _encerrarCorrida();
           _mensagem = 'Corrida não encontrada.';
         });
-        _salvarCorridaLocal(null);
-        _corridaTimer?.cancel();
         return false;
       }
       if (!mounted) return false;
       setState(() {
         _mensagem = 'Status: ${corrida.status}';
+        _statusCorrida = corrida.status;
         if (corrida.origemLat != null && corrida.origemLng != null) {
           _origemLatLng = LatLng(corrida.origemLat!, corrida.origemLng!);
         }
@@ -336,13 +367,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _rotaMotorista = [];
         }
         if (corrida.status == 'concluida' || corrida.status == 'cancelada' || corrida.status == 'rejeitada') {
-          _corridaAtiva = false;
-          _corridaIdAtual = null;
-          _motoristaLatLng = null;
-          _rotaMotorista = [];
-          _rota = [];
-          _salvarCorridaLocal(null);
-          _corridaTimer?.cancel();
+          _encerrarCorrida(limparEnderecos: corrida.status == 'concluida');
         }
       });
       return true;
@@ -474,6 +499,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Future<void> _pedirCorrida() async {
     if (_corridaAtiva && _corridaIdAtual != null) {
+      if (!_podeCancelarCorrida) {
+        setState(() => _mensagem = 'Corrida já aceita. Não é possível cancelar agora.');
+        return;
+      }
       setState(() {
         _loading = true;
         _mensagem = null;
@@ -482,15 +511,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         final rides = RidesService();
         await rides.cancelarCorrida(_corridaIdAtual!);
         setState(() {
-          _corridaAtiva = false;
-          _corridaIdAtual = null;
-          _rota = [];
-          _rotaMotorista = [];
-          _motoristaLatLng = null;
+          _encerrarCorrida();
           _mensagem = 'Corrida cancelada.';
         });
-        _salvarCorridaLocal(null);
-        _corridaTimer?.cancel();
       } catch (e) {
         setState(() => _mensagem = 'Erro ao cancelar: $e');
       } finally {
@@ -545,6 +568,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _mensagem = 'Corrida criada, aguardando motorista aceitar.';
         _corridaAtiva = true;
         _corridaIdAtual = corrida.id;
+        _statusCorrida = corrida.status;
         _motoristaLatLng = null;
       });
       _salvarCorridaLocal(_corridaIdAtual);
@@ -888,13 +912,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
-                      onPressed: _loading ? null : _pedirCorrida,
-                      icon: Icon(_corridaAtiva ? Icons.cancel : Icons.local_taxi),
+                      onPressed: _loading || (_corridaAtiva && !_podeCancelarCorrida) ? null : _pedirCorrida,
+                      icon: Icon(
+                        _corridaAtiva
+                            ? (_podeCancelarCorrida ? Icons.cancel : Icons.timelapse)
+                            : Icons.local_taxi,
+                      ),
                       label: Text(
                         _loading
                             ? 'Enviando...'
                             : _corridaAtiva
-                                ? 'Cancelar corrida'
+                                ? (_podeCancelarCorrida ? 'Cancelar corrida' : 'Corrida em andamento')
                                 : 'Pedir corrida',
                       ),
                     ),
