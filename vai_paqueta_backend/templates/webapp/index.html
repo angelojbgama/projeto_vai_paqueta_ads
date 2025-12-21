@@ -1,0 +1,1191 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vai Paquetá | Web App</title>
+  <link rel="stylesheet" href="{% static 'landing/assets/css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'landing/assets/css/LineIcons.2.0.css' %}">
+  <link rel="stylesheet" href="{% static 'leaflet/leaflet.css' %}">
+  <style>
+    :root { --vp-primary: #388E3C; --vp-bg: #f8fafb; --vp-dark: #0c1a12; }
+    body { background: var(--vp-bg); color: #1f2933; font-family: "Inter", sans-serif; }
+    .vp-header { background: #fff; border-bottom: 1px solid #e5e7eb; }
+    .vp-header .btn { background: var(--vp-primary); border-color: var(--vp-primary); }
+    .vp-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.04);}
+    .vp-title { color: var(--vp-dark); font-weight: 700; }
+    .vp-badge { background: var(--vp-primary); color: #fff; padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+    .vp-section { padding: 32px 0; }
+    .vp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .vp-label { font-weight: 600; margin-bottom: 4px; }
+    .vp-muted { color: #6b7280; font-size: 14px; }
+    pre { background: #0b1724; color: #cfe3ff; padding: 12px; border-radius: 10px; font-size: 13px; overflow-x: auto; }
+    #map { width: 100%; height: 360px; border-radius: 12px; border: 1px solid #e5e7eb; }
+    .nav-pills .nav-link.active { background: var(--vp-primary); }
+    /* Login shell */
+    .vp-login-shell { min-height: 70vh; display: flex; align-items: center; }
+    .vp-login-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 18px; padding: 28px; box-shadow: 0 15px 60px rgba(0,0,0,0.06); width: 100%; }
+    .vp-login-hero { background: linear-gradient(135deg, rgba(56,142,60,0.12), rgba(56,142,60,0.05)); border-radius: 14px; padding: 20px; height: 100%; }
+    .vp-login-hero ul { padding-left: 18px; }
+    .vp-login-hero li { margin-bottom: 8px; color: #1f2933; }
+    .vp-toggle { background: #f1f5f9; border-radius: 10px; padding: 6px; display: inline-flex; gap: 6px; }
+    .vp-toggle button { border: none; background: transparent; padding: 8px 14px; border-radius: 8px; font-weight: 600; color: #1f2933; }
+    .vp-toggle button.active { background: #fff; color: #0c1a12; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .vp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1050; display: none; align-items: center; justify-content: center; }
+    .vp-modal { background: #fff; border-radius: 14px; padding: 20px; max-width: 720px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .vp-modal h5 { margin: 0; }
+    #ride-modal-map,
+    #driver-ride-modal-map { width: 100%; height: 260px; border-radius: 10px; border: 1px solid #e5e7eb; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="vp-header py-3">
+    <div class="container d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá" style="height:40px;">
+        <div>
+          <div class="vp-title mb-0">Vai Paquetá - Web</div>
+          <div class="vp-muted">Beta • Mesmos fluxos do app mobile</div>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-success btn-sm" href="/" target="_blank"><i class="lni lni-home"></i> Landing</a>
+        <button class="btn btn-outline-success btn-sm" id="btn-logout"><i class="lni lni-exit"></i> Sair</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Autenticação -->
+    <div class="vp-section vp-login-shell" id="auth-section">
+      <div class="vp-login-card">
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="vp-login-hero h-100">
+              <div class="vp-badge mb-2">Faça login para continuar</div>
+              <div class="vp-title h4 mb-2">Peça eco-táxi pela web</div>
+              <p class="vp-muted">Mesmos fluxos do app mobile: entrar, pedir corrida, acompanhar no mapa e operar como eco-taxista.</p>
+              <ul class="mt-3">
+                <li>Pedir corrida com atalhos e status em tempo real.</li>
+                <li>Motorista recebe e aceita pelo app; você acompanha.</li>
+                <li>Mapa com origem, destino e posição do motorista.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="vp-card h-100">
+              <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                  <div class="vp-title h5 mb-0">Acessar sua conta</div>
+                  <div class="vp-muted">Use seu e-mail para entrar ou criar conta.</div>
+                </div>
+                <div class="vp-toggle" id="auth-toggle">
+                  <button data-auth="login" class="active" type="button">Login</button>
+                  <button data-auth="register" type="button">Cadastro</button>
+                </div>
+              </div>
+              <div id="auth-login-form">
+                <div class="mb-2">
+                  <label class="vp-label">E-mail</label>
+                  <input class="form-control" id="login-email" placeholder="seu@email.com">
+                </div>
+                <div class="mb-3">
+                  <label class="vp-label">Senha</label>
+                  <input class="form-control" type="password" id="login-password" placeholder="mínimo 6 caracteres">
+                </div>
+                <button class="btn btn-success w-100" id="btn-login">Entrar</button>
+              </div>
+              <div id="auth-register-form" class="d-none">
+                <div class="mb-2 mt-3">
+                  <label class="vp-label">Nome</label>
+                  <input class="form-control" id="reg-nome" placeholder="Seu nome">
+                </div>
+                <div class="mb-2">
+                  <label class="vp-label">Telefone</label>
+                  <input class="form-control" id="reg-telefone" placeholder="(xx) xxxxx-xxxx">
+                </div>
+                <div class="mb-2">
+                  <label class="vp-label">E-mail</label>
+                  <input class="form-control" id="reg-email" placeholder="seu@email.com">
+                </div>
+                <div class="mb-3">
+                  <label class="vp-label">Senha</label>
+                  <input class="form-control" type="password" id="reg-password" placeholder="mínimo 6 caracteres">
+                </div>
+                <button class="btn btn-success w-100" id="btn-register">Criar e entrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Área logada -->
+    <div class="vp-section d-none" id="app-section">
+      <div class="vp-card mb-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div>
+            <div class="vp-title h5 mb-0">Sessão ativa</div>
+            <div class="vp-muted" id="session-user">Carregando...</div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-outline-success btn-sm" id="btn-refresh-passenger">Status passageiro</button>
+            <button class="btn btn-outline-success btn-sm" id="btn-refresh-driver">Status motorista</button>
+          </div>
+        </div>
+      </div>
+
+      <ul class="nav nav-pills mb-3" id="vp-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link d-none" data-target="#tab-passenger" type="button">Passageiro</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link d-none" data-target="#tab-driver" type="button">Eco-taxista</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" data-target="#tab-profile" type="button">Perfil</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- Passageiro -->
+        <div id="tab-passenger" class="tab-pane fade d-none">
+          <div class="vp-grid">
+            <div class="vp-card">
+              <div class="vp-title h5 mb-3">Pedir corrida</div>
+              <div class="mb-2">
+                <label class="vp-label">Origem</label>
+                <div class="input-group">
+                  <input class="form-control" id="origem-end" list="addresses-list" placeholder="Usar GPS ou escolher endereço">
+                  <button class="btn btn-outline-success" id="btn-origem-gps"><i class="lni lni-map-marker"></i></button>
+                </div>
+                <small class="vp-muted">A origem tenta pegar seu GPS primeiro; se negar permissão, escolha um endereço sugerido.</small>
+              </div>
+              <div class="mb-3">
+                <label class="vp-label">Destino</label>
+                <input class="form-control" id="destino-end" list="addresses-list" placeholder="Escolha um endereço de destino">
+                <small class="vp-muted">Sugestões vindas do mapa de Paquetá.</small>
+              </div>
+              <input type="hidden" id="origem-lat">
+              <input type="hidden" id="origem-lng">
+              <input type="hidden" id="destino-lat">
+              <input type="hidden" id="destino-lng">
+              <datalist id="addresses-list"></datalist>
+              <button class="btn btn-success w-100 mt-2" id="btn-solicitar">Solicitar corrida</button>
+            </div>
+
+            <div class="vp-card">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="vp-title h5 mb-0">Status da corrida</div>
+                <span class="vp-badge">Passageiro</span>
+              </div>
+              <p class="vp-muted">Busca a corrida ativa para este passageiro.</p>
+              <pre id="passageiro-corrida">{}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Motorista -->
+        <div id="tab-driver" class="tab-pane fade d-none">
+          <div class="vp-grid">
+            <div class="vp-card">
+              <div class="vp-title h5 mb-3">Enviar localização</div>
+              <div class="mb-2">
+                <label class="vp-label">Posição atual (lat, lng)</label>
+                <div class="input-group">
+                  <input class="form-control" id="ping-lat" placeholder="-22.763">
+                  <input class="form-control" id="ping-lng" placeholder="-43.106">
+                  <button class="btn btn-outline-success" id="btn-ping-gps"><i class="lni lni-map-marker"></i></button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="vp-label">Precisão (m) opcional</label>
+                <input class="form-control" id="ping-precisao" placeholder="10">
+              </div>
+              <button class="btn btn-success w-100" id="btn-enviar-ping">Enviar ping</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Perfil -->
+        <div id="tab-profile" class="tab-pane fade show active">
+          <div class="vp-grid">
+            <div class="vp-card">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="vp-title h5 mb-0">Dados do usuário</div>
+                <span class="vp-badge">Perfil</span>
+              </div>
+              <div class="mb-2">
+                <label class="vp-label">Nome</label>
+                <input class="form-control" id="perfil-nome" placeholder="Seu nome">
+              </div>
+              <div class="mb-2">
+                <label class="vp-label">Telefone</label>
+                <input class="form-control" id="perfil-telefone" placeholder="(xx) xxxxx-xxxx">
+              </div>
+              <div class="mb-2">
+                <label class="vp-label">Tipo do perfil</label>
+                <select class="form-select" id="perfil-tipo">
+                  <option value="passageiro">Passageiro</option>
+                  <option value="ecotaxista">Eco-taxista</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="vp-label">Device UUID (opcional)</label>
+                <input class="form-control" id="perfil-device" placeholder="auto ou personalizado">
+              </div>
+              <button class="btn btn-success w-100" id="btn-update-profile">Salvar perfil</button>
+            </div>
+
+            <div class="vp-card">
+              <div class="vp-title h5 mb-2">Sessão</div>
+              <pre id="session-info">{ "token": null }</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mapa -->
+      <div class="vp-section pt-0">
+      <div class="vp-card">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="vp-title h5 mb-0">Mapa</div>
+          <span class="vp-badge">Origem / Destino / Motorista</span>
+        </div>
+        <div class="vp-muted mb-2" id="map-status">Carregando mapa...</div>
+        <div id="map"></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script src="{% static 'leaflet/leaflet.js' %}"></script>
+
+  <!-- Modal de corrida aberta (passageiro) -->
+  <div class="vp-modal-backdrop" id="ride-modal">
+    <div class="vp-modal">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Corrida em andamento</h5>
+        <span class="vp-badge">Passageiro</span>
+      </div>
+      <div class="vp-muted mb-2">Sua corrida está ativa. Acompanhe o status e o mapa.</div>
+      <div id="ride-modal-map"></div>
+      <pre id="ride-modal-body" style="max-height: 200px; margin-top: 12px;"></pre>
+      <div class="mt-3 text-end">
+        <button class="btn btn-outline-danger btn-sm" id="modal-cancel-ride">Cancelar corrida</button>
+      </div>
+    </div>
+  </div>
+  <!-- Modal de corrida aberta (motorista) -->
+  <div class="vp-modal-backdrop" id="driver-ride-modal">
+    <div class="vp-modal">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Corrida atribuída</h5>
+        <span class="vp-badge">Eco-taxista</span>
+      </div>
+      <div class="vp-muted mb-2">Você recebeu uma corrida. Aceite e acompanhe o trajeto.</div>
+      <div id="driver-ride-modal-map"></div>
+      <pre id="driver-ride-modal-body" style="max-height: 200px; margin-top: 12px;"></pre>
+      <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
+        <button class="btn btn-outline-success btn-sm" id="btn-aceitar">Aceitar</button>
+        <button class="btn btn-outline-danger btn-sm" id="btn-rejeitar">Rejeitar</button>
+        <button class="btn btn-outline-success btn-sm" id="btn-iniciar">Iniciar</button>
+        <button class="btn btn-outline-success btn-sm" id="btn-finalizar">Finalizar</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const state = {
+      token: null,
+      user: null,
+      map: null,
+      markers: {},
+      rideModalMap: null,
+      rideModalMarkers: {},
+      driverModalMap: null,
+      driverModalMarkers: {},
+      watchId: null,
+      addresses: [],
+      addressIndex: new Map(),
+      ridePolling: null,
+      driverRidePolling: null,
+      activePassengerRide: null,
+      activeDriverRide: null,
+    };
+    const ADDRESSES_URL = "{% static 'landing/data/addresses.json' %}";
+
+    function loadSession() {
+      try {
+        state.token = localStorage.getItem('vp_token') || null;
+        const u = localStorage.getItem('vp_user');
+        state.user = u ? JSON.parse(u) : null;
+      } catch (e) {
+        console.warn('Erro ao carregar sessão', e);
+      }
+      renderSession();
+      toggleAuthViews();
+      if (state.user) initMap();
+    }
+
+    function saveSession() {
+      localStorage.setItem('vp_token', state.token || '');
+      localStorage.setItem('vp_user', state.user ? JSON.stringify(state.user) : '');
+      renderSession();
+      toggleAuthViews();
+      enforceRoleTabs();
+      ensurePassengerPolling();
+      ensureDriverPolling();
+    }
+
+    function logout() {
+      state.token = null;
+      state.user = null;
+      saveSession();
+      document.getElementById('passageiro-corrida').textContent = '{}';
+      const driverBody = document.getElementById('driver-ride-modal-body');
+      if (driverBody) driverBody.textContent = '{}';
+      state.activePassengerRide = null;
+      state.activeDriverRide = null;
+      renderRideModal(null);
+      renderDriverModal(null);
+    }
+
+    function renderSession() {
+      const info = document.getElementById('session-info');
+      info.textContent = JSON.stringify({ token: state.token, user: state.user }, null, 2);
+      const label = document.getElementById('session-user');
+      label.textContent = state.user ? `${state.user.nome || ''} • ${state.user.email}` : 'Não autenticado';
+      if (state.user) {
+        document.getElementById('perfil-tipo').value = state.user.perfil_tipo || 'passageiro';
+        document.getElementById('perfil-device').value = state.user.device_uuid || '';
+        document.getElementById('perfil-nome').value = state.user.nome || '';
+        document.getElementById('perfil-telefone').value = state.user.telefone || '';
+      }
+    }
+
+    function toggleAuthViews() {
+      const auth = document.getElementById('auth-section');
+      const app = document.getElementById('app-section');
+      if (state.token) {
+        auth.classList.add('d-none');
+        app.classList.remove('d-none');
+        setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 200);
+      } else {
+        auth.classList.remove('d-none');
+        app.classList.add('d-none');
+        stopAutoPing();
+      }
+    }
+
+    // Toggle login/cadastro
+    document.querySelectorAll('#auth-toggle button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#auth-toggle button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.auth;
+        document.getElementById('auth-login-form').classList.toggle('d-none', mode !== 'login');
+        document.getElementById('auth-register-form').classList.toggle('d-none', mode !== 'register');
+      });
+    });
+
+    async function api(path, { method = 'GET', body } = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (state.token) headers['Authorization'] = `Token ${state.token}`;
+      const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.detail || res.statusText);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
+      return data;
+    }
+
+    function setLoading(btn, loading) {
+      if (!btn) return;
+      btn.disabled = loading;
+      btn.dataset.original = btn.dataset.original || btn.innerHTML;
+      btn.innerHTML = loading ? '<span class="spinner-border spinner-border-sm"></span>' : btn.dataset.original;
+    }
+
+    function toast(msg, isError = false) {
+      console.log(msg);
+      alert((isError ? 'Erro: ' : '') + msg);
+    }
+
+    // Tabs
+    document.querySelectorAll('#vp-tabs .nav-link').forEach((btn) => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.target));
+    });
+
+    function switchTab(targetSelector) {
+      document.querySelectorAll('#vp-tabs .nav-link').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach((tab) => tab.classList.remove('show', 'active'));
+      const btn = [...document.querySelectorAll('#vp-tabs .nav-link')].find((b) => b.dataset.target === targetSelector);
+      if (btn) btn.classList.add('active');
+      const target = document.querySelector(targetSelector);
+      if (target) target.classList.add('show', 'active');
+    }
+
+    function enforceRoleTabs() {
+      const passengerTabBtn = document.querySelector('[data-target="#tab-passenger"]');
+      const driverTabBtn = document.querySelector('[data-target="#tab-driver"]');
+      const passengerTab = document.querySelector('#tab-passenger');
+      const driverTab = document.querySelector('#tab-driver');
+      const profileTabBtn = document.querySelector('[data-target="#tab-profile"]');
+      const profileTab = document.querySelector('#tab-profile');
+
+      // Reset visibility
+      [passengerTabBtn, driverTabBtn].forEach((btn) => btn.classList.add('d-none'));
+      [passengerTab, driverTab].forEach((tab) => tab.classList.add('d-none'));
+      profileTabBtn.classList.remove('d-none');
+      profileTab.classList.remove('d-none');
+
+      if (!state.user) {
+        switchTab('#tab-profile');
+        return;
+      }
+      const tipo = state.user.perfil_tipo;
+      if (tipo === 'passageiro') {
+        passengerTabBtn.classList.remove('d-none');
+        passengerTab.classList.remove('d-none');
+        switchTab('#tab-passenger');
+      } else if (tipo === 'ecotaxista') {
+        driverTabBtn.classList.remove('d-none');
+        driverTab.classList.remove('d-none');
+        switchTab('#tab-driver');
+      } else {
+        switchTab('#tab-profile');
+      }
+    }
+
+    // Auth
+    document.getElementById('btn-login').addEventListener('click', async () => {
+      const email = document.getElementById('login-email').value.trim();
+      const password = document.getElementById('login-password').value;
+      const btn = document.getElementById('btn-login');
+      try {
+        setLoading(btn, true);
+        const data = await api('/api/auth/login/', { method: 'POST', body: { email, password } });
+        state.token = data.user.token;
+        state.user = data.user;
+        saveSession();
+        initMap();
+        ensureAutoPing();
+        enforceRoleTabs();
+        toast('Login feito!');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    document.getElementById('btn-register').addEventListener('click', async () => {
+      const body = {
+        nome: document.getElementById('reg-nome').value.trim(),
+        telefone: document.getElementById('reg-telefone').value.trim(),
+        email: document.getElementById('reg-email').value.trim(),
+        password: document.getElementById('reg-password').value,
+        tipo: 'passageiro',
+      };
+      const btn = document.getElementById('btn-register');
+      try {
+        setLoading(btn, true);
+        const data = await api('/api/auth/register/', { method: 'POST', body });
+        state.token = data.user.token;
+        state.user = data.user;
+        saveSession();
+        initMap();
+        ensureAutoPing();
+        enforceRoleTabs();
+        toast('Cadastro criado e sessão iniciada!');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', logout);
+
+    document.getElementById('btn-update-profile').addEventListener('click', async () => {
+      if (!state.token) return toast('Faça login primeiro', true);
+      const body = {
+        nome: document.getElementById('perfil-nome').value.trim(),
+        telefone: document.getElementById('perfil-telefone').value.trim(),
+        tipo: document.getElementById('perfil-tipo').value,
+        device_uuid: document.getElementById('perfil-device').value.trim(),
+      };
+      const btn = document.getElementById('btn-update-profile');
+      try {
+        setLoading(btn, true);
+        const data = await api('/api/auth/me/', { method: 'PATCH', body });
+        state.user = data.user;
+        saveSession();
+        ensureAutoPing();
+        enforceRoleTabs();
+        toast('Perfil atualizado');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    // GPS helper
+    async function requestOriginGps() {
+      if (!navigator.geolocation) {
+        toast('Geolocalização não suportada. Escolha um endereço de origem.', true);
+        return;
+      }
+      if (!window.isSecureContext && location.hostname !== 'localhost') {
+        toast('GPS no navegador exige https ou localhost. Abra em http://localhost:8000 ou habilite https.', true);
+        return;
+      }
+      const getPos = (opts) =>
+        new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, opts);
+        });
+      toast('Solicitando sua localização...', false);
+      const attempts = [
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+        { enableHighAccuracy: false, timeout: 30000, maximumAge: 0 },
+      ];
+      try {
+        let pos = null;
+        for (const opts of attempts) {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            pos = await getPos(opts);
+            break;
+          } catch (err) {
+            if (err && err.code === 3) continue; // timeout, tenta próxima
+            throw err;
+          }
+        }
+        if (!pos) throw new Error('timeout');
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        document.getElementById('origem-lat').value = lat;
+        document.getElementById('origem-lng').value = lng;
+        const addr = await reverseGeocode(lat, lng);
+        document.getElementById('origem-end').value = addr || 'Sua localização atual';
+        // Limpa os campos de destino lat/lng para evitar reuso incorreto
+        document.getElementById('destino-lat').value = document.getElementById('destino-lat').value || '';
+        document.getElementById('destino-lng').value = document.getElementById('destino-lng').value || '';
+        toast('Origem preenchida com seu GPS');
+        updateMapFromRide({
+          origem_lat: lat,
+          origem_lng: lng,
+        });
+      } catch (err) {
+        console.warn('GPS origem falhou', err);
+        let msg = 'Não foi possível ler sua localização. Informe o endereço manualmente.';
+        if (err && err.code === 1) msg = 'Permita o GPS no navegador (https ou localhost) ou escolha um endereço manualmente.';
+        if (err && err.code === 2) msg = 'Sinal de GPS indisponível agora. Tente novamente ou escolha um endereço.';
+        if (err && err.code === 3) msg = 'Tempo esgotado para pegar o GPS. Escolha um endereço ou tente novamente.';
+        toast(msg, true);
+      }
+    }
+    document.getElementById('btn-origem-gps').addEventListener('click', requestOriginGps);
+    document.getElementById('btn-ping-gps').addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        toast('Geolocalização não suportada.', true);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('ping-lat').value = pos.coords.latitude.toFixed(6);
+          document.getElementById('ping-lng').value = pos.coords.longitude.toFixed(6);
+        },
+        (err) => toast(err.message, true),
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    });
+
+    // Address suggestions
+    async function loadAddresses() {
+      try {
+        const res = await fetch(ADDRESSES_URL);
+        const data = await res.json();
+        state.addresses = data || [];
+        state.addressIndex.clear();
+        state.addresses.forEach((addr) => {
+          const label = `${addr.street}${addr.housenumber ? ' ' + addr.housenumber : ''}`;
+          state.addressIndex.set(label.toLowerCase(), { lat: addr.lat, lng: addr.lng, label });
+        });
+      } catch (e) {
+        console.warn('Falha ao carregar addresses.json', e);
+      }
+    }
+
+    function applyAddress(inputId, latId, lngId) {
+      const val = document.getElementById(inputId).value.trim().toLowerCase();
+      const match = state.addressIndex.get(val);
+      if (match) {
+        document.getElementById(latId).value = match.lat;
+        document.getElementById(lngId).value = match.lng;
+        return;
+      }
+      // Não limpe se veio do GPS ou já existe coord válida
+      if (val === 'sua localização atual') return;
+      const currentLat = document.getElementById(latId).value;
+      const currentLng = document.getElementById(lngId).value;
+      if (currentLat && currentLng) return;
+      if (!val) {
+        document.getElementById(latId).value = '';
+        document.getElementById(lngId).value = '';
+      }
+    }
+
+    function updateDatalistSuggestions(term) {
+      const list = document.getElementById('addresses-list');
+      list.innerHTML = '';
+      const query = term.trim().toLowerCase();
+      if (!query || query.length < 2) return; // só mostra sugestões a partir de 2 caracteres
+      let count = 0;
+      for (const [key, val] of state.addressIndex.entries()) {
+        if (key.includes(query)) {
+          const opt = document.createElement('option');
+          opt.value = val.label;
+          list.appendChild(opt);
+          count += 1;
+          if (count >= 15) break; // limita sugestões
+        }
+      }
+    }
+
+    ['change', 'input', 'blur', 'focus'].forEach((evt) => {
+      document.getElementById('origem-end').addEventListener(evt, () => {
+        updateDatalistSuggestions(document.getElementById('origem-end').value);
+        applyAddress('origem-end', 'origem-lat', 'origem-lng');
+        renderInputMarkers();
+      });
+      document.getElementById('destino-end').addEventListener(evt, () => {
+        updateDatalistSuggestions(document.getElementById('destino-end').value);
+        applyAddress('destino-end', 'destino-lat', 'destino-lng');
+        renderInputMarkers();
+      });
+    });
+
+    function parseCoord(val) {
+      const n = parseFloat(val);
+      if (Number.isNaN(n)) return null;
+      return n.toFixed(6);
+    }
+
+    async function reverseGeocode(lat, lng) {
+      try {
+        const res = await fetch(`/api/geo/reverse/?lat=${lat}&lng=${lng}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.endereco || null;
+      } catch (e) {
+        console.warn('Falha no reverse geocode', e);
+        return null;
+      }
+    }
+
+    // Passenger flow
+    document.getElementById('btn-solicitar').addEventListener('click', async () => {
+      if (!state.user?.perfil_id) return toast('Faça login para pedir corrida', true);
+      applyAddress('origem-end', 'origem-lat', 'origem-lng');
+      applyAddress('destino-end', 'destino-lat', 'destino-lng');
+      const origemLat = parseCoord(document.getElementById('origem-lat').value);
+      const origemLng = parseCoord(document.getElementById('origem-lng').value);
+      const destinoLat = parseCoord(document.getElementById('destino-lat').value);
+      const destinoLng = parseCoord(document.getElementById('destino-lng').value);
+      const body = {
+        perfil_id: state.user.perfil_id,
+        origem_lat: origemLat,
+        origem_lng: origemLng,
+        destino_lat: destinoLat,
+        destino_lng: destinoLng,
+        origem_endereco: document.getElementById('origem-end').value,
+        destino_endereco: document.getElementById('destino-end').value,
+      };
+      if (!body.origem_lat || !body.origem_lng) return toast('Pegue sua localização (botão GPS) ou escolha uma origem sugerida.', true);
+      if (!body.destino_lat || !body.destino_lng) return toast('Escolha um destino das sugestões para continuarmos.', true);
+      const btn = document.getElementById('btn-solicitar');
+      try {
+        setLoading(btn, true);
+        const corrida = await api('/api/corridas/solicitar/', { method: 'POST', body });
+        renderPassengerRide(corrida);
+        toast('Corrida solicitada!');
+      } catch (e) {
+        if (e.status === 409 && e.data?.corrida) {
+          renderPassengerRide(e.data.corrida);
+          toast(e.message);
+        } else {
+          toast(e.message, true);
+        }
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    async function fetchPassengerRide() {
+      if (!state.user?.perfil_id) return;
+      const corrida = await api(`/api/corridas/para_passageiro/${state.user.perfil_id}/`);
+      renderPassengerRide(corrida);
+    }
+    document.getElementById('btn-refresh-passenger').addEventListener('click', async () => {
+      try { await fetchPassengerRide(); } catch (e) { toast(e.message, true); }
+    });
+
+    const ACTIVE_RIDE_STATUSES = new Set(['aguardando', 'aceita', 'em_andamento']);
+
+    function normalizeRideStatus(status) {
+      const key = (status || '')
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_');
+      if (key === 'aguardando_motorista') return 'aguardando';
+      return key;
+    }
+
+    function isActiveRideStatus(status) {
+      return ACTIVE_RIDE_STATUSES.has(normalizeRideStatus(status));
+    }
+
+    function renderPassengerRide(corrida) {
+      document.getElementById('passageiro-corrida').textContent = JSON.stringify(corrida || {}, null, 2);
+      if (corrida && corrida.id && isActiveRideStatus(corrida.status)) {
+        state.activePassengerRide = corrida;
+      } else {
+        state.activePassengerRide = null;
+      }
+      updateMapFromRide(state.activePassengerRide);
+      renderRideModal(state.activePassengerRide);
+    }
+
+    // Driver flow
+    document.getElementById('btn-enviar-ping').addEventListener('click', async () => {
+      if (!state.user?.perfil_id) return toast('Faça login', true);
+      if (state.user.perfil_tipo !== 'ecotaxista') return toast('Troque o perfil para eco-taxista em Perfil', true);
+      const btn = document.getElementById('btn-enviar-ping');
+      const lat = parseCoord(document.getElementById('ping-lat').value);
+      const lng = parseCoord(document.getElementById('ping-lng').value);
+      const precisao = document.getElementById('ping-precisao').value;
+      if (!lat || !lng) return toast('Preencha latitude/longitude válidas ou use o GPS.', true);
+      try {
+        setLoading(btn, true);
+        await sendPing(lat, lng, precisao ? parseFloat(precisao) : undefined);
+        toast('Localização enviada');
+      } catch (e) {
+        toast(e.message, true);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    async function fetchDriverRide() {
+      if (!state.user?.perfil_id || state.user.perfil_tipo !== 'ecotaxista') return;
+      const corrida = await api(`/api/corridas/para_motorista/${state.user.perfil_id}/`);
+      renderDriverRide(corrida);
+      return corrida;
+    }
+    document.getElementById('btn-refresh-driver').addEventListener('click', async () => {
+      try { await fetchDriverRide(); } catch (e) { toast(e.message, true); }
+    });
+
+    function renderDriverRide(corrida) {
+      const hasActiveRide = corrida && corrida.id;
+      state.activeDriverRide = hasActiveRide ? corrida : null;
+      updateMapFromRide(state.activeDriverRide);
+      toggleDriverButtons(state.activeDriverRide);
+      renderDriverModal(state.activeDriverRide);
+    }
+
+    function toggleDriverButtons(corrida) {
+      const btnAceitar = document.getElementById('btn-aceitar');
+      const btnRejeitar = document.getElementById('btn-rejeitar');
+      const btnIniciar = document.getElementById('btn-iniciar');
+      const btnFinalizar = document.getElementById('btn-finalizar');
+
+      const show = (btn) => {
+        if (!btn) return;
+        btn.classList.remove('d-none');
+        btn.removeAttribute('disabled');
+      };
+      [btnAceitar, btnRejeitar, btnIniciar, btnFinalizar].forEach((b) => {
+        if (!b) return;
+        b.setAttribute('disabled', 'disabled');
+        b.classList.add('d-none');
+      });
+      if (!corrida || !corrida.status) return;
+      const status = normalizeRideStatus(corrida.status);
+      if (status === 'aguardando') {
+        show(btnAceitar);
+        show(btnRejeitar);
+      }
+      if (status === 'aceita') {
+        show(btnRejeitar);
+        show(btnIniciar);
+      }
+      if (status === 'em_andamento') {
+        show(btnFinalizar);
+      }
+    }
+
+    function renderInputMarkers() {
+      // Mostra marcadores de origem/destino mesmo antes da corrida
+      const origemLat = parseCoord(document.getElementById('origem-lat').value);
+      const origemLng = parseCoord(document.getElementById('origem-lng').value);
+      const destinoLat = parseCoord(document.getElementById('destino-lat').value);
+      const destinoLng = parseCoord(document.getElementById('destino-lng').value);
+      const fakeRide = {};
+      if (origemLat && origemLng) {
+        fakeRide.origem_lat = origemLat;
+        fakeRide.origem_lng = origemLng;
+      }
+      if (destinoLat && destinoLng) {
+        fakeRide.destino_lat = destinoLat;
+        fakeRide.destino_lng = destinoLng;
+      }
+      updateMapFromRide(fakeRide);
+    }
+
+    function renderRideModal(corrida) {
+      const backdrop = document.getElementById('ride-modal');
+      const body = document.getElementById('ride-modal-body');
+      const cancelBtn = document.getElementById('modal-cancel-ride');
+      const hasRide = corrida && corrida.id && isActiveRideStatus(corrida.status);
+      const canCancel = hasRide && normalizeRideStatus(corrida.status) === 'aguardando';
+      cancelBtn.classList.toggle('d-none', !canCancel);
+      if (hasRide) {
+        body.textContent = JSON.stringify(corrida, null, 2);
+        backdrop.style.display = 'flex';
+        updateRideModalMap(corrida);
+      } else {
+        body.textContent = '';
+        backdrop.style.display = 'none';
+      }
+    }
+
+    function updateRideModalMap(corrida) {
+      if (!hasLeaflet()) return;
+      if (!state.rideModalMap) {
+        state.rideModalMap = L.map('ride-modal-map', { zoomControl: false, attributionControl: false }).setView([-22.763, -43.106], 14);
+        currentProvider = 0;
+        tryNextProvider(state.rideModalMap);
+      }
+      const map = state.rideModalMap;
+      ['origem', 'destino', 'motorista'].forEach((k) => {
+        if (state.rideModalMarkers[k]) {
+          map.removeLayer(state.rideModalMarkers[k]);
+          delete state.rideModalMarkers[k];
+        }
+      });
+      const points = [];
+      if (corrida.origem_lat && corrida.origem_lng) {
+        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(map);
+        state.rideModalMarkers.origem = marker;
+        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+      }
+      if (corrida.destino_lat && corrida.destino_lng) {
+        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(map);
+        state.rideModalMarkers.destino = marker;
+        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+      }
+      if (corrida.motorista_lat && corrida.motorista_lng) {
+        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista' }).addTo(map);
+        state.rideModalMarkers.motorista = marker;
+        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+      }
+      if (points.length) {
+        const bounds = L.latLngBounds(points);
+        map.fitBounds(bounds.pad(0.3));
+      }
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    function renderDriverModal(corrida) {
+      const backdrop = document.getElementById('driver-ride-modal');
+      const body = document.getElementById('driver-ride-modal-body');
+      const hasRide = corrida && corrida.id;
+      if (hasRide) {
+        body.textContent = JSON.stringify(corrida, null, 2);
+        backdrop.style.display = 'flex';
+        updateDriverModalMap(corrida);
+      } else {
+        if (body) body.textContent = '';
+        backdrop.style.display = 'none';
+      }
+    }
+
+    function updateDriverModalMap(corrida) {
+      if (!hasLeaflet()) return;
+      if (!state.driverModalMap) {
+        state.driverModalMap = L.map('driver-ride-modal-map', { zoomControl: false, attributionControl: false }).setView([-22.763, -43.106], 14);
+        currentProvider = 0;
+        tryNextProvider(state.driverModalMap);
+      }
+      const map = state.driverModalMap;
+      ['origem', 'destino', 'motorista'].forEach((k) => {
+        if (state.driverModalMarkers[k]) {
+          map.removeLayer(state.driverModalMarkers[k]);
+          delete state.driverModalMarkers[k];
+        }
+      });
+      const points = [];
+      if (corrida.origem_lat && corrida.origem_lng) {
+        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(map);
+        state.driverModalMarkers.origem = marker;
+        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+      }
+      if (corrida.destino_lat && corrida.destino_lng) {
+        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(map);
+        state.driverModalMarkers.destino = marker;
+        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+      }
+      if (corrida.motorista_lat && corrida.motorista_lng) {
+        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista' }).addTo(map);
+        state.driverModalMarkers.motorista = marker;
+        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+      }
+      if (points.length) {
+        const bounds = L.latLngBounds(points);
+        map.fitBounds(bounds.pad(0.3));
+      }
+      setTimeout(() => map.invalidateSize(), 200);
+    }
+
+    async function driverAction(action) {
+      const corrida = await fetchDriverRide();
+      if (!corrida || !corrida.id) throw new Error('Nenhuma corrida ativa atribuída');
+      const body = { motorista_id: state.user.perfil_id, perfil_id: state.user.perfil_id };
+      const res = await api(`/api/corridas/${corrida.id}/${action}/`, { method: 'POST', body });
+      renderDriverRide(res);
+      toast(`Ação ${action} realizada`);
+    }
+    document.getElementById('btn-aceitar').addEventListener('click', async () => {
+      try { await driverAction('aceitar'); } catch (e) { toast(e.message, true); }
+    });
+    document.getElementById('btn-rejeitar').addEventListener('click', async () => {
+      try { await driverAction('rejeitar'); } catch (e) { toast(e.message, true); }
+    });
+    document.getElementById('btn-iniciar').addEventListener('click', async () => {
+      try { await driverAction('iniciar'); } catch (e) { toast(e.message, true); }
+    });
+    document.getElementById('btn-finalizar').addEventListener('click', async () => {
+      try { await driverAction('finalizar'); } catch (e) { toast(e.message, true); }
+    });
+
+    // Map
+    function hasLeaflet() {
+      if (typeof L === 'undefined') {
+        console.warn('Leaflet não carregou (sem rede?). Mapa desativado.');
+        document.getElementById('map-status').textContent = 'Mapa indisponível (verifique sua conexão).';
+        return false;
+      }
+      return true;
+    }
+
+    const TILE_PROVIDERS = [
+      // Offline/embarcado
+      { url: '/static/landing/assets/tiles/{z}/{x}/{y}.png', attribution: 'Tiles locais', local: true, minZoom: 12, maxZoom: 19 },
+      // Online
+      { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap' },
+      { url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap contributors' },
+      { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', attribution: '&copy; OSM & Carto' },
+    ];
+
+    let currentProvider = 0;
+
+    function tryNextProvider(map) {
+      if (currentProvider >= TILE_PROVIDERS.length) {
+        document.getElementById('map-status').textContent = 'Tiles indisponíveis. Verifique a conexão.';
+        return;
+      }
+      const prov = TILE_PROVIDERS[currentProvider];
+      currentProvider += 1;
+      try {
+        const layer = L.tileLayer(prov.url, {
+          maxZoom: prov.maxZoom || 19,
+          minZoom: prov.minZoom || 0,
+          attribution: prov.attribution,
+          noWrap: true,
+          errorTileUrl: "{% static 'leaflet/images/marker-icon.png' %}", /* fallback visual */
+        });
+        layer.on('tileerror', () => {
+          if (prov.local) {
+            document.getElementById('map-status').textContent = 'Alguns tiles locais faltando; verifique se o mapa está completo.';
+            return; // não remove camada local
+          }
+          document.getElementById('map-status').textContent = 'Falha ao carregar tiles, tentando outro provedor...';
+          map.removeLayer(layer);
+          tryNextProvider(map);
+        });
+        layer.on('load', () => {
+          document.getElementById('map-status').textContent = 'Origem/destino serão exibidos aqui.';
+        });
+        layer.addTo(map);
+      } catch (e) {
+        console.warn('Erro ao carregar tiles', e);
+        tryNextProvider(map);
+      }
+    }
+
+    function initMap(force) {
+      if (state.map && !force) return;
+      if (!hasLeaflet()) return;
+      const fallback = [-22.763, -43.106];
+      state.map = L.map('map').setView(fallback, 14);
+      // Limita à área de Paquetá para evitar tiles fora do recorte local
+      state.map.setMaxBounds([[-22.78, -43.13], [-22.74, -43.08]]);
+      currentProvider = 0;
+      tryNextProvider(state.map);
+      setTimeout(() => state.map && state.map.invalidateSize(), 200);
+    }
+
+    function updateMapFromRide(corrida) {
+      if (!state.map) initMap();
+      if (!state.map) return;
+      ['origem', 'destino', 'motorista'].forEach((k) => {
+        if (state.markers[k]) {
+          state.map.removeLayer(state.markers[k]);
+          delete state.markers[k];
+        }
+      });
+      if (!corrida || !corrida.id) return;
+      const points = [];
+      if (corrida.origem_lat && corrida.origem_lng) {
+        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(state.map);
+        marker.bindPopup('Origem');
+        state.markers.origem = marker;
+        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+      }
+      if (corrida.destino_lat && corrida.destino_lng) {
+        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(state.map);
+        marker.bindPopup('Destino');
+        state.markers.destino = marker;
+        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+      }
+      if (corrida.motorista_lat && corrida.motorista_lng) {
+        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista', icon: L.icon({
+          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        }) }).addTo(state.map);
+        marker.bindPopup('Motorista');
+        state.markers.motorista = marker;
+        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+      }
+      if (points.length) {
+        const bounds = L.latLngBounds(points);
+        state.map.fitBounds(bounds.pad(0.3));
+        document.getElementById('map-status').textContent = '';
+      } else {
+        document.getElementById('map-status').textContent = 'Nenhum ponto de origem/destino definido.';
+      }
+    }
+
+    // Auto ping para eco-taxista
+    async function sendPing(lat, lng, precisao) {
+      if (!state.user?.perfil_id) throw new Error('Sem perfil logado');
+      const body = {
+        perfil: state.user.perfil_id,
+        latitude: parseCoord(lat),
+        longitude: parseCoord(lng),
+      };
+      if (!body.latitude || !body.longitude) throw new Error('Coordenadas inválidas para ping');
+      if (precisao !== undefined) body.precisao_m = precisao;
+      await api('/api/pings/', { method: 'POST', body });
+    }
+
+    function stopAutoPing() {
+      if (state.watchId && navigator.geolocation) {
+        navigator.geolocation.clearWatch(state.watchId);
+        state.watchId = null;
+      }
+    }
+
+    function ensureAutoPing() {
+      stopAutoPing();
+      if (!state.user || state.user.perfil_tipo !== 'ecotaxista') return;
+      if (!navigator.geolocation) {
+        toast('Geolocalização não suportada. Insira a posição manualmente.');
+        return;
+      }
+      state.watchId = navigator.geolocation.watchPosition(
+        async (pos) => {
+          try {
+            await sendPing(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          } catch (e) {
+            console.warn('Falha ao enviar ping automático', e);
+          }
+        },
+        (err) => {
+          toast('Permita o GPS para enviar sua posição automática. Sem permissão, você pode preencher manualmente os campos de origem/destino.', true);
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+      );
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap(true);
+      loadSession();
+      enforceRoleTabs();
+      loadAddresses();
+      // tenta já pegar a origem via GPS
+      requestOriginGps();
+      ensurePassengerPolling();
+      ensureDriverPolling();
+    });
+
+    // Polling de corrida para passageiro
+    function ensurePassengerPolling() {
+      if (state.ridePolling) {
+        clearInterval(state.ridePolling);
+        state.ridePolling = null;
+      }
+      if (state.user && state.user.perfil_tipo === 'passageiro') {
+        // consulta imediata para exibir modal/mapa assim que logar ou trocar de perfil
+        fetchPassengerRide().catch((e) => console.warn('Polling passageiro (imediato) falhou', e));
+        state.ridePolling = setInterval(() => {
+          fetchPassengerRide().catch((e) => console.warn('Polling passageiro falhou', e));
+        }, 4000);
+      } else {
+        renderRideModal(null);
+        state.activePassengerRide = null;
+      }
+    }
+
+    function ensureDriverPolling() {
+      if (state.driverRidePolling) {
+        clearInterval(state.driverRidePolling);
+        state.driverRidePolling = null;
+      }
+      if (state.user && state.user.perfil_tipo === 'ecotaxista') {
+        fetchDriverRide().catch((e) => console.warn('Polling motorista (imediato) falhou', e));
+        state.driverRidePolling = setInterval(() => {
+          fetchDriverRide().catch((e) => console.warn('Polling motorista falhou', e));
+        }, 4000);
+      } else {
+        renderDriverModal(null);
+        state.activeDriverRide = null;
+      }
+    }
+
+    // Cancelar corrida via modal
+    document.getElementById('modal-cancel-ride').addEventListener('click', async () => {
+      try {
+        const corrida = await api(`/api/corridas/para_passageiro/${state.user.perfil_id}/`);
+        if (!corrida || !corrida.id) return toast('Nenhuma corrida ativa para cancelar', true);
+        const res = await api(`/api/corridas/${corrida.id}/cancelar/`, { method: 'POST', body: { perfil_id: state.user.perfil_id } });
+        state.activePassengerRide = null;
+        renderPassengerRide(res);
+        toast('Corrida cancelada');
+      } catch (e) {
+        toast(e.message, true);
+      }
+    });
+  </script>
+</body>
+</html>

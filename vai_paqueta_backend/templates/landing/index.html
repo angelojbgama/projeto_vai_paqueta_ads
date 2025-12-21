@@ -1,0 +1,467 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="no-js" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Vai Paquetá | Mobilidade com eco-táxis na ilha</title>
+    <meta name="description"
+        content="Aplicativo piloto que conecta passageiros e eco-taxistas em Paquetá, centralizando pedidos e atalhos como o ponto das barcas." />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'landing/assets/images/favicon.png' %}" />
+
+    <!-- ========================= CSS here ========================= -->
+    <link rel="stylesheet" href="{% static 'landing/assets/css/bootstrap.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/LineIcons.2.0.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/animate.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/tiny-slider.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/glightbox.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/main.css' %}" />
+
+</head>
+
+<body>
+    <!-- Preloader -->
+    <div class="preloader">
+        <div class="preloader-inner">
+            <div class="preloader-icon">
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </div>
+    <!-- /End Preloader -->
+
+    <!-- Start Header Area -->
+    <header class="header navbar-area">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-12">
+                    <div class="nav-inner">
+                        <!-- Start Navbar -->
+                        <nav class="navbar navbar-expand-lg">
+                            <a class="navbar-brand" href="#home">
+                                <img
+                                    src="{% static 'landing/assets/images/logo/logo.png' %}"
+                                    data-logo-top="{% static 'landing/assets/images/logo/logo.png' %}"
+                                    data-logo-sticky="{% static 'landing/assets/images/logo/logo-collor.png' %}"
+                                    alt="Vai Paquetá">
+                            </a>
+                            <button class="navbar-toggler mobile-menu-btn" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+                                aria-expanded="false" aria-label="Toggle navigation">
+                                <span class="toggler-icon"></span>
+                                <span class="toggler-icon"></span>
+                                <span class="toggler-icon"></span>
+                            </button>
+                            <div class="collapse navbar-collapse sub-menu-bar" id="navbarSupportedContent">
+                                <ul id="nav" class="navbar-nav ms-auto">
+                                    <li class="nav-item">
+                                        <a href="#home" class="page-scroll active"
+                                            aria-label="Ir para a seção inicial">Início</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#features" class="page-scroll"
+                                            aria-label="Ir para a seção Como funciona">Como funciona</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#impacto" class="page-scroll"
+                                            aria-label="Ir para a seção de impacto">Impacto</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#precos" class="page-scroll"
+                                            aria-label="Ir para a seção de preços">Preços</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#download-android" class="page-scroll"
+                                            aria-label="Ir para a seção de download">Baixar Android</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a href="#contato" class="page-scroll"
+                                            aria-label="Ir para a seção de contato">Contato</a>
+                                    </li>
+                                </ul>
+                            </div> <!-- navbar collapse -->
+                            <div class="button add-list-button">
+                                <a href="#download-android" class="btn">Baixar para Android</a>
+                            </div>
+                        </nav>
+                        <!-- End Navbar -->
+                    </div>
+                </div>
+            </div> <!-- row -->
+        </div> <!-- container -->
+    </header>
+    <!-- End Header Area -->
+
+    <!-- Start Hero Area -->
+    <section id="home" class="hero-area">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-5 col-md-12 col-12">
+                    <div class="hero-content">
+                        <h1 class="wow fadeInLeft" data-wow-delay=".4s">Eco-táxis de Paquetá, agora em um só lugar</h1>
+                        <p class="wow fadeInLeft" data-wow-delay=".6s">O Vai Paquetá é o app para turistas e moradores
+                            que querem pedir corrida sem complicação: peça aqui de forma prática e repassamos a chamada
+                            para o eco-taxista mais próximo.</p>
+                        <div class="button wow fadeInLeft" data-wow-delay=".8s">
+                            <a href="#download-android" class="btn"><i class="lni lni-android"></i> Baixar para Android</a>
+                            <a href="#features" class="btn btn-alt"><i class="lni lni-mobile"></i> Ver como funciona</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-7 col-md-12 col-12">
+                    <div class="hero-image wow fadeInRight" data-wow-delay=".4s">
+                        <img src="{% static 'landing/assets/images/hero/phone.png' %}" alt="Tela do app Vai Paquetá">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Hero Area -->
+
+    <!-- Start Features Area -->
+    <section id="features" class="features section">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="section-title">
+                        <h3 class="wow zoomIn" data-wow-delay=".2s">Como funciona</h3>
+                        <h2 class="wow fadeInUp" data-wow-delay=".4s">Peça e receba eco-táxi em minutos</h2>
+                        <p class="wow fadeInUp" data-wow-delay=".6s">Você informa origem e destino pelo app. Nós buscamos
+                            quem está mais perto e avisamos um eco-taxista disponível. Ele aceita, aparece no mapa e você
+                            acompanha até a chegada.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".2s">
+                        <i class="lni lni-map-marker"></i>
+                        <h3>Origem e destino rápidos</h3>
+                        <p>Selecione sua localização ou use atalhos como Barcas e siga direto para pedir a corrida.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".4s">
+                        <i class="lni lni-direction-alt"></i>
+                        <h3>Fila organizada</h3>
+                        <p>Mandamos sua chamada para quem está por perto. O eco-taxista aceita e você vê a confirmação.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".6s">
+                        <i class="lni lni-whatsapp"></i>
+                        <h3>Contato familiar</h3>
+                        <p>Quer alinhar algum detalhe? Abra o WhatsApp e fale direto com o motorista após o aceite.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".2s">
+                        <i class="lni lni-timer"></i>
+                        <h3>Menos espera</h3>
+                        <p>Se ninguém responder rápido, tentamos outro eco-taxista. Você acompanha o status no app.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".4s">
+                        <i class="lni lni-mobile"></i>
+                        <h3>Pensado para turistas</h3>
+                        <p>Chegou agora na ilha? Sem grupos ou contatos: baixe o app, faça login e peça seu eco-táxi.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".6s">
+                        <i class="lni lni-stats-up"></i>
+                        <h3>Dados para gestão</h3>
+                        <p>Organizamos as corridas e horários para melhorar a disponibilidade e reduzir atrasos na ilha.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Features Area -->
+
+    <!-- Start Achievement Area -->
+    <section id="impacto" class="our-achievement section">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-10 offset-lg-1 col-md-12 col-12">
+                    <div class="title">
+                        <h2>Impacto esperado para quem vive e visita Paquetá</h2>
+                        <p>O piloto busca diminuir o tempo de espera, dar previsibilidade de chegada às barcas e
+                            fortalecer a atividade econômica dos eco-taxistas.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
+                    <div class="row">
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <div class="single-achievement wow fadeInUp" data-wow-delay=".2s">
+                                <h3 class="counter"><span id="secondo1" class="countup" cup-end="5">5</span> min</h3>
+                                <p>meta de resposta nas chamadas prioritárias</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <div class="single-achievement wow fadeInUp" data-wow-delay=".4s">
+                                <h3 class="counter"><span id="secondo2" class="countup" cup-end="20">20</span>+</h3>
+                                <p>eco-taxistas convidados para o piloto</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-4 col-12">
+                            <div class="single-achievement wow fadeInUp" data-wow-delay=".6s">
+                                <h3 class="counter"><span id="secondo3" class="countup" cup-end="3">3</span></h3>
+                                <p>atalhos rápidos (Barcas e pontos centrais)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Achievement Area -->
+
+    <!-- Start Pricing Table Area -->
+    <section id="precos" class="pricing-table section">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="section-title">
+                        <h3 class="wow zoomIn" data-wow-delay=".2s">Preços</h3>
+                        <h2 class="wow fadeInUp" data-wow-delay=".4s">Uso gratuito para passageiros e eco-taxistas</h2>
+                        <p class="wow fadeInUp" data-wow-delay=".6s">O app não cobra tarifa pela corrida. O pagamento é
+                            combinado diretamente entre passageiro e eco-taxista. A plataforma se mantém com anúncios
+                            exibidos dentro do aplicativo.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-4 col-md-6 col-12">
+                    <div class="single-table wow fadeInUp" data-wow-delay=".2s">
+                        <div class="table-head">
+                            <h4 class="title">Passageiros</h4>
+                            <p>Peça corridas sem pagar taxa ao app.</p>
+                            <div class="price">
+                                <h2 class="amount">R$0<span class="duration">/uso</span></h2>
+                            </div>
+                            <div class="button">
+                                <a href="#download-android" class="btn">Baixar e pedir</a>
+                            </div>
+                        </div>
+                        <div class="table-content">
+                            <h4 class="middle-title">Inclui</h4>
+                            <ul class="table-list">
+                                <li><i class="lni lni-checkmark-circle"></i> Chamadas com atalhos (Barcas, praça).</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Acompanhamento do status e mapa.</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Contato direto com o motorista.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <div class="single-table wow fadeInUp" data-wow-delay=".4s">
+                        <div class="table-head">
+                            <h4 class="title">Eco-taxistas</h4>
+                            <p>Receba corridas sem pagar comissão ao app.</p>
+                            <div class="price">
+                                <h2 class="amount">R$0<span class="duration">/corrida</span></h2>
+                            </div>
+                            <div class="button">
+                                <a href="#contato" class="btn">Cadastro</a>
+                            </div>
+                        </div>
+                        <div class="table-content">
+                            <h4 class="middle-title">Inclui</h4>
+                            <ul class="table-list">
+                                <li><i class="lni lni-checkmark-circle"></i> Chamadas organizadas por proximidade.</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Sem tarifas sobre o valor cobrado.</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Canal direto com passageiros.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <div class="single-table wow fadeInUp" data-wow-delay=".6s">
+                        <div class="table-head">
+                            <h4 class="title">Anunciantes</h4>
+                            <p>Espaços de mídia que financiam a plataforma.</p>
+                            <div class="price">
+                                <h2 class="amount">R$ sob<span class="duration"> consulta</span></h2>
+                            </div>
+                            <div class="button">
+                                <a href="#contato" class="btn">Falar sobre mídia</a>
+                            </div>
+                        </div>
+                        <div class="table-content">
+                            <h4 class="middle-title">Inclui</h4>
+                            <ul class="table-list">
+                                <li><i class="lni lni-checkmark-circle"></i> Anúncios exibidos dentro do app.</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Formatos alinhados à mobilidade local.</li>
+                                <li><i class="lni lni-checkmark-circle"></i> Relatórios de alcance básico.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!--/ End Pricing Table Area -->
+
+    <!-- Start Download Area -->
+    <section id="download-android" class="section call-action">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
+                    <div class="cta-content">
+                        <h2 class="wow fadeInUp" data-wow-delay=".2s">Baixe o app para Android</h2>
+                        <p class="wow fadeInUp" data-wow-delay=".4s">Use o botão para receber o link de instalação do Vai
+                            Paquetá. Se ainda estiver em testes, avisaremos você assim que liberar.</p>
+                        <div class="button wow fadeInUp" data-wow-delay=".6s">
+                            <a href="mailto:contato@vaipaqueta.app?subject=Quero%20baixar%20o%20Vai%20Paquet%C3%A1%20no%20Android"
+                                class="btn"><i class="lni lni-android"></i> Receber link de download</a>
+                            <a href="#features" class="btn btn-alt"><i class="lni lni-mobile"></i> Ver como funciona</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Download Area -->
+
+    <!-- Start Call To Action Area -->
+    <section id="contato" class="section call-action">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
+                    <div class="cta-content">
+                        <h2 class="wow fadeInUp" data-wow-delay=".2s">Fale com a equipe Vai Paquetá</h2>
+                        <p class="wow fadeInUp" data-wow-delay=".4s">Quer saber sobre o app, participar dos testes ou
+                            integrar a API? Envie uma mensagem e respondemos por e-mail ou WhatsApp.</p>
+                        <div class="button wow fadeInUp" data-wow-delay=".6s">
+                            <a href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1"
+                                class="btn">Enviar mensagem</a>
+                            <a href="#features" class="btn btn-alt">Rever como funciona</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- End Call To Action Area -->
+
+    <!-- Start Footer Area -->
+    <footer class="footer">
+        <!-- Start Footer Top -->
+        <div class="footer-top">
+            <div class="container">
+                <div class="row">
+                    <div class="col-lg-4 col-md-4 col-12">
+                        <!-- Single Widget -->
+                        <div class="single-footer f-about">
+                            <div class="logo">
+                                <a href="#home">
+                                    <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá">
+                                </a>
+                            </div>
+                            <p>Vai Paquetá é um piloto de mobilidade que conecta passageiros e eco-taxistas na Ilha de
+                                Paquetá, combinando organização digital com o contato próximo da comunidade.</p>
+                            <ul class="social">
+                                <li><a href="javascript:void(0)"><i class="lni lni-facebook-filled"></i></a></li>
+                                <li><a href="javascript:void(0)"><i class="lni lni-twitter-original"></i></a></li>
+                                <li><a href="javascript:void(0)"><i class="lni lni-instagram"></i></a></li>
+                                <li><a href="javascript:void(0)"><i class="lni lni-linkedin-original"></i></a></li>
+                            </ul>
+                            <p class="copyright-text">Landing page baseada no template Appvilla (UIdeck / ThemeWagon) e
+                                integrada ao backend Django do projeto.</p>
+                        </div>
+                        <!-- End Single Widget -->
+                    </div>
+                    <div class="col-lg-8 col-md-8 col-12">
+                        <div class="row">
+                            <div class="col-lg-4 col-md-6 col-12">
+                                <!-- Single Widget -->
+                                <div class="single-footer f-link">
+                                    <h3>Aplicativo</h3>
+                                    <ul>
+                                        <li><a href="#features">Como funciona</a></li>
+                                        <li><a href="#impacto">Impacto esperado</a></li>
+                                        <li><a href="#precos">Preços</a></li>
+                                        <li><a href="#download-android">Baixar Android</a></li>
+                                    </ul>
+                                </div>
+                                <!-- End Single Widget -->
+                            </div>
+                            <div class="col-lg-4 col-md-6 col-12">
+                                <!-- Single Widget -->
+                                <div class="single-footer f-link">
+                                    <h3>Projeto</h3>
+                                    <ul>
+                                        <li><a href="#contato">Contato e dúvidas</a></li>
+                                        <li><a href="#contato">Cadastro de eco-taxista</a></li>
+                                        <li><a href="#contato">Parcerias locais</a></li>
+                                    </ul>
+                                </div>
+                                <!-- End Single Widget -->
+                            </div>
+                            <div class="col-lg-4 col-md-6 col-12">
+                                <!-- Single Widget -->
+                                <div class="single-footer f-link">
+                                    <h3>Contato</h3>
+                                    <ul>
+                                        <li><a
+                                                href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1">contato@vaipaqueta.app</a>
+                                        </li>
+                                        <li><a href="#contato">Fale com a equipe</a></li>
+                                    </ul>
+                                </div>
+                                <!-- End Single Widget -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!--/ End Footer Top -->
+    </footer>
+    <!--/ End Footer Area -->
+
+    <!-- ========================= scroll-top ========================= -->
+    <a href="#" class="scroll-top">
+        <i class="lni lni-chevron-up"></i>
+    </a>
+
+    <!-- ========================= JS here ========================= -->
+    <script src="{% static 'landing/assets/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'landing/assets/js/wow.min.js' %}"></script>
+    <script src="{% static 'landing/assets/js/tiny-slider.js' %}"></script>
+    <script src="{% static 'landing/assets/js/glightbox.min.js' %}"></script>
+    <script src="{% static 'landing/assets/js/count-up.min.js' %}"></script>
+    <script src="{% static 'landing/assets/js/main.js' %}"></script>
+    <script type="text/javascript">
+        //====== counter up
+        var cu = new counterUp({
+            start: 0,
+            duration: 2000,
+            intvalues: true,
+            interval: 100,
+            append: " ",
+        });
+        cu.start();
+    </script>
+</body>
+
+</html>
