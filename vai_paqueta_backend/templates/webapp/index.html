@@ -37,6 +37,15 @@
     .vp-modal h5 { margin: 0; }
     #ride-modal-map,
     #driver-ride-modal-map { width: 100%; height: 260px; border-radius: 10px; border: 1px solid #e5e7eb; margin-top: 10px; }
+    .vp-modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+    .vp-modal-item { background: #f8fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
+    .vp-modal-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin-bottom: 6px; }
+    .vp-modal-value { font-weight: 600; color: #0c1a12; word-break: break-word; }
+    .vp-modal-sub { margin-top: 4px; color: #475569; font-size: 15px; word-break: break-word; }
+    .vp-modal-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .vp-modal-whatsapp { padding: 4px 10px; font-size: 12px; }
+    .vp-modal-status { background: linear-gradient(135deg, rgba(56,142,60,0.18), rgba(56,142,60,0.05)); border: 1px solid rgba(56,142,60,0.25); grid-column: 1 / -1; }
+    .vp-modal-status .vp-modal-value { font-size: 20px; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -129,10 +138,7 @@
             <div class="vp-title h5 mb-0">Sessão ativa</div>
             <div class="vp-muted" id="session-user">Carregando...</div>
           </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-outline-success btn-sm" id="btn-refresh-passenger">Status passageiro</button>
-            <button class="btn btn-outline-success btn-sm" id="btn-refresh-driver">Status motorista</button>
-          </div>
+          <span class="vp-badge d-none" id="session-profile-badge"></span>
         </div>
       </div>
 
@@ -175,14 +181,6 @@
               <button class="btn btn-success w-100 mt-2" id="btn-solicitar">Solicitar corrida</button>
             </div>
 
-            <div class="vp-card">
-              <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="vp-title h5 mb-0">Status da corrida</div>
-                <span class="vp-badge">Passageiro</span>
-              </div>
-              <p class="vp-muted">Busca a corrida ativa para este passageiro.</p>
-              <pre id="passageiro-corrida">{}</pre>
-            </div>
           </div>
         </div>
 
@@ -190,20 +188,33 @@
         <div id="tab-driver" class="tab-pane fade d-none">
           <div class="vp-grid">
             <div class="vp-card">
-              <div class="vp-title h5 mb-3">Enviar localização</div>
+              <div class="vp-title h5 mb-2">Localização automática</div>
+              <p class="vp-muted">Sua posição é enviada automaticamente quando o GPS estiver ativo.</p>
               <div class="mb-2">
-                <label class="vp-label">Posição atual (lat, lng)</label>
-                <div class="input-group">
-                  <input class="form-control" id="ping-lat" placeholder="-22.763">
-                  <input class="form-control" id="ping-lng" placeholder="-43.106">
-                  <button class="btn btn-outline-success" id="btn-ping-gps"><i class="lni lni-map-marker"></i></button>
+                <div class="vp-label">Status</div>
+                <div id="driver-gps-status">Aguardando GPS...</div>
+                <div class="vp-muted" id="driver-gps-last">Último envio: —</div>
+                <div class="vp-muted" id="driver-gps-coords">Posição: —</div>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-success btn-sm" id="btn-enable-gps">Ativar GPS</button>
+                <button class="btn btn-outline-secondary btn-sm" id="btn-toggle-manual">Enviar manualmente</button>
+              </div>
+              <div class="mt-3 d-none" id="driver-manual-form">
+                <div class="mb-2">
+                  <label class="vp-label">Posição atual (lat, lng)</label>
+                  <div class="input-group">
+                    <input class="form-control" id="ping-lat" placeholder="-22.763">
+                    <input class="form-control" id="ping-lng" placeholder="-43.106">
+                    <button class="btn btn-outline-success" id="btn-ping-gps"><i class="lni lni-map-marker"></i></button>
+                  </div>
                 </div>
+                <div class="mb-3">
+                  <label class="vp-label">Precisão (m) opcional</label>
+                  <input class="form-control" id="ping-precisao" placeholder="10">
+                </div>
+                <button class="btn btn-success w-100" id="btn-enviar-ping">Enviar ping</button>
               </div>
-              <div class="mb-3">
-                <label class="vp-label">Precisão (m) opcional</label>
-                <input class="form-control" id="ping-precisao" placeholder="10">
-              </div>
-              <button class="btn btn-success w-100" id="btn-enviar-ping">Enviar ping</button>
             </div>
 
           </div>
@@ -232,17 +243,9 @@
                   <option value="ecotaxista">Eco-taxista</option>
                 </select>
               </div>
-              <div class="mb-3">
-                <label class="vp-label">Device UUID (opcional)</label>
-                <input class="form-control" id="perfil-device" placeholder="auto ou personalizado">
-              </div>
               <button class="btn btn-success w-100" id="btn-update-profile">Salvar perfil</button>
             </div>
 
-            <div class="vp-card">
-              <div class="vp-title h5 mb-2">Sessão</div>
-              <pre id="session-info">{ "token": null }</pre>
-            </div>
           </div>
         </div>
       </div>
@@ -272,7 +275,26 @@
       </div>
       <div class="vp-muted mb-2">Sua corrida está ativa. Acompanhe o status e o mapa.</div>
       <div id="ride-modal-map"></div>
-      <pre id="ride-modal-body" style="max-height: 200px; margin-top: 12px;"></pre>
+      <div class="vp-modal-grid" id="ride-modal-body">
+        <div class="vp-modal-item vp-modal-status">
+          <div class="vp-modal-label">Status</div>
+          <div class="vp-modal-value" id="ride-modal-status">Aguardando motorista</div>
+          <div class="vp-modal-sub" id="ride-modal-status-hint">Aguardando confirmação do motorista.</div>
+        </div>
+        <div class="vp-modal-item">
+          <div class="vp-modal-label">Motorista</div>
+          <div class="vp-modal-sub" id="ride-modal-driver-name">Aguardando motorista aceitar</div>
+          <div class="vp-modal-sub vp-modal-inline">
+            <span id="ride-modal-driver-phone">—</span>
+            <a class="btn btn-success btn-sm vp-modal-whatsapp d-none" id="ride-modal-whatsapp" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          </div>
+        </div>
+        <div class="vp-modal-item">
+          <div class="vp-modal-label">Rota</div>
+          <div class="vp-modal-sub" id="ride-modal-origem">Origem: —</div>
+          <div class="vp-modal-sub" id="ride-modal-destino">Destino: —</div>
+        </div>
+      </div>
       <div class="mt-3 text-end">
         <button class="btn btn-outline-danger btn-sm" id="modal-cancel-ride">Cancelar corrida</button>
       </div>
@@ -287,7 +309,26 @@
       </div>
       <div class="vp-muted mb-2">Você recebeu uma corrida. Aceite e acompanhe o trajeto.</div>
       <div id="driver-ride-modal-map"></div>
-      <pre id="driver-ride-modal-body" style="max-height: 200px; margin-top: 12px;"></pre>
+      <div class="vp-modal-grid" id="driver-ride-modal-body">
+        <div class="vp-modal-item vp-modal-status">
+          <div class="vp-modal-label">Status</div>
+          <div class="vp-modal-value" id="driver-modal-status">Aguardando sua confirmação</div>
+          <div class="vp-modal-sub" id="driver-modal-status-hint">Corrida aguardando sua confirmação.</div>
+        </div>
+        <div class="vp-modal-item">
+          <div class="vp-modal-label">Passageiro</div>
+          <div class="vp-modal-sub" id="driver-modal-passenger-name">—</div>
+          <div class="vp-modal-sub vp-modal-inline">
+            <span id="driver-modal-passenger-phone">—</span>
+            <a class="btn btn-success btn-sm vp-modal-whatsapp d-none" id="driver-modal-whatsapp" href="#" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          </div>
+        </div>
+        <div class="vp-modal-item">
+          <div class="vp-modal-label">Rota</div>
+          <div class="vp-modal-sub" id="driver-modal-origem">Origem: —</div>
+          <div class="vp-modal-sub" id="driver-modal-destino">Destino: —</div>
+        </div>
+      </div>
       <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
         <button class="btn btn-outline-success btn-sm" id="btn-aceitar">Aceitar</button>
         <button class="btn btn-outline-danger btn-sm" id="btn-rejeitar">Rejeitar</button>
@@ -343,9 +384,9 @@
       state.token = null;
       state.user = null;
       saveSession();
-      document.getElementById('passageiro-corrida').textContent = '{}';
-      const driverBody = document.getElementById('driver-ride-modal-body');
-      if (driverBody) driverBody.textContent = '{}';
+      const passengerStatus = document.getElementById('passageiro-corrida');
+      if (passengerStatus) passengerStatus.textContent = '{}';
+      clearDriverModalDetails();
       state.activePassengerRide = null;
       state.activeDriverRide = null;
       renderRideModal(null);
@@ -353,13 +394,26 @@
     }
 
     function renderSession() {
-      const info = document.getElementById('session-info');
-      info.textContent = JSON.stringify({ token: state.token, user: state.user }, null, 2);
       const label = document.getElementById('session-user');
       label.textContent = state.user ? `${state.user.nome || ''} • ${state.user.email}` : 'Não autenticado';
+      const badge = document.getElementById('session-profile-badge');
+      if (badge) {
+        if (state.user?.perfil_tipo) {
+          const perfilLabel =
+            state.user.perfil_tipo === 'passageiro'
+              ? 'Passageiro'
+              : state.user.perfil_tipo === 'ecotaxista'
+                ? 'Eco-taxista'
+                : state.user.perfil_tipo;
+          badge.textContent = perfilLabel;
+          badge.classList.remove('d-none');
+        } else {
+          badge.textContent = '';
+          badge.classList.add('d-none');
+        }
+      }
       if (state.user) {
         document.getElementById('perfil-tipo').value = state.user.perfil_tipo || 'passageiro';
-        document.getElementById('perfil-device').value = state.user.device_uuid || '';
         document.getElementById('perfil-nome').value = state.user.nome || '';
         document.getElementById('perfil-telefone').value = state.user.telefone || '';
       }
@@ -514,12 +568,15 @@
 
     document.getElementById('btn-update-profile').addEventListener('click', async () => {
       if (!state.token) return toast('Faça login primeiro', true);
+      const deviceField = document.getElementById('perfil-device');
       const body = {
         nome: document.getElementById('perfil-nome').value.trim(),
         telefone: document.getElementById('perfil-telefone').value.trim(),
         tipo: document.getElementById('perfil-tipo').value,
-        device_uuid: document.getElementById('perfil-device').value.trim(),
       };
+      if (deviceField && deviceField.value.trim()) {
+        body.device_uuid = deviceField.value.trim();
+      }
       const btn = document.getElementById('btn-update-profile');
       try {
         setLoading(btn, true);
@@ -592,20 +649,23 @@
       }
     }
     document.getElementById('btn-origem-gps').addEventListener('click', requestOriginGps);
-    document.getElementById('btn-ping-gps').addEventListener('click', () => {
-      if (!navigator.geolocation) {
-        toast('Geolocalização não suportada.', true);
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          document.getElementById('ping-lat').value = pos.coords.latitude.toFixed(6);
-          document.getElementById('ping-lng').value = pos.coords.longitude.toFixed(6);
-        },
-        (err) => toast(err.message, true),
-        { enableHighAccuracy: true, timeout: 8000 }
-      );
-    });
+    const pingGpsBtn = document.getElementById('btn-ping-gps');
+    if (pingGpsBtn) {
+      pingGpsBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) {
+          toast('Geolocalização não suportada.', true);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            document.getElementById('ping-lat').value = pos.coords.latitude.toFixed(6);
+            document.getElementById('ping-lng').value = pos.coords.longitude.toFixed(6);
+          },
+          (err) => toast(err.message, true),
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      });
+    }
 
     // Address suggestions
     async function loadAddresses() {
@@ -733,9 +793,12 @@
       const corrida = await api(`/api/corridas/para_passageiro/${state.user.perfil_id}/`);
       renderPassengerRide(corrida);
     }
-    document.getElementById('btn-refresh-passenger').addEventListener('click', async () => {
-      try { await fetchPassengerRide(); } catch (e) { toast(e.message, true); }
-    });
+    const refreshPassengerBtn = document.getElementById('btn-refresh-passenger');
+    if (refreshPassengerBtn) {
+      refreshPassengerBtn.addEventListener('click', async () => {
+        try { await fetchPassengerRide(); } catch (e) { toast(e.message, true); }
+      });
+    }
 
     const ACTIVE_RIDE_STATUSES = new Set(['aguardando', 'aceita', 'em_andamento']);
 
@@ -754,7 +817,8 @@
     }
 
     function renderPassengerRide(corrida) {
-      document.getElementById('passageiro-corrida').textContent = JSON.stringify(corrida || {}, null, 2);
+      const passengerStatus = document.getElementById('passageiro-corrida');
+      if (passengerStatus) passengerStatus.textContent = JSON.stringify(corrida || {}, null, 2);
       if (corrida && corrida.id && isActiveRideStatus(corrida.status)) {
         state.activePassengerRide = corrida;
       } else {
@@ -765,24 +829,27 @@
     }
 
     // Driver flow
-    document.getElementById('btn-enviar-ping').addEventListener('click', async () => {
-      if (!state.user?.perfil_id) return toast('Faça login', true);
-      if (state.user.perfil_tipo !== 'ecotaxista') return toast('Troque o perfil para eco-taxista em Perfil', true);
-      const btn = document.getElementById('btn-enviar-ping');
-      const lat = parseCoord(document.getElementById('ping-lat').value);
-      const lng = parseCoord(document.getElementById('ping-lng').value);
-      const precisao = document.getElementById('ping-precisao').value;
-      if (!lat || !lng) return toast('Preencha latitude/longitude válidas ou use o GPS.', true);
-      try {
-        setLoading(btn, true);
-        await sendPing(lat, lng, precisao ? parseFloat(precisao) : undefined);
-        toast('Localização enviada');
-      } catch (e) {
-        toast(e.message, true);
-      } finally {
-        setLoading(btn, false);
-      }
-    });
+    const sendPingBtn = document.getElementById('btn-enviar-ping');
+    if (sendPingBtn) {
+      sendPingBtn.addEventListener('click', async () => {
+        if (!state.user?.perfil_id) return toast('Faça login', true);
+        if (state.user.perfil_tipo !== 'ecotaxista') return toast('Troque o perfil para eco-taxista em Perfil', true);
+        const btn = document.getElementById('btn-enviar-ping');
+        const lat = parseCoord(document.getElementById('ping-lat').value);
+        const lng = parseCoord(document.getElementById('ping-lng').value);
+        const precisao = document.getElementById('ping-precisao').value;
+        if (!lat || !lng) return toast('Preencha latitude/longitude válidas ou use o GPS.', true);
+        try {
+          setLoading(btn, true);
+          await sendPing(lat, lng, precisao ? parseFloat(precisao) : undefined);
+          toast('Localização enviada');
+        } catch (e) {
+          toast(e.message, true);
+        } finally {
+          setLoading(btn, false);
+        }
+      });
+    }
 
     async function fetchDriverRide() {
       if (!state.user?.perfil_id || state.user.perfil_tipo !== 'ecotaxista') return;
@@ -790,9 +857,12 @@
       renderDriverRide(corrida);
       return corrida;
     }
-    document.getElementById('btn-refresh-driver').addEventListener('click', async () => {
-      try { await fetchDriverRide(); } catch (e) { toast(e.message, true); }
-    });
+    const refreshDriverBtn = document.getElementById('btn-refresh-driver');
+    if (refreshDriverBtn) {
+      refreshDriverBtn.addEventListener('click', async () => {
+        try { await fetchDriverRide(); } catch (e) { toast(e.message, true); }
+      });
+    }
 
     function renderDriverRide(corrida) {
       const hasActiveRide = corrida && corrida.id;
@@ -851,19 +921,131 @@
       updateMapFromRide(fakeRide);
     }
 
+    const RIDE_STATUS_LABELS = {
+      aguardando: 'Aguardando motorista',
+      aceita: 'Motorista aceitou',
+      em_andamento: 'Em andamento',
+      cancelada: 'Cancelada',
+      concluida: 'Concluída',
+      rejeitada: 'Rejeitada',
+    };
+
+    function formatRideStatus(status) {
+      const normalized = normalizeRideStatus(status);
+      return RIDE_STATUS_LABELS[normalized] || status || 'Aguardando motorista';
+    }
+
+    function formatLatLng(lat, lng) {
+      if (lat == null || lng == null) return null;
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      if (Number.isNaN(latNum) || Number.isNaN(lngNum)) return null;
+      return `${latNum.toFixed(6)}, ${lngNum.toFixed(6)}`;
+    }
+
+    function updateDriverGpsStatus({ status, lastSent, coords } = {}) {
+      const statusEl = document.getElementById('driver-gps-status');
+      const lastEl = document.getElementById('driver-gps-last');
+      const coordsEl = document.getElementById('driver-gps-coords');
+      if (statusEl && status !== undefined) statusEl.textContent = status;
+      if (lastEl && lastSent !== undefined) lastEl.textContent = lastSent ? `Último envio: ${lastSent}` : 'Último envio: —';
+      if (coordsEl && coords !== undefined) coordsEl.textContent = coords ? `Posição: ${coords}` : 'Posição: —';
+    }
+
+    function buildWhatsAppLink(phone) {
+      const digits = (phone || '').toString().replace(/\D+/g, '');
+      if (!digits) return null;
+      let normalized = digits;
+      if (digits.length <= 11 && !digits.startsWith('55')) {
+        normalized = `55${digits}`;
+      }
+      if (normalized.length < 12) return null;
+      return `https://wa.me/${normalized}`;
+    }
+
+    function updateRideModalDetails(corrida) {
+      const statusEl = document.getElementById('ride-modal-status');
+      const statusHintEl = document.getElementById('ride-modal-status-hint');
+      const driverNameEl = document.getElementById('ride-modal-driver-name');
+      const driverPhoneEl = document.getElementById('ride-modal-driver-phone');
+      const driverWhatsEl = document.getElementById('ride-modal-whatsapp');
+      const origemEl = document.getElementById('ride-modal-origem');
+      const destinoEl = document.getElementById('ride-modal-destino');
+      const status = formatRideStatus(corrida.status);
+      const normalized = normalizeRideStatus(corrida.status);
+      const motorista = corrida.motorista || {};
+      const showDriver = normalized === 'aceita' || normalized === 'em_andamento';
+      const statusHint =
+        normalized === 'aguardando'
+          ? 'Aguardando confirmação do motorista.'
+          : normalized === 'aceita'
+            ? 'Motorista confirmado. A caminho da origem.'
+            : normalized === 'em_andamento'
+              ? 'Corrida em andamento.'
+              : 'Status atualizado.';
+      const origemText = corrida.origem_endereco || formatLatLng(corrida.origem_lat, corrida.origem_lng) || '—';
+      const destinoText = corrida.destino_endereco || formatLatLng(corrida.destino_lat, corrida.destino_lng) || '—';
+
+      if (statusEl) statusEl.textContent = status;
+      if (statusHintEl) statusHintEl.textContent = statusHint;
+      if (origemEl) origemEl.textContent = `Origem: ${origemText}`;
+      if (destinoEl) destinoEl.textContent = `Destino: ${destinoText}`;
+
+      if (showDriver) {
+        if (driverNameEl) driverNameEl.textContent = motorista.nome || 'Motorista confirmado';
+        if (driverPhoneEl) driverPhoneEl.textContent = motorista.telefone || 'Telefone não informado';
+        if (driverWhatsEl) {
+          const link = buildWhatsAppLink(motorista.telefone);
+          if (link) {
+            driverWhatsEl.href = link;
+            driverWhatsEl.classList.remove('d-none');
+          } else {
+            driverWhatsEl.href = '#';
+            driverWhatsEl.classList.add('d-none');
+          }
+        }
+      } else {
+        if (driverNameEl) driverNameEl.textContent = 'Aguardando motorista aceitar';
+        if (driverPhoneEl) driverPhoneEl.textContent = '—';
+        if (driverWhatsEl) {
+          driverWhatsEl.href = '#';
+          driverWhatsEl.classList.add('d-none');
+        }
+      }
+    }
+
+    function clearRideModalDetails() {
+      const statusEl = document.getElementById('ride-modal-status');
+      const statusHintEl = document.getElementById('ride-modal-status-hint');
+      const driverNameEl = document.getElementById('ride-modal-driver-name');
+      const driverPhoneEl = document.getElementById('ride-modal-driver-phone');
+      const driverWhatsEl = document.getElementById('ride-modal-whatsapp');
+      const origemEl = document.getElementById('ride-modal-origem');
+      const destinoEl = document.getElementById('ride-modal-destino');
+      if (statusEl) statusEl.textContent = 'Aguardando motorista';
+      if (statusHintEl) statusHintEl.textContent = 'Aguardando confirmação do motorista.';
+      if (driverNameEl) driverNameEl.textContent = 'Aguardando motorista aceitar';
+      if (driverPhoneEl) driverPhoneEl.textContent = '—';
+      if (driverWhatsEl) {
+        driverWhatsEl.href = '#';
+        driverWhatsEl.classList.add('d-none');
+      }
+      if (origemEl) origemEl.textContent = 'Origem: —';
+      if (destinoEl) destinoEl.textContent = 'Destino: —';
+    }
+
     function renderRideModal(corrida) {
       const backdrop = document.getElementById('ride-modal');
-      const body = document.getElementById('ride-modal-body');
       const cancelBtn = document.getElementById('modal-cancel-ride');
       const hasRide = corrida && corrida.id && isActiveRideStatus(corrida.status);
       const canCancel = hasRide && normalizeRideStatus(corrida.status) === 'aguardando';
       cancelBtn.classList.toggle('d-none', !canCancel);
       if (hasRide) {
-        body.textContent = JSON.stringify(corrida, null, 2);
+        updateRideModalDetails(corrida);
         backdrop.style.display = 'flex';
         updateRideModalMap(corrida);
       } else {
-        body.textContent = '';
+        clearRideModalDetails();
         backdrop.style.display = 'none';
       }
     }
@@ -905,16 +1087,77 @@
       setTimeout(() => map.invalidateSize(), 200);
     }
 
+    function driverStatusHint(normalized) {
+      if (normalized === 'aguardando') return 'Corrida aguardando sua confirmação.';
+      if (normalized === 'aceita') return 'Siga até a origem e inicie a corrida.';
+      if (normalized === 'em_andamento') return 'Leve o passageiro ao destino.';
+      if (normalized === 'concluida') return 'Corrida concluída.';
+      if (normalized === 'cancelada') return 'Corrida cancelada.';
+      if (normalized === 'rejeitada') return 'Corrida rejeitada.';
+      return 'Status atualizado.';
+    }
+
+    function updateDriverModalDetails(corrida) {
+      const statusEl = document.getElementById('driver-modal-status');
+      const statusHintEl = document.getElementById('driver-modal-status-hint');
+      const passengerNameEl = document.getElementById('driver-modal-passenger-name');
+      const passengerPhoneEl = document.getElementById('driver-modal-passenger-phone');
+      const passengerWhatsEl = document.getElementById('driver-modal-whatsapp');
+      const origemEl = document.getElementById('driver-modal-origem');
+      const destinoEl = document.getElementById('driver-modal-destino');
+      const normalized = normalizeRideStatus(corrida.status);
+      const status = formatRideStatus(corrida.status);
+      const passageiro = corrida.cliente || {};
+      const origemText = corrida.origem_endereco || formatLatLng(corrida.origem_lat, corrida.origem_lng) || '—';
+      const destinoText = corrida.destino_endereco || formatLatLng(corrida.destino_lat, corrida.destino_lng) || '—';
+
+      if (statusEl) statusEl.textContent = status;
+      if (statusHintEl) statusHintEl.textContent = driverStatusHint(normalized);
+      if (passengerNameEl) passengerNameEl.textContent = passageiro.nome || 'Passageiro confirmado';
+      if (passengerPhoneEl) passengerPhoneEl.textContent = passageiro.telefone || 'Telefone não informado';
+      if (passengerWhatsEl) {
+        const link = buildWhatsAppLink(passageiro.telefone);
+        if (link) {
+          passengerWhatsEl.href = link;
+          passengerWhatsEl.classList.remove('d-none');
+        } else {
+          passengerWhatsEl.href = '#';
+          passengerWhatsEl.classList.add('d-none');
+        }
+      }
+      if (origemEl) origemEl.textContent = `Origem: ${origemText}`;
+      if (destinoEl) destinoEl.textContent = `Destino: ${destinoText}`;
+    }
+
+    function clearDriverModalDetails() {
+      const statusEl = document.getElementById('driver-modal-status');
+      const statusHintEl = document.getElementById('driver-modal-status-hint');
+      const passengerNameEl = document.getElementById('driver-modal-passenger-name');
+      const passengerPhoneEl = document.getElementById('driver-modal-passenger-phone');
+      const passengerWhatsEl = document.getElementById('driver-modal-whatsapp');
+      const origemEl = document.getElementById('driver-modal-origem');
+      const destinoEl = document.getElementById('driver-modal-destino');
+      if (statusEl) statusEl.textContent = 'Aguardando sua confirmação';
+      if (statusHintEl) statusHintEl.textContent = 'Corrida aguardando sua confirmação.';
+      if (passengerNameEl) passengerNameEl.textContent = '—';
+      if (passengerPhoneEl) passengerPhoneEl.textContent = '—';
+      if (passengerWhatsEl) {
+        passengerWhatsEl.href = '#';
+        passengerWhatsEl.classList.add('d-none');
+      }
+      if (origemEl) origemEl.textContent = 'Origem: —';
+      if (destinoEl) destinoEl.textContent = 'Destino: —';
+    }
+
     function renderDriverModal(corrida) {
       const backdrop = document.getElementById('driver-ride-modal');
-      const body = document.getElementById('driver-ride-modal-body');
       const hasRide = corrida && corrida.id;
       if (hasRide) {
-        body.textContent = JSON.stringify(corrida, null, 2);
+        updateDriverModalDetails(corrida);
         backdrop.style.display = 'flex';
         updateDriverModalMap(corrida);
       } else {
-        if (body) body.textContent = '';
+        clearDriverModalDetails();
         backdrop.style.display = 'none';
       }
     }
@@ -1053,7 +1296,11 @@
           delete state.markers[k];
         }
       });
-      if (!corrida || !corrida.id) return;
+      if (!corrida) {
+        const statusEl = document.getElementById('map-status');
+        if (statusEl) statusEl.textContent = 'Origem/destino serão exibidos aqui.';
+        return;
+      }
       const points = [];
       if (corrida.origem_lat && corrida.origem_lng) {
         const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(state.map);
@@ -1079,9 +1326,11 @@
       if (points.length) {
         const bounds = L.latLngBounds(points);
         state.map.fitBounds(bounds.pad(0.3));
-        document.getElementById('map-status').textContent = '';
+        const statusEl = document.getElementById('map-status');
+        if (statusEl) statusEl.textContent = '';
       } else {
-        document.getElementById('map-status').textContent = 'Nenhum ponto de origem/destino definido.';
+        const statusEl = document.getElementById('map-status');
+        if (statusEl) statusEl.textContent = 'Origem/destino serão exibidos aqui.';
       }
     }
 
@@ -1103,6 +1352,7 @@
         navigator.geolocation.clearWatch(state.watchId);
         state.watchId = null;
       }
+      updateDriverGpsStatus({ status: 'GPS pausado', lastSent: null });
     }
 
     function ensureAutoPing() {
@@ -1110,18 +1360,26 @@
       if (!state.user || state.user.perfil_tipo !== 'ecotaxista') return;
       if (!navigator.geolocation) {
         toast('Geolocalização não suportada. Insira a posição manualmente.');
+        updateDriverGpsStatus({ status: 'GPS indisponível', lastSent: null });
         return;
       }
+      updateDriverGpsStatus({ status: 'Ativando GPS...' });
       state.watchId = navigator.geolocation.watchPosition(
         async (pos) => {
           try {
+            const coords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            updateDriverGpsStatus({ status: 'Enviando localização...', coords });
             await sendPing(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+            const sentAt = new Date().toLocaleTimeString('pt-BR');
+            updateDriverGpsStatus({ status: 'GPS ativo', lastSent: sentAt });
           } catch (e) {
             console.warn('Falha ao enviar ping automático', e);
+            updateDriverGpsStatus({ status: 'Falha ao enviar localização' });
           }
         },
         (err) => {
-          toast('Permita o GPS para enviar sua posição automática. Sem permissão, você pode preencher manualmente os campos de origem/destino.', true);
+          toast('Permita o GPS para enviar sua posição automática. Sem permissão, você pode enviar manualmente sua localização.', true);
+          updateDriverGpsStatus({ status: 'GPS desativado', lastSent: null });
         },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
       );
@@ -1135,9 +1393,25 @@
       loadAddresses();
       // tenta já pegar a origem via GPS
       requestOriginGps();
+      ensureAutoPing();
       ensurePassengerPolling();
       ensureDriverPolling();
     });
+
+    const enableGpsBtn = document.getElementById('btn-enable-gps');
+    if (enableGpsBtn) {
+      enableGpsBtn.addEventListener('click', () => ensureAutoPing());
+    }
+
+    const toggleManualBtn = document.getElementById('btn-toggle-manual');
+    if (toggleManualBtn) {
+      toggleManualBtn.addEventListener('click', () => {
+        const manualForm = document.getElementById('driver-manual-form');
+        if (!manualForm) return;
+        manualForm.classList.toggle('d-none');
+        toggleManualBtn.textContent = manualForm.classList.contains('d-none') ? 'Enviar manualmente' : 'Ocultar envio manual';
+      });
+    }
 
     // Polling de corrida para passageiro
     function ensurePassengerPolling() {

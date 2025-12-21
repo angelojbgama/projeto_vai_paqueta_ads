@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/map_config.dart';
 import '../auth/auth_provider.dart';
@@ -117,6 +118,92 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final normalized = raw.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
     if (normalized == 'aguardando_motorista') return 'aguardando';
     return normalized;
+  }
+
+  String _statusLabel(String? status) {
+    switch (_normalizarStatus(status)) {
+      case 'aguardando':
+        return 'Aguardando motorista';
+      case 'aceita':
+        return 'Motorista aceitou';
+      case 'em_andamento':
+        return 'Em andamento';
+      case 'concluida':
+        return 'Concluída';
+      case 'cancelada':
+        return 'Cancelada';
+      case 'rejeitada':
+        return 'Rejeitada';
+      default:
+        return status?.trim().isNotEmpty == true ? status!.trim() : 'Status atualizado';
+    }
+  }
+
+  String _statusHintMotorista(String? status) {
+    switch (_normalizarStatus(status)) {
+      case 'aguardando':
+        return 'Corrida aguardando sua confirmação.';
+      case 'aceita':
+        return 'Siga até a origem e inicie a corrida.';
+      case 'em_andamento':
+        return 'Leve o passageiro ao destino.';
+      case 'concluida':
+        return 'Corrida concluída.';
+      case 'cancelada':
+        return 'Corrida cancelada.';
+      case 'rejeitada':
+        return 'Corrida rejeitada.';
+      default:
+        return 'Status atualizado.';
+    }
+  }
+
+  String? _formatLatLng(LatLng? pos) {
+    if (pos == null) return null;
+    return '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+  }
+
+  String? _buildWhatsAppLink(String? telefone) {
+    final digits = (telefone ?? '').replaceAll(RegExp(r'\D+'), '');
+    if (digits.isEmpty) return null;
+    var normalized = digits;
+    if (digits.length <= 11 && !digits.startsWith('55')) {
+      normalized = '55$digits';
+    }
+    if (normalized.length < 12) return null;
+    return 'https://wa.me/$normalized';
+  }
+
+  Future<void> _abrirWhatsApp(String? telefone) async {
+    final link = _buildWhatsAppLink(telefone);
+    if (link == null) return;
+    final uri = Uri.parse(link);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      setState(() => _status = 'Não foi possível abrir o WhatsApp.');
+    }
+  }
+
+  Widget _infoBox(BuildContext context, String title, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 1, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 6),
+          ...children,
+        ],
+      ),
+    );
   }
 
   Future<void> _atualizarPosicao() async {
@@ -286,6 +373,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                     final corridaAtual = _corridaAtual ?? corrida;
                     final statusRaw = corridaAtual['status'] as String?;
                     final status = _normalizarStatus(statusRaw);
+                    final statusLabel = _statusLabel(statusRaw);
+                    final statusHint = _statusHintMotorista(statusRaw);
                     final origem = (() {
                       final lat = _asDouble(corridaAtual['origem_lat']);
                       final lng = _asDouble(corridaAtual['origem_lng']);
@@ -308,6 +397,23 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                       }
                       return null;
                     })();
+                    final passageiroTelefone = (() {
+                      final cliente = corridaAtual['cliente'];
+                      if (cliente is Map<String, dynamic>) {
+                        final telefone = (cliente['telefone'] as String?)?.trim();
+                        if (telefone != null && telefone.isNotEmpty) return telefone;
+                      }
+                      return null;
+                    })();
+                    final origemEndereco = (corridaAtual['origem_endereco'] as String?)?.trim();
+                    final destinoEndereco = (corridaAtual['destino_endereco'] as String?)?.trim();
+                    final origemTexto = origemEndereco != null && origemEndereco.isNotEmpty
+                        ? origemEndereco
+                        : (_formatLatLng(origem) ?? '—');
+                    final destinoTexto = destinoEndereco != null && destinoEndereco.isNotEmpty
+                        ? destinoEndereco
+                        : (_formatLatLng(destino) ?? '—');
+                    final passengerWhatsLink = _buildWhatsAppLink(passageiroTelefone);
                     final motoristaPos = _posicao ?? (() {
                       final lat = _asDouble(corridaAtual['motorista_lat']);
                       final lng = _asDouble(corridaAtual['motorista_lng']);
@@ -332,14 +438,97 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                               ],
                             ),
                             const SizedBox(height: 12),
-                            if (passageiroNome != null)
-                              Text('Passageiro: $passageiroNome', style: Theme.of(context).textTheme.bodyMedium),
-                            if (corridaAtual['origem_endereco'] != null)
-                              Text('Origem: ${corridaAtual['origem_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                            if (corridaAtual['destino_endereco'] != null)
-                              Text('Destino: ${corridaAtual['destino_endereco']}', style: Theme.of(context).textTheme.bodyMedium),
-                            if (corridaAtual['id'] != null) Text('Corrida #${corridaAtual['id']}'),
-                            if (statusRaw != null) Text('Status: $statusRaw'),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.green.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'STATUS',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(letterSpacing: 1, color: Colors.green.shade700),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    statusLabel,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(statusHint, style: Theme.of(context).textTheme.bodySmall),
+                                  if (corridaAtual['id'] != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text('Corrida #${corridaAtual['id']}', style: Theme.of(context).textTheme.bodySmall),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final passengerCard = _infoBox(
+                                  context,
+                                  'Passageiro',
+                                  [
+                                    Text(passageiroNome ?? 'Passageiro confirmado',
+                                        style: Theme.of(context).textTheme.bodyMedium),
+                                    const SizedBox(height: 6),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      children: [
+                                        Text(
+                                          passageiroTelefone ?? 'Telefone não informado',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(color: Colors.grey.shade700),
+                                        ),
+                                        if (passengerWhatsLink != null)
+                                          OutlinedButton.icon(
+                                            onPressed: () => _abrirWhatsApp(passageiroTelefone),
+                                            icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                            label: const Text('WhatsApp'),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                                final routeCard = _infoBox(
+                                  context,
+                                  'Rota',
+                                  [
+                                    Text('Origem: $origemTexto', style: Theme.of(context).textTheme.bodyMedium),
+                                    const SizedBox(height: 4),
+                                    Text('Destino: $destinoTexto', style: Theme.of(context).textTheme.bodyMedium),
+                                  ],
+                                );
+                                if (constraints.maxWidth >= 520) {
+                                  return Row(
+                                    children: [
+                                      Expanded(child: passengerCard),
+                                      const SizedBox(width: 12),
+                                      Expanded(child: routeCard),
+                                    ],
+                                  );
+                                }
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    passengerCard,
+                                    const SizedBox(height: 12),
+                                    routeCard,
+                                  ],
+                                );
+                              },
+                            ),
                             const SizedBox(height: 12),
                             if (origem != null || destino != null || motoristaPos != null)
                               SizedBox(
@@ -597,24 +786,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            auth.when(
-              data: (user) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
-                  if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
-                  TextButton.icon(
-                    onPressed: () => context.goNamed('perfil'),
-                    icon: const Icon(Icons.settings),
-                    label: const Text('Editar dados'),
-                  ),
-                ],
-              ),
-              loading: () => const Text('Verificando conta...'),
-              error: (e, _) => Text('Erro na conta: $e'),
-            ),
-            const SizedBox(height: 16),
-            if (_status != null) Text(_status!),
             const SizedBox(height: 16),
             SizedBox(
               height: 260,

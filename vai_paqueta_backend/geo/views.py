@@ -24,7 +24,25 @@ class ReverseGeocodeView(APIView):
             location = geolocator.reverse(f"{lat}, {lng}", language="pt")
             if not location:
                 return Response({"detail": "Endereço não encontrado."}, status=404)
-            return Response({"endereco": location.address})
+            raw = getattr(location, "raw", {}) or {}
+            address = raw.get("address") or {}
+            street = (
+                address.get("road")
+                or address.get("pedestrian")
+                or address.get("street")
+                or address.get("residential")
+                or address.get("path")
+                or address.get("footway")
+                or address.get("neighbourhood")
+            )
+            number = address.get("house_number")
+            if street and number:
+                short_address = f"{street}, {number}"
+            elif street:
+                short_address = street
+            else:
+                short_address = location.address
+            return Response({"endereco": short_address, "endereco_completo": location.address})
         except Exception as exc:  # noqa: BLE001
             return Response({"detail": f"Falha no geocoding: {exc}"}, status=500)
 

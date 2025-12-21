@@ -12,6 +12,10 @@ class CorridaResumo {
   final double? motoristaLat;
   final double? motoristaLng;
   final DateTime? motoristaPingEm;
+  final String? origemEndereco;
+  final String? destinoEndereco;
+  final String? motoristaNome;
+  final String? motoristaTelefone;
 
   CorridaResumo({
     required this.id,
@@ -23,6 +27,10 @@ class CorridaResumo {
     this.motoristaLat,
     this.motoristaLng,
     this.motoristaPingEm,
+    this.origemEndereco,
+    this.destinoEndereco,
+    this.motoristaNome,
+    this.motoristaTelefone,
   });
 
   factory CorridaResumo.fromJson(Map<String, dynamic> json) {
@@ -38,6 +46,13 @@ class CorridaResumo {
       if (v is String) return DateTime.tryParse(v);
       return null;
     }
+    final motorista = json['motorista'];
+    String? motoristaNome;
+    String? motoristaTelefone;
+    if (motorista is Map<String, dynamic>) {
+      motoristaNome = (motorista['nome'] as String?)?.trim();
+      motoristaTelefone = (motorista['telefone'] as String?)?.trim();
+    }
     return CorridaResumo(
       id: json['id'] as int,
       status: json['status'] as String,
@@ -48,6 +63,10 @@ class CorridaResumo {
       motoristaLat: _d(json['motorista_lat']),
       motoristaLng: _d(json['motorista_lng']),
       motoristaPingEm: _dt(json['motorista_ping_em']),
+      origemEndereco: (json['origem_endereco'] as String?)?.trim(),
+      destinoEndereco: (json['destino_endereco'] as String?)?.trim(),
+      motoristaNome: motoristaNome,
+      motoristaTelefone: motoristaTelefone,
     );
   }
 }

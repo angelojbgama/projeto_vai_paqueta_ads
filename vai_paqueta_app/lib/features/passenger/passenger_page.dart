@@ -11,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/map_config.dart';
 import '../../services/geo_service.dart';
@@ -31,6 +32,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   LatLng? _origemLatLng;
   LatLng? _destinoLatLng;
   LatLng? _motoristaLatLng;
+  String? _motoristaNome;
+  String? _motoristaTelefone;
+  String? _origemEnderecoCorrida;
+  String? _destinoEnderecoCorrida;
   List<LatLng> _rota = [];
   List<LatLng> _rotaMotorista = [];
   bool _loading = false;
@@ -38,6 +43,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _corridaAtiva = false;
   int? _corridaIdAtual;
   String? _statusCorrida;
+  bool _modalAberto = false;
+  StateSetter? _modalSetState;
   TileProvider _tileProvider = NetworkTileProvider();
   String _tileUrl = MapTileConfig.networkTemplate;
   double? _tileMinZoom;
@@ -72,11 +79,73 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return normalized;
   }
 
+  String _statusLabel(String? status) {
+    switch (_normalizarStatus(status)) {
+      case 'aguardando':
+        return 'Aguardando motorista';
+      case 'aceita':
+        return 'Motorista aceitou';
+      case 'em_andamento':
+        return 'Em andamento';
+      case 'concluida':
+        return 'Concluída';
+      case 'cancelada':
+        return 'Cancelada';
+      case 'rejeitada':
+        return 'Rejeitada';
+      default:
+        return status?.trim().isNotEmpty == true ? status!.trim() : 'Aguardando motorista';
+    }
+  }
+
+  String _statusHint(String? status) {
+    switch (_normalizarStatus(status)) {
+      case 'aguardando':
+        return 'Aguardando confirmação do motorista.';
+      case 'aceita':
+        return 'Motorista confirmado. A caminho da origem.';
+      case 'em_andamento':
+        return 'Corrida em andamento.';
+      default:
+        return 'Status atualizado.';
+    }
+  }
+
+  String? _formatLatLng(LatLng? pos) {
+    if (pos == null) return null;
+    return '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+  }
+
+  String? _buildWhatsAppLink(String? telefone) {
+    final digits = (telefone ?? '').replaceAll(RegExp(r'\D+'), '');
+    if (digits.isEmpty) return null;
+    var normalized = digits;
+    if (digits.length <= 11 && !digits.startsWith('55')) {
+      normalized = '55$digits';
+    }
+    if (normalized.length < 12) return null;
+    return 'https://wa.me/$normalized';
+  }
+
+  Future<void> _abrirWhatsApp(String? telefone) async {
+    final link = _buildWhatsAppLink(telefone);
+    if (link == null) return;
+    final uri = Uri.parse(link);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      setState(() => _mensagem = 'Não foi possível abrir o WhatsApp.');
+    }
+  }
+
   void _encerrarCorrida({bool limparEnderecos = false}) {
     _corridaAtiva = false;
     _corridaIdAtual = null;
     _statusCorrida = null;
     _motoristaLatLng = null;
+    _motoristaNome = null;
+    _motoristaTelefone = null;
+    _origemEnderecoCorrida = null;
+    _destinoEnderecoCorrida = null;
     _rotaMotorista = [];
     _rota = [];
     if (limparEnderecos) {
@@ -89,6 +158,25 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
     _salvarCorridaLocal(null);
     _corridaTimer?.cancel();
+    _fecharModalCorrida();
+  }
+
+  void _fecharModalCorrida() {
+    if (!_modalAberto || !mounted) return;
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    _modalAberto = false;
+    _modalSetState = null;
+  }
+
+  void _sincronizarModalCorrida() {
+    if (!_corridaAtiva || _corridaIdAtual == null) return;
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+      return;
+    }
+    _mostrarModalCorrida();
   }
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
@@ -293,7 +381,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _corridaAtiva = true;
           _corridaIdAtual = current.id;
           _statusCorrida = current.status;
-          _mensagem = 'Corrida ativa (${current.status}).';
+          _motoristaNome = current.motoristaNome;
+          _motoristaTelefone = current.motoristaTelefone;
+          _origemEnderecoCorrida = current.origemEndereco;
+          _destinoEnderecoCorrida = current.destinoEndereco;
           if (current.origemLat != null && current.origemLng != null) {
             _origemLatLng = LatLng(current.origemLat!, current.origemLng!);
           }
@@ -304,7 +395,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             _motoristaLatLng = LatLng(current.motoristaLat!, current.motoristaLng!);
             _atualizarRotaMotorista(current.status);
           }
+          if (_origemCtrl.text.trim().isEmpty && current.origemEndereco != null && current.origemEndereco!.isNotEmpty) {
+            _origemCtrl.text = current.origemEndereco!;
+          }
+          if (_destinoCtrl.text.trim().isEmpty && current.destinoEndereco != null && current.destinoEndereco!.isNotEmpty) {
+            _destinoCtrl.text = current.destinoEndereco!;
+          }
         });
+        _sincronizarModalCorrida();
         _salvarCorridaLocal(current.id);
         _iniciarPollingCorrida();
       } else {
@@ -351,8 +449,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       if (!mounted) return false;
       setState(() {
-        _mensagem = 'Status: ${corrida.status}';
         _statusCorrida = corrida.status;
+        _motoristaNome = corrida.motoristaNome;
+        _motoristaTelefone = corrida.motoristaTelefone;
+        _origemEnderecoCorrida = corrida.origemEndereco;
+        _destinoEnderecoCorrida = corrida.destinoEndereco;
         if (corrida.origemLat != null && corrida.origemLng != null) {
           _origemLatLng = LatLng(corrida.origemLat!, corrida.origemLng!);
         }
@@ -369,10 +470,280 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (corrida.status == 'concluida' || corrida.status == 'cancelada' || corrida.status == 'rejeitada') {
           _encerrarCorrida(limparEnderecos: corrida.status == 'concluida');
         }
+        if (_origemCtrl.text.trim().isEmpty && corrida.origemEndereco != null && corrida.origemEndereco!.isNotEmpty) {
+          _origemCtrl.text = corrida.origemEndereco!;
+        }
+        if (_destinoCtrl.text.trim().isEmpty && corrida.destinoEndereco != null && corrida.destinoEndereco!.isNotEmpty) {
+          _destinoCtrl.text = corrida.destinoEndereco!;
+        }
       });
+      _sincronizarModalCorrida();
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  Widget _infoBox(BuildContext context, String title, List<Widget> children) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 1, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 6),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRideInfoCard(BuildContext context, {EdgeInsetsGeometry? margin}) {
+    if (!_corridaAtiva || _corridaIdAtual == null) {
+      return const SizedBox.shrink();
+    }
+    final status = _statusLabel(_statusCorrida);
+    final hint = _statusHint(_statusCorrida);
+    final normalized = _normalizarStatus(_statusCorrida);
+    final showDriver = normalized == 'aceita' || normalized == 'em_andamento';
+    final driverName = showDriver
+        ? (_motoristaNome?.trim().isNotEmpty == true ? _motoristaNome!.trim() : 'Motorista confirmado')
+        : 'Aguardando motorista aceitar';
+    final driverPhone = showDriver
+        ? (_motoristaTelefone?.trim().isNotEmpty == true ? _motoristaTelefone!.trim() : 'Telefone não informado')
+        : '—';
+    final origemText = (_origemEnderecoCorrida?.trim().isNotEmpty == true ? _origemEnderecoCorrida! : _origemCtrl.text).trim();
+    final destinoText = (_destinoEnderecoCorrida?.trim().isNotEmpty == true ? _destinoEnderecoCorrida! : _destinoCtrl.text).trim();
+    final origem = origemText.isNotEmpty ? origemText : (_formatLatLng(_origemLatLng) ?? '—');
+    final destino = destinoText.isNotEmpty ? destinoText : (_formatLatLng(_destinoLatLng) ?? '—');
+    final link = showDriver ? _buildWhatsAppLink(_motoristaTelefone) : null;
+
+    return Container(
+      margin: margin ?? const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 18, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'STATUS',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 1, color: Colors.green.shade700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  status,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(hint, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          _infoBox(
+            context,
+            'Motorista',
+            [
+              Text(driverName, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(driverPhone, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700)),
+                  if (link != null)
+                    OutlinedButton.icon(
+                      onPressed: () => _abrirWhatsApp(_motoristaTelefone),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                      label: const Text('WhatsApp'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _infoBox(
+            context,
+            'Rota',
+            [
+              Text('Origem: $origem', style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 4),
+              Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _mostrarModalCorrida() async {
+    if (_modalAberto || !mounted) return;
+    _modalAberto = true;
+    await Future<void>.delayed(Duration.zero);
+    try {
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierLabel: 'Corrida',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (ctx, anim, __) {
+          return SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Material(
+                  color: Theme.of(context).dialogBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  child: StatefulBuilder(
+                    builder: (dialogContext, setModalState) {
+                      _modalSetState = setModalState;
+                      final origem = _origemLatLng;
+                      final destino = _destinoLatLng;
+                      final motorista = _motoristaLatLng;
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.local_taxi, color: Colors.green, size: 24),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Corrida',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              _buildRideInfoCard(context, margin: EdgeInsets.zero),
+                              const SizedBox(height: 12),
+                              if (origem != null || destino != null || motorista != null)
+                                SizedBox(
+                                  height: 220,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: FlutterMap(
+                                      options: MapOptions(
+                                        initialCenter: origem ?? motorista ?? destino ?? const LatLng(-22.763, -43.106),
+                                        initialZoom: 14,
+                                        interactionOptions: const InteractionOptions(flags: ~InteractiveFlag.rotate),
+                                      ),
+                                      children: [
+                                        TileLayer(
+                                          urlTemplate: _tileUrl,
+                                          tileProvider: _tileProvider,
+                                          userAgentPackageName: 'com.example.vai_paqueta_app',
+                                          minZoom: _tileMinZoom ?? 0,
+                                          maxZoom: _tileMaxZoom ?? double.infinity,
+                                          minNativeZoom: _tileMinNativeZoom ?? 0,
+                                          maxNativeZoom: _tileMaxNativeZoom ?? 19,
+                                        ),
+                                        MarkerLayer(
+                                          markers: [
+                                            if (origem != null)
+                                              Marker(
+                                                point: origem,
+                                                width: 36,
+                                                height: 36,
+                                                child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                              ),
+                                            if (destino != null)
+                                              Marker(
+                                                point: destino,
+                                                width: 36,
+                                                height: 36,
+                                                child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                                              ),
+                                            if (motorista != null)
+                                              Marker(
+                                                point: motorista,
+                                                width: 36,
+                                                height: 36,
+                                                child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                              ),
+                                          ],
+                                        ),
+                                        if (_rota.length >= 2)
+                                          PolylineLayer(
+                                            polylines: [
+                                              Polyline(points: _rota, strokeWidth: 3, color: Colors.blueAccent),
+                                            ],
+                                          ),
+                                        if (_rotaMotorista.length >= 2)
+                                          PolylineLayer(
+                                            polylines: [
+                                              Polyline(points: _rotaMotorista, strokeWidth: 3, color: Colors.orangeAccent),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              if (_podeCancelarCorrida) ...[
+                                const SizedBox(height: 16),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _loading ? null : _pedirCorrida,
+                                    icon: const Icon(Icons.cancel),
+                                    label: const Text('Cancelar corrida'),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (ctx, anim, secondary, child) {
+          return FadeTransition(
+            opacity: anim,
+            child: ScaleTransition(
+              scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+              child: child ?? const SizedBox.shrink(),
+            ),
+          );
+        },
+      );
+    } finally {
+      _modalAberto = false;
+      _modalSetState = null;
     }
   }
 
@@ -512,7 +883,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         await rides.cancelarCorrida(_corridaIdAtual!);
         setState(() {
           _encerrarCorrida();
-          _mensagem = 'Corrida cancelada.';
         });
       } catch (e) {
         setState(() => _mensagem = 'Erro ao cancelar: $e');
@@ -565,12 +935,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       );
 
       setState(() {
-        _mensagem = 'Corrida criada, aguardando motorista aceitar.';
         _corridaAtiva = true;
         _corridaIdAtual = corrida.id;
         _statusCorrida = corrida.status;
         _motoristaLatLng = null;
       });
+      _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
     } catch (e) {
@@ -720,25 +1090,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: auth.when(
-              data: (user) => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(user != null ? 'Conta: ${user.email}' : 'Faça login para usar o app'),
-                  if (user != null && user.perfilTipo.isNotEmpty) Text('Modo: ${user.perfilTipo}'),
-                  TextButton.icon(
-                    onPressed: () => context.goNamed('perfil'),
-                    icon: const Icon(Icons.settings),
-                    label: const Text('Editar dados'),
-                  ),
-                ],
-              ),
-                loading: () => const Text('Verificando conta...'),
-                error: (e, _) => Text('Erro na conta: $e'),
-              ),
-            ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -900,16 +1251,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       ),
                     const SizedBox(height: 8),
                     if (_mensagem != null) Text(_mensagem!),
-                    if (_corridaAtiva && _corridaIdAtual != null)
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text('Corrida $_corridaIdAtual em andamento'),
-                      ),
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: _loading || (_corridaAtiva && !_podeCancelarCorrida) ? null : _pedirCorrida,
