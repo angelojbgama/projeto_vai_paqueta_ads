@@ -14,6 +14,11 @@ class ApiClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 15),
     ));
+    _refreshDio = Dio(BaseOptions(
+      baseUrl: ApiConfig.baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ));
 
     if (kDebugMode) {
       _dio.interceptors.add(
@@ -31,17 +36,37 @@ class ApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await AuthStorage.getToken();
+          final token = await AuthStorage.getAccessToken();
           if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Token $token';
+            options.headers['Authorization'] = 'Bearer $token';
           }
           handler.next(options);
+        },
+        onError: (error, handler) async {
+          final status = error.response?.statusCode;
+          final requestOptions = error.requestOptions;
+          final isRefresh = requestOptions.path.contains('/auth/token/refresh/');
+          if (status == 401 && !isRefresh && requestOptions.extra['retry'] != true) {
+            try {
+              final newAccess = await _refreshToken();
+              if (newAccess != null && newAccess.isNotEmpty) {
+                requestOptions.headers['Authorization'] = 'Bearer $newAccess';
+                requestOptions.extra['retry'] = true;
+                final response = await _dio.fetch(requestOptions);
+                return handler.resolve(response);
+              }
+            } catch (_) {
+              // Falha ao renovar, segue para logout.
+            }
+            await AuthStorage.clearTokens();
+          }
+          return handler.next(error);
         },
       ),
     );
 
-    // Permite certificados do loca.lt (self-signed) apenas em ambiente não-web.
-    if (!kIsWeb) {
+    // Permite certificados do loca.lt (self-signed) apenas em debug e não-web.
+    if (!kIsWeb && kDebugMode) {
       _dio.httpClientAdapter = IOHttpClientAdapter(
         createHttpClient: () {
           final client = HttpClient();
@@ -57,6 +82,40 @@ class ApiClient {
 
   static final ApiClient _instance = ApiClient._internal();
   late final Dio _dio;
+  late final Dio _refreshDio;
+  Future<String?>? _refreshFuture;
+
+  Future<String?> _refreshToken() async {
+    if (_refreshFuture != null) return _refreshFuture!;
+    final refresh = await AuthStorage.getRefreshToken();
+    if (refresh == null || refresh.isEmpty) return null;
+    _refreshFuture = _refreshDio
+        .post(
+          '/auth/token/refresh/',
+          data: {'refresh': refresh},
+          options: Options(validateStatus: (_) => true),
+        )
+        .then((resp) async {
+          if (resp.statusCode != 200 || resp.data is! Map) {
+            await AuthStorage.clearTokens();
+            return null;
+          }
+          final data = Map<String, dynamic>.from(resp.data as Map);
+          final access = data['access'] as String?;
+          final newRefresh = data['refresh'] as String?;
+          if (access == null || access.isEmpty) {
+            await AuthStorage.clearTokens();
+            return null;
+          }
+          await AuthStorage.saveTokens(
+            access: access,
+            refresh: (newRefresh != null && newRefresh.isNotEmpty) ? newRefresh : refresh,
+          );
+          return access;
+        })
+        .whenComplete(() => _refreshFuture = null);
+    return _refreshFuture!;
+  }
 
   static Dio get client => _instance._dio;
 }

@@ -63,11 +63,13 @@ class AuthService {
     }
     final data = resp.data as Map<String, dynamic>;
     final userJson = data['user'] as Map<String, dynamic>?;
-    final token = userJson != null ? userJson['token'] as String? : null;
-    if (token == null || userJson == null) {
+    final tokens = data['tokens'] as Map<String, dynamic>?;
+    final access = tokens?['access'] as String?;
+    final refresh = tokens?['refresh'] as String?;
+    if (access == null || refresh == null || userJson == null) {
       throw Exception('Resposta inválida do servidor.');
     }
-    await AuthStorage.saveToken(token);
+    await AuthStorage.saveTokens(access: access, refresh: refresh);
     return AuthUser.fromJson(userJson);
   }
 
@@ -86,11 +88,13 @@ class AuthService {
     }
     final data = resp.data as Map<String, dynamic>;
     final userJson = data['user'] as Map<String, dynamic>?;
-    final token = userJson != null ? userJson['token'] as String? : null;
-    if (token == null || userJson == null) {
+    final tokens = data['tokens'] as Map<String, dynamic>?;
+    final access = tokens?['access'] as String?;
+    final refresh = tokens?['refresh'] as String?;
+    if (access == null || refresh == null || userJson == null) {
       throw Exception('Resposta inválida do servidor.');
     }
-    await AuthStorage.saveToken(token);
+    await AuthStorage.saveTokens(access: access, refresh: refresh);
     return AuthUser.fromJson(userJson);
   }
 
@@ -138,6 +142,14 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    await AuthStorage.clearToken();
+    final refresh = await AuthStorage.getRefreshToken();
+    if (refresh != null && refresh.isNotEmpty) {
+      await _dio.post(
+        '/auth/logout/',
+        data: {'refresh': refresh},
+        options: Options(validateStatus: (_) => true),
+      );
+    }
+    await AuthStorage.clearTokens();
   }
 }

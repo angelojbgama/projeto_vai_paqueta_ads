@@ -12,12 +12,12 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
 
   @override
   Future<AuthUser?> build() async {
-    final token = await AuthStorage.getToken();
+    final token = await AuthStorage.getAccessToken();
     if (token == null) return null;
     try {
       return await _service.me();
     } catch (_) {
-      await AuthStorage.clearToken();
+      await AuthStorage.clearTokens();
       return null;
     }
   }

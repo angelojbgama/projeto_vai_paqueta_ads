@@ -8,8 +8,8 @@ class PerfilSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Perfil
-        fields = ["id", "user", "device_uuid", "plataforma", "tipo", "nome", "telefone", "criado_em", "atualizado_em"]
-        read_only_fields = ["id", "user", "device_uuid", "criado_em", "atualizado_em"]
+        fields = ["id", "plataforma", "tipo", "nome", "telefone", "criado_em", "atualizado_em"]
+        read_only_fields = ["id", "criado_em", "atualizado_em"]
 
     def get_telefone(self, obj):
         if not obj.user:

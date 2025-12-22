@@ -339,7 +339,6 @@
   </div>
   <script>
     const state = {
-      token: null,
       user: null,
       map: null,
       markers: {},
@@ -355,11 +354,11 @@
       activePassengerRide: null,
       activeDriverRide: null,
     };
+    let refreshPromise = null;
     const ADDRESSES_URL = "{% static 'landing/data/addresses.json' %}";
 
     function loadSession() {
       try {
-        state.token = localStorage.getItem('vp_token') || null;
         const u = localStorage.getItem('vp_user');
         state.user = u ? JSON.parse(u) : null;
       } catch (e) {
@@ -368,11 +367,13 @@
       renderSession();
       toggleAuthViews();
       if (state.user) initMap();
+      syncSession();
     }
 
     function saveSession() {
-      localStorage.setItem('vp_token', state.token || '');
       localStorage.setItem('vp_user', state.user ? JSON.stringify(state.user) : '');
+      localStorage.removeItem('vp_access');
+      localStorage.removeItem('vp_refresh');
       renderSession();
       toggleAuthViews();
       enforceRoleTabs();
@@ -380,8 +381,20 @@
       ensureDriverPolling();
     }
 
-    function logout() {
-      state.token = null;
+    async function revokeRefreshToken() {
+      try {
+        await fetch('/api/auth/logout/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Use-Cookies': '1' },
+          credentials: 'include',
+        });
+      } catch (e) {
+        console.warn('Falha ao revogar refresh token', e);
+      }
+    }
+
+    async function logout() {
+      await revokeRefreshToken();
       state.user = null;
       saveSession();
       const passengerStatus = document.getElementById('passageiro-corrida');
@@ -422,7 +435,7 @@
     function toggleAuthViews() {
       const auth = document.getElementById('auth-section');
       const app = document.getElementById('app-section');
-      if (state.token) {
+      if (state.user) {
         auth.classList.add('d-none');
         app.classList.remove('d-none');
         setTimeout(() => { if (state.map) state.map.invalidateSize(); }, 200);
@@ -430,6 +443,21 @@
         auth.classList.remove('d-none');
         app.classList.add('d-none');
         stopAutoPing();
+      }
+    }
+
+    async function syncSession() {
+      try {
+        const data = await api('/api/auth/me/', { method: 'GET', headers: { 'X-Use-Cookies': '1' } });
+        if (data.user) {
+          state.user = data.user;
+          saveSession();
+          if (!state.map) initMap();
+          ensureAutoPing();
+          enforceRoleTabs();
+        }
+      } catch (e) {
+        if (state.user) logout();
       }
     }
 
@@ -444,10 +472,46 @@
       });
     });
 
-    async function api(path, { method = 'GET', body } = {}) {
-      const headers = { 'Content-Type': 'application/json' };
-      if (state.token) headers['Authorization'] = `Token ${state.token}`;
-      const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    async function refreshAccessToken() {
+      if (!refreshPromise) {
+        refreshPromise = fetch('/api/auth/token/refresh/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Use-Cookies': '1' },
+          credentials: 'include',
+        })
+          .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              const err = new Error(data.detail || res.statusText);
+              err.status = res.status;
+              throw err;
+            }
+            return true;
+          })
+          .finally(() => {
+            refreshPromise = null;
+          });
+      }
+      return refreshPromise;
+    }
+
+    async function api(path, { method = 'GET', body, retry = false, headers = {} } = {}) {
+      const mergedHeaders = { 'Content-Type': 'application/json', ...headers };
+      const res = await fetch(path, {
+        method,
+        headers: mergedHeaders,
+        credentials: 'include',
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (res.status === 401 && !retry) {
+        try {
+          await refreshAccessToken();
+          return api(path, { method, body, retry: true, headers });
+        } catch (e) {
+          logout();
+          throw e;
+        }
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         const err = new Error(data.detail || res.statusText);
@@ -523,9 +587,15 @@
       const btn = document.getElementById('btn-login');
       try {
         setLoading(btn, true);
-        const data = await api('/api/auth/login/', { method: 'POST', body: { email, password } });
-        state.token = data.user.token;
-        state.user = data.user;
+        const data = await api('/api/auth/login/', {
+          method: 'POST',
+          body: { email, password },
+          headers: { 'X-Use-Cookies': '1' },
+        });
+        state.user = data.user || null;
+        if (!state.user) {
+          throw new Error('Resposta inválida do servidor.');
+        }
         saveSession();
         initMap();
         ensureAutoPing();
@@ -549,9 +619,15 @@
       const btn = document.getElementById('btn-register');
       try {
         setLoading(btn, true);
-        const data = await api('/api/auth/register/', { method: 'POST', body });
-        state.token = data.user.token;
-        state.user = data.user;
+        const data = await api('/api/auth/register/', {
+          method: 'POST',
+          body,
+          headers: { 'X-Use-Cookies': '1' },
+        });
+        state.user = data.user || null;
+        if (!state.user) {
+          throw new Error('Resposta inválida do servidor.');
+        }
         saveSession();
         initMap();
         ensureAutoPing();
@@ -567,7 +643,7 @@
     document.getElementById('btn-logout').addEventListener('click', logout);
 
     document.getElementById('btn-update-profile').addEventListener('click', async () => {
-      if (!state.token) return toast('Faça login primeiro', true);
+      if (!state.user) return toast('Faça login primeiro', true);
       const deviceField = document.getElementById('perfil-device');
       const body = {
         nome: document.getElementById('perfil-nome').value.trim(),

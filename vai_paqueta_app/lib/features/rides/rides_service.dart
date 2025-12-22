@@ -73,7 +73,6 @@ class CorridaResumo {
 
 class MotoristaProximo {
   final int perfilId;
-  final String deviceUuid;
   final double latitude;
   final double longitude;
   final double? precisaoM;
@@ -81,7 +80,6 @@ class MotoristaProximo {
 
   MotoristaProximo({
     required this.perfilId,
-    required this.deviceUuid,
     required this.latitude,
     required this.longitude,
     required this.distKm,
@@ -91,7 +89,6 @@ class MotoristaProximo {
   factory MotoristaProximo.fromJson(Map<String, dynamic> json) {
     return MotoristaProximo(
       perfilId: json['perfil_id'] as int,
-      deviceUuid: json['device_uuid'] as String,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       precisaoM: (json['precisao_m'] as num?)?.toDouble(),
