@@ -70,10 +70,11 @@ TEMPLATES = [
 WSGI_APPLICATION = "vai_paqueta.wsgi.application"
 ASGI_APPLICATION = "vai_paqueta.asgi.application"
 
+DB_PATH = os.environ.get("DJANGO_DB_PATH")
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": DB_PATH or (BASE_DIR / "db.sqlite3"),
     }
 }
 

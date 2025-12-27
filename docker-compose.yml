@@ -9,8 +9,10 @@ services:
       - "8000:8000"
     env_file:
       - ./vai_paqueta_backend/.env
+    environment:
+      - DJANGO_DB_PATH=/app/data/db.sqlite3
     volumes:
-      - ./vai_paqueta_backend/db.sqlite3:/app/db.sqlite3
+      - db_data:/app/data
       - staticfiles:/app/staticfiles
     restart: unless-stopped
   nginx:
@@ -25,4 +27,5 @@ services:
     restart: unless-stopped
 
 volumes:
+  db_data:
   staticfiles:
