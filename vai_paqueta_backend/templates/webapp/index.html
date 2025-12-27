@@ -7,21 +7,52 @@
   <title>Vai Paquetá | Web App</title>
   <link rel="stylesheet" href="{% static 'landing/assets/css/bootstrap.min.css' %}">
   <link rel="stylesheet" href="{% static 'landing/assets/css/LineIcons.2.0.css' %}">
+  <link rel="stylesheet" href="{% static 'landing/assets/css/main.css' %}">
   <link rel="stylesheet" href="{% static 'leaflet/leaflet.css' %}">
   <style>
-    :root { --vp-primary: #388E3C; --vp-bg: #f8fafb; --vp-dark: #0c1a12; }
-    body { background: var(--vp-bg); color: #1f2933; font-family: "Inter", sans-serif; }
-    .vp-header { background: #fff; border-bottom: 1px solid #e5e7eb; }
-    .vp-header .btn { background: var(--vp-primary); border-color: var(--vp-primary); }
-    .vp-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.04);}
-    .vp-title { color: var(--vp-dark); font-weight: 700; }
+    :root {
+      --vp-primary: #388E3C;
+      --vp-bg: #f9f9f9;
+      --vp-dark: #081828;
+      --vp-muted: #888;
+      --bs-success: #388E3C;
+      --bs-success-rgb: 56, 142, 60;
+    }
+    body { background: var(--vp-bg); color: var(--vp-muted); font-family: "Inter", sans-serif; }
+    .webapp-header {
+      background: #388E3C;
+      z-index: 2000;
+    }
+    .webapp-header.sticky {
+      z-index: 2000;
+    }
+    .leaflet-container {
+      z-index: 1;
+    }
+    .webapp-main {
+      padding-top: 140px;
+    }
+    @media (max-width: 767px) {
+      .webapp-main {
+        padding-top: 110px;
+      }
+    }
+    .vp-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+    }
+    .vp-title { color: var(--vp-dark); font-weight: 600; }
     .vp-badge { background: var(--vp-primary); color: #fff; padding: 6px 10px; border-radius: 999px; font-size: 12px; }
-    .vp-section { padding: 32px 0; }
+    .vp-section { padding: 60px 0; }
     .vp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-    .vp-label { font-weight: 600; margin-bottom: 4px; }
-    .vp-muted { color: #6b7280; font-size: 14px; }
+    .vp-label { font-weight: 600; margin-bottom: 4px; color: var(--vp-dark); }
+    .vp-muted { color: var(--vp-muted); font-size: 14px; }
     pre { background: #0b1724; color: #cfe3ff; padding: 12px; border-radius: 10px; font-size: 13px; overflow-x: auto; }
-    #map { width: 100%; height: 360px; border-radius: 12px; border: 1px solid #e5e7eb; }
+    #map { width: 100%; height: 360px; border-radius: 6px; border: 1px solid #eee; }
     .nav-pills .nav-link.active { background: var(--vp-primary); }
     /* Login shell */
     .vp-login-shell { min-height: 70vh; display: flex; align-items: center; }
@@ -46,26 +77,79 @@
     .vp-modal-whatsapp { padding: 4px 10px; font-size: 12px; }
     .vp-modal-status { background: linear-gradient(135deg, rgba(56,142,60,0.18), rgba(56,142,60,0.05)); border: 1px solid rgba(56,142,60,0.25); grid-column: 1 / -1; }
     .vp-modal-status .vp-modal-value { font-size: 20px; font-weight: 700; }
+    .vp-modal-progress { height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .vp-modal-progress-bar { height: 100%; width: 0%; background: var(--vp-primary); transition: width 0.25s ease; }
+    .vp-modal-progress-hint { font-size: 13px; color: #2e7d32; margin-top: 6px; }
+    .vp-modal-progress--warn .vp-modal-progress-bar { background: #f59e0b; }
+    .vp-modal-progress-hint--warn { color: #b45309; }
+    .vp-progress {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      margin-top: 8px;
+    }
+    .vp-progress.is-active { opacity: 1; }
+    .vp-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--vp-primary);
+      transition: width 0.4s ease;
+    }
   </style>
 </head>
 <body>
-  <div class="vp-header py-3">
-    <div class="container d-flex align-items-center justify-content-between">
-      <div class="d-flex align-items-center gap-2">
-        <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá" style="height:40px;">
-        <div>
-          <div class="vp-title mb-0">Vai Paquetá - Web</div>
-          <div class="vp-muted">Beta • Mesmos fluxos do app mobile</div>
+  <header class="header navbar-area webapp-header">
+    <div class="container">
+      <div class="row align-items-center">
+        <div class="col-lg-12">
+          <div class="nav-inner">
+            <nav class="navbar navbar-expand-lg">
+              <a class="navbar-brand" href="/app/">
+                <img
+                  src="{% static 'landing/assets/images/logo/logo.png' %}"
+                  data-logo-top="{% static 'landing/assets/images/logo/logo.png' %}"
+                  data-logo-sticky="{% static 'landing/assets/images/logo/logo-collor.png' %}"
+                  alt="Vai Paquetá">
+              </a>
+              <button class="navbar-toggler mobile-menu-btn" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+                aria-expanded="false" aria-label="Toggle navigation">
+                <span class="toggler-icon"></span>
+                <span class="toggler-icon"></span>
+                <span class="toggler-icon"></span>
+              </button>
+              <div class="collapse navbar-collapse sub-menu-bar" id="navbarSupportedContent">
+                <ul id="nav" class="navbar-nav ms-auto">
+                  <li class="nav-item">
+                    <a href="/app/" class="page-scroll active" aria-label="Ir para o web app">Web App</a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="/" class="page-scroll" aria-label="Ir para a landing">Início</a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="/#download-android" class="page-scroll"
+                      aria-label="Ir para baixar Android">Baixar Android</a>
+                  </li>
+                  <li class="nav-item">
+                    <a href="#contato" class="page-scroll" aria-label="Ir para a seção de contato">Contato</a>
+                  </li>
+                </ul>
+              </div>
+              <div class="button add-list-button">
+                <button class="btn" id="btn-logout" type="button"><i class="lni lni-exit"></i> Sair</button>
+              </div>
+            </nav>
+          </div>
         </div>
       </div>
-      <div class="d-flex gap-2">
-        <a class="btn btn-success btn-sm" href="/" target="_blank"><i class="lni lni-home"></i> Landing</a>
-        <button class="btn btn-outline-success btn-sm" id="btn-logout"><i class="lni lni-exit"></i> Sair</button>
-      </div>
     </div>
-  </div>
+  </header>
 
-  <div class="container">
+  <main class="webapp-main">
+    <div class="container">
     <!-- Autenticação -->
     <div class="vp-section vp-login-shell" id="auth-section">
       <div class="vp-login-card">
@@ -195,6 +279,9 @@
                 <div id="driver-gps-status">Aguardando GPS...</div>
                 <div class="vp-muted" id="driver-gps-last">Último envio: —</div>
                 <div class="vp-muted" id="driver-gps-coords">Posição: —</div>
+                <div class="vp-progress" id="driver-gps-progress">
+                  <div class="vp-progress-bar" id="driver-gps-progress-bar"></div>
+                </div>
               </div>
               <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-success btn-sm" id="btn-enable-gps">Ativar GPS</button>
@@ -202,13 +289,15 @@
               </div>
               <div class="mt-3 d-none" id="driver-manual-form">
                 <div class="mb-2">
-                  <label class="vp-label">Posição atual (lat, lng)</label>
+                  <label class="vp-label">Localização manual</label>
                   <div class="input-group">
-                    <input class="form-control" id="ping-lat" placeholder="-22.763">
-                    <input class="form-control" id="ping-lng" placeholder="-43.106">
+                    <input class="form-control" id="driver-end" list="addresses-list" placeholder="Escolha um endereço">
                     <button class="btn btn-outline-success" id="btn-ping-gps"><i class="lni lni-map-marker"></i></button>
                   </div>
+                  <small class="vp-muted">Use um endereço da lista ou o GPS para preencher.</small>
                 </div>
+                <input type="hidden" id="driver-lat">
+                <input type="hidden" id="driver-lng">
                 <div class="mb-3">
                   <label class="vp-label">Precisão (m) opcional</label>
                   <input class="form-control" id="ping-precisao" placeholder="10">
@@ -261,9 +350,77 @@
         <div id="map"></div>
       </div>
     </div>
-  </div>
-  </div>
+    </div>
+  </main>
 
+  <footer class="footer">
+    <div class="footer-top">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-4 col-md-4 col-12">
+            <!-- Single Widget -->
+            <div class="single-footer f-about">
+              <div class="logo">
+                <a href="/">
+                  <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá">
+                </a>
+              </div>
+              <p>Vai Paquetá é um piloto de mobilidade que conecta passageiros e eco-taxistas na Ilha de Paquetá,
+                combinando organização digital com o contato próximo da comunidade.</p>
+            </div>
+            <!-- End Single Widget -->
+          </div>
+          <div class="col-lg-8 col-md-8 col-12">
+            <div class="row">
+              <div class="col-lg-4 col-md-6 col-12">
+                <!-- Single Widget -->
+                <div class="single-footer f-link">
+                  <h3>Aplicativo</h3>
+                  <ul>
+                    <li><a href="/#features">Como funciona</a></li>
+                    <li><a href="/#impacto">Impacto esperado</a></li>
+                    <li><a href="/#precos">Preços</a></li>
+                    <li><a href="/#download-android">Baixar Android</a></li>
+                  </ul>
+                </div>
+                <!-- End Single Widget -->
+              </div>
+              <div class="col-lg-4 col-md-6 col-12">
+                <!-- Single Widget -->
+                <div class="single-footer f-link">
+                  <h3>Projeto</h3>
+                  <ul>
+                    <li><a href="/#contato">Contato e dúvidas</a></li>
+                    <li><a href="/#contato">Cadastro de eco-taxista</a></li>
+                    <li><a href="/#contato">Parcerias locais</a></li>
+                  </ul>
+                </div>
+                <!-- End Single Widget -->
+              </div>
+              <div class="col-lg-4 col-md-6 col-12">
+                <!-- Single Widget -->
+                <div class="single-footer f-contact" id="contato">
+                  <h3>Fale com a equipe Vai Paquetá</h3>
+                  <p>Tem dúvidas, dicas ou encontrou alguma falha no app? Envie uma mensagem e respondemos por e-mail ou
+                    WhatsApp.</p>
+                  <div class="button">
+                    <a href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1"
+                      class="btn">Enviar mensagem</a>
+                    <a href="/#features" class="btn btn-alt">Rever como funciona</a>
+                  </div>
+                </div>
+                <!-- End Single Widget -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--/ End Footer Top -->
+  </footer>
+  <!--/ End Footer Area -->
+
+  <script src="{% static 'landing/assets/js/bootstrap.min.js' %}"></script>
   <script src="{% static 'leaflet/leaflet.js' %}"></script>
 
   <!-- Modal de corrida aberta (passageiro) -->
@@ -280,6 +437,14 @@
           <div class="vp-modal-label">Status</div>
           <div class="vp-modal-value" id="ride-modal-status">Aguardando motorista</div>
           <div class="vp-modal-sub" id="ride-modal-status-hint">Aguardando confirmação do motorista.</div>
+          <div class="vp-modal-progress d-none" id="ride-modal-cancel-progress">
+            <div class="vp-modal-progress-bar" id="ride-modal-cancel-progress-bar"></div>
+          </div>
+          <div class="vp-modal-progress-hint d-none" id="ride-modal-cancel-progress-hint"></div>
+          <div class="vp-modal-progress vp-modal-progress--warn d-none" id="ride-modal-finalize-progress">
+            <div class="vp-modal-progress-bar" id="ride-modal-finalize-progress-bar"></div>
+          </div>
+          <div class="vp-modal-progress-hint vp-modal-progress-hint--warn d-none" id="ride-modal-finalize-progress-hint"></div>
         </div>
         <div class="vp-modal-item">
           <div class="vp-modal-label">Motorista</div>
@@ -295,8 +460,9 @@
           <div class="vp-modal-sub" id="ride-modal-destino">Destino: —</div>
         </div>
       </div>
-      <div class="mt-3 text-end">
-        <button class="btn btn-outline-danger btn-sm" id="modal-cancel-ride">Cancelar corrida</button>
+      <div class="mt-3 d-flex justify-content-end gap-2 flex-wrap">
+        <button class="btn btn-outline-danger btn-sm" id="modal-cancel-ride">Cancelar</button>
+        <button class="btn btn-success btn-sm d-none" id="modal-finalize-ride">Finalizar</button>
       </div>
     </div>
   </div>
@@ -353,6 +519,10 @@
       driverRidePolling: null,
       activePassengerRide: null,
       activeDriverRide: null,
+      lastDriverLocation: null,
+      cancelUnlockTimer: null,
+      finalizeUnlockTimer: null,
+      serverOffsetMs: 0,
     };
     let refreshPromise = null;
     const ADDRESSES_URL = "{% static 'landing/data/addresses.json' %}";
@@ -396,6 +566,7 @@
     async function logout() {
       await revokeRefreshToken();
       state.user = null;
+      state.lastDriverLocation = null;
       saveSession();
       const passengerStatus = document.getElementById('passageiro-corrida');
       if (passengerStatus) passengerStatus.textContent = '{}';
@@ -429,6 +600,10 @@
         document.getElementById('perfil-tipo').value = state.user.perfil_tipo || 'passageiro';
         document.getElementById('perfil-nome').value = state.user.nome || '';
         document.getElementById('perfil-telefone').value = state.user.telefone || '';
+      }
+      const logoutBtn = document.getElementById('btn-logout');
+      if (logoutBtn) {
+        logoutBtn.classList.toggle('d-none', !state.user);
       }
     }
 
@@ -529,9 +704,8 @@
       btn.innerHTML = loading ? '<span class="spinner-border spinner-border-sm"></span>' : btn.dataset.original;
     }
 
-    function toast(msg, isError = false) {
-      console.log(msg);
-      alert((isError ? 'Erro: ' : '') + msg);
+    function toast(_msg, _isError = false) {
+      // Toasts desativados no web app.
     }
 
     // Tabs
@@ -661,7 +835,7 @@
         saveSession();
         ensureAutoPing();
         enforceRoleTabs();
-        toast('Perfil atualizado');
+        // Sem toast de sucesso para evitar janelas extras.
       } catch (e) {
         toast(e.message, true);
       } finally {
@@ -670,20 +844,23 @@
     });
 
     // GPS helper
-    async function requestOriginGps() {
+    async function requestOriginGps(opts = {}) {
+      const silent = Boolean(opts && opts.silent);
       if (!navigator.geolocation) {
-        toast('Geolocalização não suportada. Escolha um endereço de origem.', true);
+        if (!silent) toast('Geolocalização não suportada. Escolha um endereço de origem.', true);
         return;
       }
       if (!window.isSecureContext && location.hostname !== 'localhost') {
-        toast('GPS no navegador exige https ou localhost. Abra em http://localhost:8000 ou habilite https.', true);
+        if (!silent) {
+          toast('GPS no navegador exige https ou localhost. Abra em http://localhost:8000 ou habilite https.', true);
+        }
         return;
       }
       const getPos = (opts) =>
         new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, opts);
         });
-      toast('Solicitando sua localização...', false);
+      if (!silent) toast('Solicitando sua localização...', false);
       const attempts = [
         { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
         { enableHighAccuracy: false, timeout: 30000, maximumAge: 0 },
@@ -710,7 +887,7 @@
         // Limpa os campos de destino lat/lng para evitar reuso incorreto
         document.getElementById('destino-lat').value = document.getElementById('destino-lat').value || '';
         document.getElementById('destino-lng').value = document.getElementById('destino-lng').value || '';
-        toast('Origem preenchida com seu GPS');
+        if (!silent && !opts?.suppressSuccess) toast('Origem preenchida com seu GPS');
         updateMapFromRide({
           origem_lat: lat,
           origem_lng: lng,
@@ -721,21 +898,32 @@
         if (err && err.code === 1) msg = 'Permita o GPS no navegador (https ou localhost) ou escolha um endereço manualmente.';
         if (err && err.code === 2) msg = 'Sinal de GPS indisponível agora. Tente novamente ou escolha um endereço.';
         if (err && err.code === 3) msg = 'Tempo esgotado para pegar o GPS. Escolha um endereço ou tente novamente.';
-        toast(msg, true);
+        if (!silent) toast(msg, true);
       }
     }
-    document.getElementById('btn-origem-gps').addEventListener('click', requestOriginGps);
+    document.getElementById('btn-origem-gps').addEventListener('click', () => {
+      requestOriginGps({ suppressSuccess: true });
+    });
     const pingGpsBtn = document.getElementById('btn-ping-gps');
     if (pingGpsBtn) {
-      pingGpsBtn.addEventListener('click', () => {
+      pingGpsBtn.addEventListener('click', async () => {
         if (!navigator.geolocation) {
           toast('Geolocalização não suportada.', true);
           return;
         }
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            document.getElementById('ping-lat').value = pos.coords.latitude.toFixed(6);
-            document.getElementById('ping-lng').value = pos.coords.longitude.toFixed(6);
+          async (pos) => {
+            const lat = pos.coords.latitude.toFixed(6);
+            const lng = pos.coords.longitude.toFixed(6);
+            document.getElementById('driver-lat').value = lat;
+            document.getElementById('driver-lng').value = lng;
+            try {
+              const addr = await reverseGeocode(lat, lng);
+              document.getElementById('driver-end').value = addr || 'Sua localização atual';
+            } catch (e) {
+              document.getElementById('driver-end').value = 'Sua localização atual';
+            }
+            updateDriverLocation(Number(lat), Number(lng));
           },
           (err) => toast(err.message, true),
           { enableHighAccuracy: true, timeout: 8000 }
@@ -806,6 +994,13 @@
         applyAddress('destino-end', 'destino-lat', 'destino-lng');
         renderInputMarkers();
       });
+      const driverEnd = document.getElementById('driver-end');
+      if (driverEnd) {
+        driverEnd.addEventListener(evt, () => {
+          updateDatalistSuggestions(driverEnd.value);
+          applyAddress('driver-end', 'driver-lat', 'driver-lng');
+        });
+      }
     });
 
     function parseCoord(val) {
@@ -851,7 +1046,6 @@
         setLoading(btn, true);
         const corrida = await api('/api/corridas/solicitar/', { method: 'POST', body });
         renderPassengerRide(corrida);
-        toast('Corrida solicitada!');
       } catch (e) {
         if (e.status === 409 && e.data?.corrida) {
           renderPassengerRide(e.data.corrida);
@@ -892,15 +1086,162 @@
       return ACTIVE_RIDE_STATUSES.has(normalizeRideStatus(status));
     }
 
+    const CANCEL_AFTER_ACCEPT_MS = 2 * 60 * 1000;
+    const FINALIZE_AFTER_START_MS = 3 * 60 * 1000;
+
+    function acceptedAtMs(corrida) {
+      if (!corrida || !corrida.atualizado_em) return null;
+      const ts = Date.parse(corrida.atualizado_em);
+      return Number.isNaN(ts) ? null : ts;
+    }
+
+    function cancelUnlockRemainingMs(corrida) {
+      if (!corrida || normalizeRideStatus(corrida.status) !== 'aceita') return 0;
+      const acceptedAt = acceptedAtMs(corrida);
+      if (!acceptedAt) return 0;
+      const now = Date.now() + (state.serverOffsetMs || 0);
+      const remaining = CANCEL_AFTER_ACCEPT_MS - (now - acceptedAt);
+      return Math.max(0, remaining);
+    }
+
+    function startedAtMs(corrida) {
+      if (!corrida || !corrida.atualizado_em) return null;
+      const ts = Date.parse(corrida.atualizado_em);
+      return Number.isNaN(ts) ? null : ts;
+    }
+
+    function finalizeUnlockRemainingMs(corrida) {
+      if (!corrida || normalizeRideStatus(corrida.status) !== 'em_andamento') return 0;
+      const startedAt = startedAtMs(corrida);
+      if (!startedAt) return 0;
+      const now = Date.now() + (state.serverOffsetMs || 0);
+      const remaining = FINALIZE_AFTER_START_MS - (now - startedAt);
+      return Math.max(0, remaining);
+    }
+
+    function formatRemainingMs(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function stopCancelUnlockTimer() {
+      if (state.cancelUnlockTimer) {
+        clearInterval(state.cancelUnlockTimer);
+        state.cancelUnlockTimer = null;
+      }
+    }
+
+    function stopFinalizeUnlockTimer() {
+      if (state.finalizeUnlockTimer) {
+        clearInterval(state.finalizeUnlockTimer);
+        state.finalizeUnlockTimer = null;
+      }
+    }
+
+    function updateCancelUnlockUi() {
+      const cancelBtn = document.getElementById('modal-cancel-ride');
+      const progressWrap = document.getElementById('ride-modal-cancel-progress');
+      const progressBar = document.getElementById('ride-modal-cancel-progress-bar');
+      const progressHint = document.getElementById('ride-modal-cancel-progress-hint');
+      const finalizeWrap = document.getElementById('ride-modal-finalize-progress');
+      const finalizeBar = document.getElementById('ride-modal-finalize-progress-bar');
+      const finalizeHint = document.getElementById('ride-modal-finalize-progress-hint');
+      const finalizeBtn = document.getElementById('modal-finalize-ride');
+      if (!cancelBtn || !progressWrap || !progressBar || !progressHint) return;
+      const corrida = state.activePassengerRide;
+      if (!corrida || !corrida.id || !isActiveRideStatus(corrida.status)) {
+        cancelBtn.classList.add('d-none');
+        progressWrap.classList.add('d-none');
+        progressHint.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressHint.textContent = '';
+        stopCancelUnlockTimer();
+        return;
+      }
+      const status = normalizeRideStatus(corrida.status);
+      const remaining = cancelUnlockRemainingMs(corrida);
+      const locked = status === 'aceita' && remaining > 0;
+      cancelBtn.textContent = 'Cancelar';
+      const canCancel = status === 'aguardando' || (status === 'aceita' && remaining <= 0);
+      cancelBtn.classList.toggle('d-none', !canCancel);
+      if (locked) {
+        const progress = 1 - remaining / CANCEL_AFTER_ACCEPT_MS;
+        progressBar.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
+        progressHint.textContent = `Cancelamento liberado em ${formatRemainingMs(remaining)}`;
+        progressWrap.classList.remove('d-none');
+        progressHint.classList.remove('d-none');
+        if (!state.cancelUnlockTimer) {
+          state.cancelUnlockTimer = setInterval(updateCancelUnlockUi, 1000);
+        }
+      } else {
+        progressWrap.classList.add('d-none');
+        progressHint.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressHint.textContent = '';
+        stopCancelUnlockTimer();
+      }
+    }
+
+    function updateFinalizeUnlockUi() {
+      const finalizeBtn = document.getElementById('modal-finalize-ride');
+      const progressWrap = document.getElementById('ride-modal-finalize-progress');
+      const progressBar = document.getElementById('ride-modal-finalize-progress-bar');
+      const progressHint = document.getElementById('ride-modal-finalize-progress-hint');
+      if (!finalizeBtn || !progressWrap || !progressBar || !progressHint) return;
+      const corrida = state.activePassengerRide;
+      if (!corrida || !corrida.id || !isActiveRideStatus(corrida.status)) {
+        finalizeBtn.classList.add('d-none');
+        progressWrap.classList.add('d-none');
+        progressHint.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressHint.textContent = '';
+        stopFinalizeUnlockTimer();
+        return;
+      }
+      const status = normalizeRideStatus(corrida.status);
+      const remaining = finalizeUnlockRemainingMs(corrida);
+      const locked = status === 'em_andamento' && remaining > 0;
+      const canFinalize = status === 'em_andamento' && remaining <= 0;
+      finalizeBtn.classList.toggle('d-none', !canFinalize);
+      if (locked) {
+        const progress = 1 - remaining / FINALIZE_AFTER_START_MS;
+        progressBar.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
+        progressHint.textContent = `Finalizacao liberada em ${formatRemainingMs(remaining)}`;
+        progressWrap.classList.remove('d-none');
+        progressHint.classList.remove('d-none');
+        if (!state.finalizeUnlockTimer) {
+          state.finalizeUnlockTimer = setInterval(updateFinalizeUnlockUi, 1000);
+        }
+      } else {
+        progressWrap.classList.add('d-none');
+        progressHint.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressHint.textContent = '';
+        stopFinalizeUnlockTimer();
+      }
+    }
+
     function renderPassengerRide(corrida) {
       const passengerStatus = document.getElementById('passageiro-corrida');
       if (passengerStatus) passengerStatus.textContent = JSON.stringify(corrida || {}, null, 2);
+      if (corrida && corrida.server_time) {
+        const serverTs = Date.parse(corrida.server_time);
+        if (!Number.isNaN(serverTs)) {
+          state.serverOffsetMs = serverTs - Date.now();
+        }
+      }
       if (corrida && corrida.id && isActiveRideStatus(corrida.status)) {
         state.activePassengerRide = corrida;
       } else {
         state.activePassengerRide = null;
       }
-      updateMapFromRide(state.activePassengerRide);
+      if (state.activePassengerRide) {
+        updateMapFromRide(state.activePassengerRide);
+      } else {
+        renderInputMarkers();
+      }
       renderRideModal(state.activePassengerRide);
     }
 
@@ -911,14 +1252,14 @@
         if (!state.user?.perfil_id) return toast('Faça login', true);
         if (state.user.perfil_tipo !== 'ecotaxista') return toast('Troque o perfil para eco-taxista em Perfil', true);
         const btn = document.getElementById('btn-enviar-ping');
-        const lat = parseCoord(document.getElementById('ping-lat').value);
-        const lng = parseCoord(document.getElementById('ping-lng').value);
+        applyAddress('driver-end', 'driver-lat', 'driver-lng');
+        const lat = parseCoord(document.getElementById('driver-lat').value);
+        const lng = parseCoord(document.getElementById('driver-lng').value);
         const precisao = document.getElementById('ping-precisao').value;
-        if (!lat || !lng) return toast('Preencha latitude/longitude válidas ou use o GPS.', true);
+        if (!lat || !lng) return toast('Escolha um endereço válido ou use o GPS.', true);
         try {
           setLoading(btn, true);
           await sendPing(lat, lng, precisao ? parseFloat(precisao) : undefined);
-          toast('Localização enviada');
         } catch (e) {
           toast(e.message, true);
         } finally {
@@ -943,7 +1284,16 @@
     function renderDriverRide(corrida) {
       const hasActiveRide = corrida && corrida.id;
       state.activeDriverRide = hasActiveRide ? corrida : null;
-      updateMapFromRide(state.activeDriverRide);
+      if (state.activeDriverRide) {
+        updateMapFromRide(state.activeDriverRide);
+      } else if (state.user?.perfil_tipo === 'ecotaxista' && state.lastDriverLocation) {
+        updateMapFromRide({
+          motorista_lat: state.lastDriverLocation.lat,
+          motorista_lng: state.lastDriverLocation.lng,
+        });
+      } else {
+        updateMapFromRide(null);
+      }
       toggleDriverButtons(state.activeDriverRide);
       renderDriverModal(state.activeDriverRide);
     }
@@ -1028,6 +1378,36 @@
       if (coordsEl && coords !== undefined) coordsEl.textContent = coords ? `Posição: ${coords}` : 'Posição: —';
     }
 
+    function updateDriverLocation(lat, lng) {
+      if (lat == null || lng == null || Number.isNaN(lat) || Number.isNaN(lng)) return;
+      state.lastDriverLocation = { lat, lng };
+      if (state.user?.perfil_tipo !== 'ecotaxista') return;
+      if (state.activeDriverRide) return;
+      updateMapFromRide({ motorista_lat: lat, motorista_lng: lng });
+    }
+
+    let driverGpsSendingCount = 0;
+    function setDriverGpsSending(active) {
+      const wrap = document.getElementById('driver-gps-progress');
+      const bar = document.getElementById('driver-gps-progress-bar');
+      if (!wrap || !bar) return;
+      if (active) {
+        driverGpsSendingCount += 1;
+        wrap.classList.add('is-active');
+        bar.style.width = '100%';
+        return;
+      }
+      driverGpsSendingCount = Math.max(0, driverGpsSendingCount - 1);
+      if (driverGpsSendingCount === 0) {
+        setTimeout(() => {
+          if (driverGpsSendingCount === 0) {
+            bar.style.width = '0%';
+            wrap.classList.remove('is-active');
+          }
+        }, 300);
+      }
+    }
+
     function buildWhatsAppLink(phone) {
       const digits = (phone || '').toString().replace(/\D+/g, '');
       if (!digits) return null;
@@ -1098,6 +1478,9 @@
       const driverWhatsEl = document.getElementById('ride-modal-whatsapp');
       const origemEl = document.getElementById('ride-modal-origem');
       const destinoEl = document.getElementById('ride-modal-destino');
+      const progressWrap = document.getElementById('ride-modal-cancel-progress');
+      const progressBar = document.getElementById('ride-modal-cancel-progress-bar');
+      const progressHint = document.getElementById('ride-modal-cancel-progress-hint');
       if (statusEl) statusEl.textContent = 'Aguardando motorista';
       if (statusHintEl) statusHintEl.textContent = 'Aguardando confirmação do motorista.';
       if (driverNameEl) driverNameEl.textContent = 'Aguardando motorista aceitar';
@@ -1108,14 +1491,24 @@
       }
       if (origemEl) origemEl.textContent = 'Origem: —';
       if (destinoEl) destinoEl.textContent = 'Destino: —';
+      if (progressWrap) progressWrap.classList.add('d-none');
+      if (progressHint) progressHint.classList.add('d-none');
+      if (progressBar) progressBar.style.width = '0%';
+      if (progressHint) progressHint.textContent = '';
+      if (finalizeWrap) finalizeWrap.classList.add('d-none');
+      if (finalizeHint) finalizeHint.classList.add('d-none');
+      if (finalizeBar) finalizeBar.style.width = '0%';
+      if (finalizeHint) finalizeHint.textContent = '';
+      if (finalizeBtn) finalizeBtn.classList.add('d-none');
+      stopCancelUnlockTimer();
+      stopFinalizeUnlockTimer();
     }
 
     function renderRideModal(corrida) {
       const backdrop = document.getElementById('ride-modal');
       const cancelBtn = document.getElementById('modal-cancel-ride');
+      const finalizeBtn = document.getElementById('modal-finalize-ride');
       const hasRide = corrida && corrida.id && isActiveRideStatus(corrida.status);
-      const canCancel = hasRide && normalizeRideStatus(corrida.status) === 'aguardando';
-      cancelBtn.classList.toggle('d-none', !canCancel);
       if (hasRide) {
         updateRideModalDetails(corrida);
         backdrop.style.display = 'flex';
@@ -1124,6 +1517,10 @@
         clearRideModalDetails();
         backdrop.style.display = 'none';
       }
+      if (!hasRide && cancelBtn) cancelBtn.classList.add('d-none');
+      if (!hasRide && finalizeBtn) finalizeBtn.classList.add('d-none');
+      updateCancelUnlockUi();
+      updateFinalizeUnlockUi();
     }
 
     function updateRideModalMap(corrida) {
@@ -1281,7 +1678,6 @@
       const body = { motorista_id: state.user.perfil_id, perfil_id: state.user.perfil_id };
       const res = await api(`/api/corridas/${corrida.id}/${action}/`, { method: 'POST', body });
       renderDriverRide(res);
-      toast(`Ação ${action} realizada`);
     }
     document.getElementById('btn-aceitar').addEventListener('click', async () => {
       try { await driverAction('aceitar'); } catch (e) { toast(e.message, true); }
@@ -1391,10 +1787,13 @@
         points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
       }
       if (corrida.motorista_lat && corrida.motorista_lng) {
-        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista', icon: L.icon({
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        }) }).addTo(state.map);
+        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], {
+          title: 'Motorista',
+          icon: L.icon({
+            iconUrl: "{% static 'leaflet/images/marker-icon.png' %}",
+            shadowUrl: "{% static 'leaflet/images/marker-shadow.png' %}",
+          }),
+        }).addTo(state.map);
         marker.bindPopup('Motorista');
         state.markers.motorista = marker;
         points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
@@ -1413,14 +1812,22 @@
     // Auto ping para eco-taxista
     async function sendPing(lat, lng, precisao) {
       if (!state.user?.perfil_id) throw new Error('Sem perfil logado');
+      const latNorm = parseCoord(lat);
+      const lngNorm = parseCoord(lng);
+      if (!latNorm || !lngNorm) throw new Error('Coordenadas inválidas para ping');
+      updateDriverLocation(Number(latNorm), Number(lngNorm));
       const body = {
         perfil: state.user.perfil_id,
-        latitude: parseCoord(lat),
-        longitude: parseCoord(lng),
+        latitude: latNorm,
+        longitude: lngNorm,
       };
-      if (!body.latitude || !body.longitude) throw new Error('Coordenadas inválidas para ping');
       if (precisao !== undefined) body.precisao_m = precisao;
-      await api('/api/pings/', { method: 'POST', body });
+      setDriverGpsSending(true);
+      try {
+        await api('/api/pings/', { method: 'POST', body });
+      } finally {
+        setDriverGpsSending(false);
+      }
     }
 
     function stopAutoPing() {
@@ -1461,14 +1868,40 @@
       );
     }
 
+    function initWebappHeader() {
+      const header = document.querySelector('.navbar-area');
+      if (!header) return;
+      const logo = header.querySelector('.navbar-brand img');
+      const topLogo = logo?.getAttribute('data-logo-top') || logo?.src;
+      const stickyLogo = logo?.getAttribute('data-logo-sticky') || logo?.src;
+      const toggler = header.querySelector('.mobile-menu-btn');
+      if (toggler) {
+        toggler.addEventListener('click', () => {
+          toggler.classList.toggle('active');
+        });
+      }
+      const onScroll = () => {
+        if (window.pageYOffset > header.offsetTop) {
+          header.classList.add('sticky');
+          if (logo && stickyLogo) logo.src = stickyLogo;
+        } else {
+          header.classList.remove('sticky');
+          if (logo && topLogo) logo.src = topLogo;
+        }
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    }
+
     // Init
     document.addEventListener('DOMContentLoaded', () => {
+      initWebappHeader();
       initMap(true);
       loadSession();
       enforceRoleTabs();
       loadAddresses();
-      // tenta já pegar a origem via GPS
-      requestOriginGps();
+      // tenta já pegar a origem via GPS, sem toast inicial
+      requestOriginGps({ silent: true, suppressSuccess: true });
       ensureAutoPing();
       ensurePassengerPolling();
       ensureDriverPolling();
@@ -1528,10 +1961,39 @@
       try {
         const corrida = await api(`/api/corridas/para_passageiro/${state.user.perfil_id}/`);
         if (!corrida || !corrida.id) return toast('Nenhuma corrida ativa para cancelar', true);
+        renderPassengerRide(corrida);
+        const remaining = cancelUnlockRemainingMs(corrida);
+        if (normalizeRideStatus(corrida.status) === 'aceita' && remaining > 0) {
+          updateCancelUnlockUi();
+          return toast(`Aguarde ${formatRemainingMs(remaining)} para cancelar.`, true);
+        }
         const res = await api(`/api/corridas/${corrida.id}/cancelar/`, { method: 'POST', body: { perfil_id: state.user.perfil_id } });
         state.activePassengerRide = null;
         renderPassengerRide(res);
-        toast('Corrida cancelada');
+      } catch (e) {
+        toast(e.message, true);
+      }
+    });
+
+    // Finalizar corrida via modal (passageiro)
+    document.getElementById('modal-finalize-ride').addEventListener('click', async () => {
+      try {
+        const corrida = await api(`/api/corridas/para_passageiro/${state.user.perfil_id}/`);
+        if (!corrida || !corrida.id) return toast('Nenhuma corrida ativa para finalizar', true);
+        renderPassengerRide(corrida);
+        const remaining = finalizeUnlockRemainingMs(corrida);
+        if (normalizeRideStatus(corrida.status) === 'em_andamento' && remaining > 0) {
+          updateFinalizeUnlockUi();
+          return toast(`Aguarde ${formatRemainingMs(remaining)} para finalizar.`, true);
+        }
+        if (normalizeRideStatus(corrida.status) !== 'em_andamento') {
+          updateFinalizeUnlockUi();
+          return;
+        }
+        const res = await api(`/api/corridas/${corrida.id}/finalizar/`, { method: 'POST' });
+        state.activePassengerRide = null;
+        renderPassengerRide(res);
+        renderRideModal(null);
       } catch (e) {
         toast(e.message, true);
       }

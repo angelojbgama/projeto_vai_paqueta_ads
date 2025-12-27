@@ -3,6 +3,14 @@ class ApiConfig {
   /// flutter run --dart-define=API_BASE_URL=http://192.168.x.x:8000/api
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://persian-muscles-acdbentity-been.trycloudflare.com/api/',
+    defaultValue: 'https://accessories-profit-simpson-dispatch.trycloudflare.com/api/',
   );
+
+  /// Base do servidor sem o sufixo /api (para acessar assets estáticos).
+  static String get baseOrigin {
+    var url = baseUrl.trim();
+    if (url.isEmpty) return url;
+    url = url.replaceFirst(RegExp(r'/api/?$'), '');
+    return url.replaceFirst(RegExp(r'/$'), '');
+  }
 }

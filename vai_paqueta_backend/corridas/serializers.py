@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Corrida, LocalizacaoPing, Perfil, UserContato
@@ -26,6 +27,7 @@ class CorridaSerializer(serializers.ModelSerializer):
     motorista_lat = serializers.SerializerMethodField()
     motorista_lng = serializers.SerializerMethodField()
     motorista_ping_em = serializers.SerializerMethodField()
+    server_time = serializers.SerializerMethodField()
 
     class Meta:
         model = Corrida
@@ -45,6 +47,7 @@ class CorridaSerializer(serializers.ModelSerializer):
             "motorista_ping_em",
             "criado_em",
             "atualizado_em",
+            "server_time",
         ]
         read_only_fields = ["id", "cliente", "motorista", "status", "criado_em", "atualizado_em"]
 
@@ -77,6 +80,9 @@ class CorridaSerializer(serializers.ModelSerializer):
         if not ping:
             return None
         return ping["criado_em"]
+
+    def get_server_time(self, obj):
+        return timezone.now()
 
 
 class CorridaCreateSerializer(serializers.Serializer):

@@ -16,6 +16,14 @@
     "osm_id": 823942431
   },
   {
+    "street": "Barcas",
+    "housenumber": "",
+    "lat": -22.7621955,
+    "lng": -43.1071116,
+    "osm_type": "node",
+    "osm_id": 823942432
+  },
+  {
     "street": "Rua Padre Juvenal",
     "housenumber": "74",
     "lat": -22.753538,

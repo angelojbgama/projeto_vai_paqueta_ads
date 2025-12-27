@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/error_messages.dart';
+import '../../widgets/message_banner.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_service.dart';
 
@@ -16,7 +18,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   final _nomeCtrl = TextEditingController();
   final _telefoneCtrl = TextEditingController();
   bool _saving = false;
-  String? _mensagem;
+  AppMessage? _mensagem;
   int? _lastUserId;
 
   @override
@@ -59,7 +61,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     final nome = _nomeCtrl.text.trim();
     final telefone = _telefoneCtrl.text.trim();
     if (nome.isEmpty || telefone.isEmpty) {
-      setState(() => _mensagem = 'Preencha nome e telefone.');
+      setState(() => _mensagem = const AppMessage('Preencha nome e telefone.', MessageTone.error));
       return;
     }
     setState(() {
@@ -69,12 +71,18 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     try {
       await ref.read(authProvider.notifier).atualizarPerfil(nome: nome, telefone: telefone);
       if (!mounted) return;
-      setState(() => _mensagem = 'Dados atualizados com sucesso.');
+      setState(() => _mensagem = const AppMessage('Dados atualizados com sucesso.', MessageTone.success));
     } catch (e) {
       if (!mounted) return;
-      setState(() => _mensagem = 'Erro ao atualizar: $e');
+      setState(() => _mensagem = AppMessage('Erro ao atualizar: ${friendlyError(e)}', MessageTone.error));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _clearErrorMessage() {
+    if (_mensagem?.tone == MessageTone.error) {
+      setState(() => _mensagem = null);
     }
   }
 
@@ -133,6 +141,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   border: OutlineInputBorder(),
                 ),
                 textCapitalization: TextCapitalization.words,
+                onChanged: (_) => _clearErrorMessage(),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -142,6 +151,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
+                onChanged: (_) => _clearErrorMessage(),
               ),
               const SizedBox(height: 16),
               Row(
@@ -165,7 +175,10 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
               ),
               if (_mensagem != null) ...[
                 const SizedBox(height: 12),
-                Text(_mensagem!),
+                MessageBanner(
+                  message: _mensagem!,
+                  onClose: () => setState(() => _mensagem = null),
+                ),
               ],
               if (authState.isLoading || _saving)
                 const Padding(

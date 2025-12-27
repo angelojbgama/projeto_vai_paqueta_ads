@@ -84,7 +84,8 @@
                                 </ul>
                             </div> <!-- navbar collapse -->
                             <div class="button add-list-button">
-                                <a href="#download-android" class="btn">Baixar para Android</a>
+                                <a href="#download-android" class="btn me-2">Baixar para Android</a>
+                                <a href="{% url 'webapp' %}" class="btn">Abrir Web App</a>
                             </div>
                         </nav>
                         <!-- End Navbar -->
@@ -102,9 +103,9 @@
                 <div class="col-lg-5 col-md-12 col-12">
                     <div class="hero-content">
                         <h1 class="wow fadeInLeft" data-wow-delay=".4s">Eco-táxis de Paquetá, agora em um só lugar</h1>
-                        <p class="wow fadeInLeft" data-wow-delay=".6s">O Vai Paquetá é o app para turistas e moradores
-                            que querem pedir corrida sem complicação: peça aqui de forma prática e repassamos a chamada
-                            para o eco-taxista mais próximo.</p>
+                        <p class="wow fadeInLeft" data-wow-delay=".6s">O Vai Paquetá é o app para turistas, moradores e
+                            eco-taxistas de Paquetá. Sem complicação: peça rápido e a corrida vai para o motorista mais
+                            próximo.</p>
                         <div class="button wow fadeInLeft" data-wow-delay=".8s">
                             <a href="#download-android" class="btn"><i class="lni lni-android"></i> Baixar para Android</a>
                             <a href="#features" class="btn btn-alt"><i class="lni lni-mobile"></i> Ver como funciona</a>
@@ -186,7 +187,16 @@
                     <div class="single-feature wow fadeInUp" data-wow-delay=".6s">
                         <i class="lni lni-stats-up"></i>
                         <h3>Dados para gestão</h3>
-                        <p>Organizamos as corridas e horários para melhorar a disponibilidade e reduzir atrasos na ilha.</p>
+                        <p>Registramos pedidos, status e localização para dar visibilidade à operação e reduzir atrasos na ilha.</p>
+                    </div>
+                    <!-- End Single Feature -->
+                </div>
+                <div class="col-lg-4 col-md-6 col-12">
+                    <!-- Start Single Feature -->
+                    <div class="single-feature wow fadeInUp" data-wow-delay=".2s">
+                        <i class="lni lni-wallet"></i>
+                        <h3>Sem taxa no app</h3>
+                        <p>Não temos sistema de pagamento. A cobrança e o pagamento são feitos diretamente entre passageiro e eco-taxista.</p>
                     </div>
                     <!-- End Single Feature -->
                 </div>
@@ -342,27 +352,6 @@
     </section>
     <!-- End Download Area -->
 
-    <!-- Start Call To Action Area -->
-    <section id="contato" class="section call-action">
-        <div class="container">
-            <div class="row">
-                <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
-                    <div class="cta-content">
-                        <h2 class="wow fadeInUp" data-wow-delay=".2s">Fale com a equipe Vai Paquetá</h2>
-                        <p class="wow fadeInUp" data-wow-delay=".4s">Quer saber sobre o app, participar dos testes ou
-                            integrar a API? Envie uma mensagem e respondemos por e-mail ou WhatsApp.</p>
-                        <div class="button wow fadeInUp" data-wow-delay=".6s">
-                            <a href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1"
-                                class="btn">Enviar mensagem</a>
-                            <a href="#features" class="btn btn-alt">Rever como funciona</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <!-- End Call To Action Area -->
-
     <!-- Start Footer Area -->
     <footer class="footer">
         <!-- Start Footer Top -->
@@ -379,14 +368,6 @@
                             </div>
                             <p>Vai Paquetá é um piloto de mobilidade que conecta passageiros e eco-taxistas na Ilha de
                                 Paquetá, combinando organização digital com o contato próximo da comunidade.</p>
-                            <ul class="social">
-                                <li><a href="javascript:void(0)"><i class="lni lni-facebook-filled"></i></a></li>
-                                <li><a href="javascript:void(0)"><i class="lni lni-twitter-original"></i></a></li>
-                                <li><a href="javascript:void(0)"><i class="lni lni-instagram"></i></a></li>
-                                <li><a href="javascript:void(0)"><i class="lni lni-linkedin-original"></i></a></li>
-                            </ul>
-                            <p class="copyright-text">Landing page baseada no template Appvilla (UIdeck / ThemeWagon) e
-                                integrada ao backend Django do projeto.</p>
                         </div>
                         <!-- End Single Widget -->
                     </div>
@@ -419,14 +400,15 @@
                             </div>
                             <div class="col-lg-4 col-md-6 col-12">
                                 <!-- Single Widget -->
-                                <div class="single-footer f-link">
-                                    <h3>Contato</h3>
-                                    <ul>
-                                        <li><a
-                                                href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1">contato@vaipaqueta.app</a>
-                                        </li>
-                                        <li><a href="#contato">Fale com a equipe</a></li>
-                                    </ul>
+                                <div class="single-footer f-contact" id="contato">
+                                    <h3>Fale com a equipe Vai Paquetá</h3>
+                                    <p>Tem dúvidas, dicas ou encontrou alguma falha no app? Envie uma mensagem e
+                                        respondemos por e-mail ou WhatsApp.</p>
+                                    <div class="button">
+                                        <a href="mailto:contato@vaipaqueta.app?subject=Contato%20Vai%20Paquet%C3%A1"
+                                            class="btn">Enviar mensagem</a>
+                                        <a href="#features" class="btn btn-alt">Rever como funciona</a>
+                                    </div>
                                 </div>
                                 <!-- End Single Widget -->
                             </div>

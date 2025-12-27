@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/error_messages.dart';
+import '../../widgets/message_banner.dart';
 import 'auth_provider.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
@@ -21,8 +23,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   bool _loading = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
-  String? _mensagem;
+  AppMessage? _mensagem;
   final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.addListener(_clearErrorMessage);
+    _passwordCtrl.addListener(_clearErrorMessage);
+    _confirmPasswordCtrl.addListener(_clearErrorMessage);
+    _nomeCtrl.addListener(_clearErrorMessage);
+    _telefoneCtrl.addListener(_clearErrorMessage);
+  }
 
   @override
   void dispose() {
@@ -32,6 +44,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     _nomeCtrl.dispose();
     _telefoneCtrl.dispose();
     super.dispose();
+  }
+
+  void _clearErrorMessage() {
+    if (_mensagem?.tone == MessageTone.error) {
+      setState(() => _mensagem = null);
+    }
+  }
+
+  void _setMessage(String text, MessageTone tone) {
+    setState(() => _mensagem = AppMessage(text, tone));
   }
 
   Future<void> _submit() async {
@@ -47,39 +69,39 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       final senhaConfirmar = _confirmPasswordCtrl.text;
       if (_isRegister) {
         if (nome.isEmpty || telefone.isEmpty || email.isEmpty || senha.isEmpty || senhaConfirmar.isEmpty) {
-          setState(() => _mensagem = 'Preencha nome, telefone, e-mail e as duas senhas.');
+          _setMessage('Preencha nome, telefone, e-mail e as duas senhas.', MessageTone.error);
           return;
         }
       } else {
         if (email.isEmpty || senha.isEmpty) {
-          setState(() => _mensagem = 'Preencha e-mail e senha.');
+          _setMessage('Preencha e-mail e senha.', MessageTone.error);
           return;
         }
       }
       if (!_emailRegex.hasMatch(email)) {
-        setState(() => _mensagem = 'Informe um e-mail válido.');
+        _setMessage('Informe um e-mail válido.', MessageTone.error);
         return;
       }
       if (senha.length < 6) {
-        setState(() => _mensagem = 'Senha deve ter pelo menos 6 caracteres.');
+        _setMessage('Senha deve ter pelo menos 6 caracteres.', MessageTone.error);
         return;
       }
       if (_isRegister && senha != senhaConfirmar) {
-        setState(() => _mensagem = 'As senhas não coincidem.');
+        _setMessage('As senhas não coincidem.', MessageTone.error);
         return;
       }
       final notifier = ref.read(authProvider.notifier);
       if (_isRegister) {
         await notifier.register(email, senha, nome: nome, telefone: telefone);
-        setState(() => _mensagem = 'Cadastro realizado com sucesso.');
+        _setMessage('Cadastro realizado com sucesso.', MessageTone.success);
       } else {
         await notifier.login(email, senha);
-        setState(() => _mensagem = 'Login realizado.');
+        _setMessage('Login realizado.', MessageTone.success);
       }
       if (!mounted) return;
       context.go('/splash');
     } catch (e) {
-      setState(() => _mensagem = 'Erro: $e');
+      _setMessage(friendlyError(e), MessageTone.error);
     } finally {
       setState(() => _loading = false);
     }
@@ -88,7 +110,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
-    setState(() => _mensagem = 'Sessão encerrada.');
+    _setMessage('Sessão encerrada.', MessageTone.info);
     context.go('/auth');
   }
 
@@ -124,13 +146,19 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                     ChoiceChip(
                       label: const Text('Login'),
                       selected: !_isRegister,
-                      onSelected: (_) => setState(() => _isRegister = false),
+                      onSelected: (_) => setState(() {
+                        _isRegister = false;
+                        _mensagem = null;
+                      }),
                     ),
                     const SizedBox(width: 8),
                     ChoiceChip(
                       label: const Text('Cadastro'),
                       selected: _isRegister,
-                      onSelected: (_) => setState(() => _isRegister = true),
+                      onSelected: (_) => setState(() {
+                        _isRegister = true;
+                        _mensagem = null;
+                      }),
                     ),
                   ],
                 ),
@@ -199,7 +227,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               ],
               if (_mensagem != null) ...[
                 const SizedBox(height: 12),
-                Text(_mensagem!),
+                MessageBanner(
+                  message: _mensagem!,
+                  onClose: () => setState(() => _mensagem = null),
+                ),
               ],
               if (authState.isLoading)
                 const Padding(

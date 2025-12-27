@@ -13,7 +13,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
+import '../../core/map_viewport.dart';
+import '../../widgets/message_banner.dart';
 import '../../services/geo_service.dart';
 import '../rides/rides_service.dart';
 import '../auth/auth_provider.dart';
@@ -39,18 +42,22 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   List<LatLng> _rota = [];
   List<LatLng> _rotaMotorista = [];
   bool _loading = false;
-  String? _mensagem;
+  AppMessage? _mensagem;
   bool _corridaAtiva = false;
   int? _corridaIdAtual;
   String? _statusCorrida;
+  DateTime? _corridaAceitaEm;
+  DateTime? _corridaIniciadaEm;
   bool _modalAberto = false;
   StateSetter? _modalSetState;
-  TileProvider _tileProvider = NetworkTileProvider();
-  String _tileUrl = MapTileConfig.networkTemplate;
-  double? _tileMinZoom;
-  double? _tileMaxZoom;
+  bool _tileUsingAssets = MapTileConfig.useAssets;
+  String _tileUrl = MapTileConfig.useAssets ? MapTileConfig.assetsTemplate : MapTileConfig.networkTemplate;
   int? _tileMinNativeZoom;
   int? _tileMaxNativeZoom;
+  _TileSource? _assetTileSource;
+  _TileSource? _networkTileSource;
+  bool _usandoFallbackRede = false;
+  bool _alertaTiles = false;
   bool _posCarregada = false;
   final GeoService _geo = GeoService();
   List<GeoResult> _sugestoesOrigem = [];
@@ -63,12 +70,29 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _trocandoPerfil = false;
   double _round6(double v) => double.parse(v.toStringAsFixed(6));
   Timer? _corridaTimer;
+  Timer? _cancelUnlockTimer;
+  Timer? _finalUnlockTimer;
   bool _appPausado = false;
-  Duration _corridaPollInterval = const Duration(seconds: 10);
+  Duration _corridaPollInterval = const Duration(seconds: 4);
+  static const Duration _tempoMinimoCancelamentoAposAceite = Duration(minutes: 2);
+  static const Duration _tempoMinimoFinalizarAposInicio = Duration(minutes: 3);
+  Duration _serverTimeOffset = Duration.zero;
   bool get _podeCancelarCorrida {
-    return _corridaAtiva &&
-        _corridaIdAtual != null &&
-        _normalizarStatus(_statusCorrida) == 'aguardando';
+    if (!_corridaAtiva || _corridaIdAtual == null) return false;
+    final status = _normalizarStatus(_statusCorrida);
+    if (status == 'aguardando') return true;
+    if (status == 'aceita') return !_cancelamentoBloqueado();
+    return false;
+  }
+  bool get _podeFinalizarCorrida {
+    if (!_corridaAtiva || _corridaIdAtual == null) return false;
+    final status = _normalizarStatus(_statusCorrida);
+    if (status != 'em_andamento') return false;
+    return !_finalizacaoBloqueada();
+  }
+
+  TileProvider _buildTileProvider() {
+    return _tileUsingAssets ? AssetTileProvider() : NetworkTileProvider();
   }
 
   String _normalizarStatus(String? status) {
@@ -111,9 +135,130 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
   }
 
+  DateTime _nowServer() {
+    return DateTime.now().add(_serverTimeOffset);
+  }
+
+  void _atualizarServerOffset(DateTime? serverTime) {
+    if (serverTime == null) return;
+    _serverTimeOffset = serverTime.difference(DateTime.now());
+  }
+
+  Duration? _tempoRestanteCancelamento() {
+    if (_normalizarStatus(_statusCorrida) != 'aceita') return null;
+    if (_corridaAceitaEm == null) return _tempoMinimoCancelamentoAposAceite;
+    final elapsed = _nowServer().difference(_corridaAceitaEm!);
+    final remaining = _tempoMinimoCancelamentoAposAceite - elapsed;
+    if (remaining <= Duration.zero) return Duration.zero;
+    return remaining;
+  }
+
+  Duration? _tempoRestanteFinalizacao() {
+    if (_normalizarStatus(_statusCorrida) != 'em_andamento') return null;
+    if (_corridaIniciadaEm == null) return _tempoMinimoFinalizarAposInicio;
+    final elapsed = _nowServer().difference(_corridaIniciadaEm!);
+    final remaining = _tempoMinimoFinalizarAposInicio - elapsed;
+    if (remaining <= Duration.zero) return Duration.zero;
+    return remaining;
+  }
+
+  bool _cancelamentoBloqueado() {
+    final remaining = _tempoRestanteCancelamento();
+    return remaining != null && remaining > Duration.zero;
+  }
+
+  bool _finalizacaoBloqueada() {
+    final remaining = _tempoRestanteFinalizacao();
+    return remaining != null && remaining > Duration.zero;
+  }
+
+  double _cancelamentoProgresso(Duration remaining) {
+    final totalSeconds = _tempoMinimoCancelamentoAposAceite.inSeconds;
+    if (totalSeconds <= 0) return 1;
+    final elapsed = (totalSeconds - remaining.inSeconds).clamp(0, totalSeconds);
+    return elapsed / totalSeconds;
+  }
+
+  double _finalizacaoProgresso(Duration remaining) {
+    final totalSeconds = _tempoMinimoFinalizarAposInicio.inSeconds;
+    if (totalSeconds <= 0) return 1;
+    final elapsed = (totalSeconds - remaining.inSeconds).clamp(0, totalSeconds);
+    return elapsed / totalSeconds;
+  }
+
+  String _formatTempoRestante(Duration remaining) {
+    final totalSeconds = remaining.inSeconds.clamp(0, 3600);
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  void _gerenciarTimerCancelamento() {
+    _cancelUnlockTimer?.cancel();
+    final remaining = _tempoRestanteCancelamento();
+    if (remaining == null || remaining <= Duration.zero) return;
+    _cancelUnlockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final pending = _tempoRestanteCancelamento();
+      if (pending == null || pending <= Duration.zero) {
+        timer.cancel();
+      }
+      setState(() {});
+      _modalSetState?.call(() {});
+    });
+  }
+
+  void _gerenciarTimerFinalizacao() {
+    _finalUnlockTimer?.cancel();
+    final remaining = _tempoRestanteFinalizacao();
+    if (remaining == null || remaining <= Duration.zero) return;
+    _finalUnlockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final pending = _tempoRestanteFinalizacao();
+      if (pending == null || pending <= Duration.zero) {
+        timer.cancel();
+      }
+      setState(() {});
+      _modalSetState?.call(() {});
+    });
+  }
+
   String? _formatLatLng(LatLng? pos) {
     if (pos == null) return null;
     return '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
+  }
+
+  void _setMessage(String text, MessageTone tone) {
+    if (!mounted) {
+      _mensagem = AppMessage(text, tone);
+      return;
+    }
+    setState(() => _mensagem = AppMessage(text, tone));
+  }
+
+  void _setMessageRaw(String text, MessageTone tone) {
+    _mensagem = AppMessage(text, tone);
+  }
+
+  void _clearMessage() {
+    if (!mounted) {
+      _mensagem = null;
+      return;
+    }
+    setState(() => _mensagem = null);
+  }
+
+  void _clearInputMessage() {
+    if (_mensagem == null) return;
+    if (_mensagem!.tone == MessageTone.error || _mensagem!.tone == MessageTone.warning) {
+      _clearMessage();
+    }
   }
 
   String? _buildWhatsAppLink(String? telefone) {
@@ -133,7 +278,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     final uri = Uri.parse(link);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
-      setState(() => _mensagem = 'Não foi possível abrir o WhatsApp.');
+      setState(() => _mensagem = const AppMessage('Não foi possível abrir o WhatsApp.', MessageTone.error));
     }
   }
 
@@ -141,6 +286,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaAtiva = false;
     _corridaIdAtual = null;
     _statusCorrida = null;
+    _corridaAceitaEm = null;
+    _corridaIniciadaEm = null;
     _motoristaLatLng = null;
     _motoristaNome = null;
     _motoristaTelefone = null;
@@ -158,6 +305,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
     _salvarCorridaLocal(null);
     _corridaTimer?.cancel();
+    _cancelUnlockTimer?.cancel();
+    _finalUnlockTimer?.cancel();
     _fecharModalCorrida();
   }
 
@@ -202,6 +351,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _debounceOrigem?.cancel();
     _debounceDestino?.cancel();
     _corridaTimer?.cancel();
+    _cancelUnlockTimer?.cancel();
+    _finalUnlockTimer?.cancel();
     super.dispose();
   }
 
@@ -211,30 +362,59 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
       _appPausado = true;
       _corridaTimer?.cancel();
+      _cancelUnlockTimer?.cancel();
+      _finalUnlockTimer?.cancel();
     } else if (state == AppLifecycleState.resumed && _appPausado) {
       _appPausado = false;
       if (_corridaIdAtual != null) {
         _atualizarCorridaAtiva();
         _iniciarPollingCorrida();
       }
+      _gerenciarTimerCancelamento();
     }
   }
 
   Future<void> _configurarFonteTiles() async {
+    final networkSource = _buildNetworkSource();
     final source = await _resolverFonteTiles();
     if (!mounted) return;
 
-    setState(() {
-      _tileProvider = source.provider;
+    if (MapTileConfig.useAssets) {
+      _assetTileSource = source;
+      _networkTileSource = networkSource;
+      _applyTileSource(source, usandoFallback: false);
+    } else {
+      _networkTileSource = networkSource;
+      _applyTileSource(networkSource, usandoFallback: false);
+    }
+    final referencia = _origemLatLng ??
+        _destinoLatLng ??
+        LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
+    await _avaliarTilesPara(referencia);
+  }
+
+  _TileSource _buildNetworkSource() {
+    return _TileSource(
+      template: MapTileConfig.networkTemplate,
+      usingAssets: false,
+    );
+  }
+
+  void _applyTileSource(_TileSource source, {required bool usandoFallback}) {
+    if (!mounted) {
+      _tileUsingAssets = source.usingAssets;
       _tileUrl = source.template;
-      _tileMinZoom = source.minZoom;
-      _tileMaxZoom = source.maxZoom;
       _tileMinNativeZoom = source.minNativeZoom;
       _tileMaxNativeZoom = source.maxNativeZoom;
-
-      if (MapTileConfig.useAssets && !source.usingAssets) {
-        _mensagem ??= 'Tiles locais não encontrados, carregando mapa online.';
-      }
+      _usandoFallbackRede = usandoFallback;
+      return;
+    }
+    setState(() {
+      _tileUsingAssets = source.usingAssets;
+      _tileUrl = source.template;
+      _tileMinNativeZoom = source.minNativeZoom;
+      _tileMaxNativeZoom = source.maxNativeZoom;
+      _usandoFallbackRede = usandoFallback;
     });
   }
 
@@ -242,26 +422,58 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (MapTileConfig.useAssets) {
       final manifest = await _carregarManifesto();
       final assetZooms = _extrairZooms(manifest);
-      if (assetZooms.isNotEmpty) {
-        final minZoom = assetZooms.reduce(min);
-        final maxZoom = assetZooms.reduce(max);
-        return _TileSource(
-          template: MapTileConfig.assetsTemplate,
-          provider: AssetTileProvider(),
-          usingAssets: true,
-          minZoom: minZoom.toDouble(),
-          maxZoom: maxZoom.toDouble(),
-          minNativeZoom: minZoom,
-          maxNativeZoom: maxZoom,
-        );
-      }
+      final minZoom = assetZooms.isNotEmpty ? assetZooms.reduce(min) : MapTileConfig.assetsMinZoom;
+      final maxZoom = assetZooms.isNotEmpty ? assetZooms.reduce(max) : MapTileConfig.assetsMaxZoom;
+      return _TileSource(
+        template: MapTileConfig.assetsTemplate,
+        usingAssets: true,
+        minZoom: minZoom.toDouble(),
+        maxZoom: maxZoom.toDouble(),
+        minNativeZoom: minZoom,
+        maxNativeZoom: maxZoom,
+      );
     }
 
     return _TileSource(
       template: MapTileConfig.networkTemplate,
-      provider: NetworkTileProvider(),
       usingAssets: false,
     );
+  }
+
+  Future<bool> _tileLocalDisponivel(LatLng pos) async {
+    final path = MapTileConfig.assetPathForLatLng(
+      lat: pos.latitude,
+      lng: pos.longitude,
+      zoom: MapTileConfig.assetsSampleZoom,
+    );
+    try {
+      await rootBundle.load(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _avaliarTilesPara(LatLng? pos) async {
+    if (!MapTileConfig.useAssets || pos == null) return;
+    final ok = await _tileLocalDisponivel(pos);
+    if (!mounted) return;
+    if (ok) {
+      if (_usandoFallbackRede && _assetTileSource != null) {
+        _applyTileSource(_assetTileSource!, usandoFallback: false);
+      }
+      _alertaTiles = false;
+      return;
+    }
+    if (MapTileConfig.allowNetworkFallback && _networkTileSource != null) {
+      _applyTileSource(_networkTileSource!, usandoFallback: true);
+      _setMessage('Mapa offline indisponível aqui. Usando mapa online.', MessageTone.info);
+      return;
+    }
+    if (!_alertaTiles) {
+      _setMessage('Área fora do mapa offline. Ajuste o GPS ou baixe mais tiles.', MessageTone.warning);
+      _alertaTiles = true;
+    }
   }
 
   Future<Map<String, dynamic>?> _carregarManifesto() async {
@@ -377,10 +589,18 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       corrida ??= await rides.buscarCorridaAtiva(perfilId: perfilId);
       final current = corrida;
       if (current != null) {
+        final nextStatus = _normalizarStatus(current.status);
         setState(() {
+          _atualizarServerOffset(current.serverTime);
           _corridaAtiva = true;
           _corridaIdAtual = current.id;
           _statusCorrida = current.status;
+          _corridaAceitaEm = nextStatus == 'aceita'
+              ? (_corridaAceitaEm ?? current.atualizadoEm ?? _nowServer())
+              : null;
+          _corridaIniciadaEm = nextStatus == 'em_andamento'
+              ? (_corridaIniciadaEm ?? current.atualizadoEm ?? _nowServer())
+              : null;
           _motoristaNome = current.motoristaNome;
           _motoristaTelefone = current.motoristaTelefone;
           _origemEnderecoCorrida = current.origemEndereco;
@@ -403,8 +623,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           }
         });
         _sincronizarModalCorrida();
+        _avaliarTilesPara(_origemLatLng ?? _destinoLatLng);
         _salvarCorridaLocal(current.id);
         _iniciarPollingCorrida();
+        _gerenciarTimerCancelamento();
+        _gerenciarTimerFinalizacao();
       } else {
         _salvarCorridaLocal(null);
       }
@@ -416,7 +639,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   void _iniciarPollingCorrida() {
     _corridaTimer?.cancel();
     if (_corridaIdAtual == null) return;
-    _corridaPollInterval = const Duration(seconds: 10);
+    _corridaPollInterval = const Duration(seconds: 4);
     _agendarPoll();
   }
 
@@ -425,10 +648,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaTimer = Timer(_corridaPollInterval, () async {
       final sucesso = await _atualizarCorridaAtiva();
       if (sucesso) {
-        _corridaPollInterval = const Duration(seconds: 10);
+        _corridaPollInterval = const Duration(seconds: 4);
       } else {
         final next = _corridaPollInterval.inSeconds * 2;
-        _corridaPollInterval = Duration(seconds: next.clamp(10, 30));
+        _corridaPollInterval = Duration(seconds: next.clamp(4, 20));
       }
       _agendarPoll();
     });
@@ -443,13 +666,21 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (!mounted) return false;
         setState(() {
           _encerrarCorrida();
-          _mensagem = 'Corrida não encontrada.';
+          _mensagem = const AppMessage('Corrida não encontrada.', MessageTone.info);
         });
         return false;
       }
       if (!mounted) return false;
+      final nextStatus = _normalizarStatus(corrida.status);
       setState(() {
+        _atualizarServerOffset(corrida.serverTime);
         _statusCorrida = corrida.status;
+        _corridaAceitaEm = nextStatus == 'aceita'
+            ? (_corridaAceitaEm ?? corrida.atualizadoEm ?? _nowServer())
+            : null;
+        _corridaIniciadaEm = nextStatus == 'em_andamento'
+            ? (_corridaIniciadaEm ?? corrida.atualizadoEm ?? _nowServer())
+            : null;
         _motoristaNome = corrida.motoristaNome;
         _motoristaTelefone = corrida.motoristaTelefone;
         _origemEnderecoCorrida = corrida.origemEndereco;
@@ -478,6 +709,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
       });
       _sincronizarModalCorrida();
+      _gerenciarTimerCancelamento();
+      _gerenciarTimerFinalizacao();
       return true;
     } catch (_) {
       return false;
@@ -503,6 +736,62 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           ...children,
         ],
       ),
+    );
+  }
+
+  Widget _buildCancelCountdown(BuildContext context, {bool compact = false}) {
+    final remaining = _tempoRestanteCancelamento();
+    if (remaining == null || remaining <= Duration.zero) {
+      return const SizedBox.shrink();
+    }
+    final progress = _cancelamentoProgresso(remaining);
+    final barHeight = compact ? 6.0 : 8.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(barHeight),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: barHeight,
+            backgroundColor: Colors.green.shade100,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Cancelamento liberado em ${_formatTempoRestante(remaining)}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.green.shade800),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFinalizarCountdown(BuildContext context, {bool compact = false}) {
+    final remaining = _tempoRestanteFinalizacao();
+    if (remaining == null || remaining <= Duration.zero) {
+      return const SizedBox.shrink();
+    }
+    final progress = _finalizacaoProgresso(remaining);
+    final barHeight = compact ? 6.0 : 8.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(barHeight),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: barHeight,
+            backgroundColor: Colors.orange.shade100,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange.shade600),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Finalizacao liberada em ${_formatTempoRestante(remaining)}',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange.shade800),
+        ),
+      ],
     );
   }
 
@@ -561,6 +850,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                 ),
                 const SizedBox(height: 4),
                 Text(hint, style: Theme.of(context).textTheme.bodySmall),
+                if (_cancelamentoBloqueado()) ...[
+                  const SizedBox(height: 8),
+                  _buildCancelCountdown(context),
+                ],
+                if (_finalizacaoBloqueada()) ...[
+                  const SizedBox(height: 8),
+                  _buildFinalizarCountdown(context),
+                ],
               ],
             ),
           ),
@@ -652,71 +949,124 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                   height: 220,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
-                                    child: FlutterMap(
-                                      options: MapOptions(
-                                        initialCenter: origem ?? motorista ?? destino ?? const LatLng(-22.763, -43.106),
-                                        initialZoom: 14,
-                                        interactionOptions: const InteractionOptions(flags: ~InteractiveFlag.rotate),
-                                      ),
-                                      children: [
-                                        TileLayer(
-                                          urlTemplate: _tileUrl,
-                                          tileProvider: _tileProvider,
-                                          userAgentPackageName: 'com.example.vai_paqueta_app',
-                                          minZoom: _tileMinZoom ?? 0,
-                                          maxZoom: _tileMaxZoom ?? double.infinity,
-                                          minNativeZoom: _tileMinNativeZoom ?? 0,
-                                          maxNativeZoom: _tileMaxNativeZoom ?? 19,
-                                        ),
-                                        MarkerLayer(
-                                          markers: [
-                                            if (origem != null)
-                                              Marker(
-                                                point: origem,
-                                                width: 36,
-                                                height: 36,
-                                                child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                    child: Builder(
+                                      builder: (context) {
+                                        final bounds = MapTileConfig.tilesBounds;
+                                        final rawPins = MapViewport.collectPins([origem, destino, motorista]);
+                                        final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                                        final center = MapViewport.clampCenter(
+                                          MapViewport.centerForPins(pins),
+                                          bounds,
+                                        );
+                                        final zoom = MapViewport.zoomForPins(
+                                          pins,
+                                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                          fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                                        );
+                                        final fitBounds = MapViewport.boundsForPins(pins);
+                                        final fit = fitBounds == null
+                                            ? null
+                                            : CameraFit.bounds(
+                                                bounds: fitBounds,
+                                                padding: const EdgeInsets.all(24),
+                                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                              );
+                                        final key = ValueKey(
+                                          'pass-modal-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                                        );
+                                        return FlutterMap(
+                                          key: key,
+                                          options: MapOptions(
+                                            initialCenter: center,
+                                            initialZoom: zoom,
+                                            initialCameraFit: fit,
+                                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                            cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                          ),
+                                          children: [
+                                            TileLayer(
+                                              urlTemplate: _tileUrl,
+                                              tileProvider: _buildTileProvider(),
+                                              userAgentPackageName: 'com.example.vai_paqueta_app',
+                                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                              minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                              maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                              tileBounds: bounds,
+                                            ),
+                                            MarkerLayer(
+                                              markers: [
+                                                if (origem != null)
+                                                  Marker(
+                                                    point: origem,
+                                                    width: 36,
+                                                    height: 36,
+                                                    child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                                  ),
+                                                if (destino != null)
+                                                  Marker(
+                                                    point: destino,
+                                                    width: 36,
+                                                    height: 36,
+                                                    child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                                                  ),
+                                                if (motorista != null)
+                                                  Marker(
+                                                    point: motorista,
+                                                    width: 36,
+                                                    height: 36,
+                                                    child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                                  ),
+                                              ],
+                                            ),
+                                            if (_rota.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(points: _rota, strokeWidth: 3, color: Colors.blueAccent),
+                                                ],
                                               ),
-                                            if (destino != null)
-                                              Marker(
-                                                point: destino,
-                                                width: 36,
-                                                height: 36,
-                                                child: const Icon(Icons.flag, color: Colors.red, size: 30),
-                                              ),
-                                            if (motorista != null)
-                                              Marker(
-                                                point: motorista,
-                                                width: 36,
-                                                height: 36,
-                                                child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                            if (_rotaMotorista.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(
+                                                    points: _rotaMotorista,
+                                                    strokeWidth: 3,
+                                                    color: Colors.orangeAccent,
+                                                  ),
+                                                ],
                                               ),
                                           ],
-                                        ),
-                                        if (_rota.length >= 2)
-                                          PolylineLayer(
-                                            polylines: [
-                                              Polyline(points: _rota, strokeWidth: 3, color: Colors.blueAccent),
-                                            ],
-                                          ),
-                                        if (_rotaMotorista.length >= 2)
-                                          PolylineLayer(
-                                            polylines: [
-                                              Polyline(points: _rotaMotorista, strokeWidth: 3, color: Colors.orangeAccent),
-                                            ],
-                                          ),
-                                      ],
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
-                              if (_podeCancelarCorrida) ...[
+                              if (_podeCancelarCorrida || _podeFinalizarCorrida) ...[
                                 const SizedBox(height: 16),
                                 Align(
                                   alignment: Alignment.centerRight,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _loading ? null : _pedirCorrida,
-                                    icon: const Icon(Icons.cancel),
-                                    label: const Text('Cancelar corrida'),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.end,
+                                    children: [
+                                      if (_podeCancelarCorrida)
+                                        OutlinedButton.icon(
+                                          onPressed: _loading ? null : _pedirCorrida,
+                                          icon: const Icon(Icons.cancel),
+                                          label: const Text('Cancelar'),
+                                        ),
+                                      if (_podeFinalizarCorrida)
+                                        ElevatedButton.icon(
+                                          onPressed: _loading ? null : _finalizarCorrida,
+                                          icon: const Icon(Icons.flag),
+                                          label: const Text('Finalizar'),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -785,7 +1135,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       context.go('/motorista');
     } catch (e) {
       if (mounted) {
-        setState(() => _mensagem = 'Erro ao trocar para EcoTaxista: $e');
+        setState(
+          () => _mensagem = AppMessage(
+            'Erro ao trocar para EcoTaxista: ${friendlyError(e)}',
+            MessageTone.error,
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -806,7 +1161,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
         if (!mounted) return;
-        setState(() => _mensagem = 'Permissão de localização negada.');
+        setState(() => _mensagem = const AppMessage('Permissão de localização negada.', MessageTone.error));
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
@@ -815,25 +1170,39 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemLatLng = LatLng(pos.latitude, pos.longitude);
         _posCarregada = true;
       });
+      _avaliarTilesPara(_origemLatLng);
       try {
         final res = await _geo.reverse(pos.latitude, pos.longitude);
         if (!mounted) return;
         setState(() {
           _origemCtrl.text = res.endereco.isNotEmpty ? res.endereco : _origemCtrl.text;
           if (!silencioso) {
-            _mensagem = res.endereco.isNotEmpty ? res.endereco : 'Origem definida pelo GPS.';
+            _mensagem = AppMessage(
+              res.endereco.isNotEmpty ? res.endereco : 'Origem definida pelo GPS.',
+              MessageTone.info,
+            );
           }
         });
       } catch (_) {
         if (!silencioso) {
           if (!mounted) return;
-          setState(() => _mensagem = 'Origem definida pelo GPS (falha no endereço, use o texto digitado).');
+          setState(
+            () => _mensagem = const AppMessage(
+              'Origem definida pelo GPS (falha no endereço, use o texto digitado).',
+              MessageTone.info,
+            ),
+          );
         }
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        if (!silencioso) _mensagem = 'Erro ao obter localização: $e';
+        if (!silencioso) {
+          _mensagem = AppMessage(
+            'Erro ao obter localização: ${friendlyError(e)}',
+            MessageTone.error,
+          );
+        }
       });
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -859,25 +1228,86 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   void _onOrigemChanged(String texto) {
+    _clearInputMessage();
     _debounceOrigem?.cancel();
     _debounceOrigem = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesOrigem(texto));
   }
 
   void _onDestinoChanged(String texto) {
+    _clearInputMessage();
     _debounceDestino?.cancel();
     _debounceDestino = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesDestino(texto));
   }
 
+  Future<void> _finalizarCorrida() async {
+    if (!_corridaAtiva || _corridaIdAtual == null) return;
+    setState(() {
+      _loading = true;
+      _mensagem = null;
+    });
+    final refreshed = await _atualizarCorridaAtiva();
+    if (!mounted) return;
+    if (!refreshed) {
+      setState(() => _loading = false);
+      return;
+    }
+    if (!_podeFinalizarCorrida) {
+      final remaining = _tempoRestanteFinalizacao();
+      final msg = remaining != null && remaining > Duration.zero
+          ? 'Aguarde ${_formatTempoRestante(remaining)} para finalizar.'
+          : 'Corrida ainda nao pode ser finalizada.';
+      setState(
+        () => _mensagem = AppMessage(
+          msg,
+          MessageTone.warning,
+        ),
+      );
+      setState(() => _loading = false);
+      return;
+    }
+    try {
+      final rides = RidesService();
+      await rides.finalizarCorrida(_corridaIdAtual!);
+      setState(() {
+        _encerrarCorrida(limparEnderecos: true);
+        _mensagem = const AppMessage('Corrida finalizada.', MessageTone.success);
+      });
+    } catch (e) {
+      setState(
+        () => _mensagem = AppMessage('Erro ao finalizar: ${friendlyError(e)}', MessageTone.error),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   Future<void> _pedirCorrida() async {
     if (_corridaAtiva && _corridaIdAtual != null) {
-      if (!_podeCancelarCorrida) {
-        setState(() => _mensagem = 'Corrida já aceita. Não é possível cancelar agora.');
-        return;
-      }
       setState(() {
         _loading = true;
         _mensagem = null;
       });
+      final refreshed = await _atualizarCorridaAtiva();
+      if (!mounted) return;
+      if (!refreshed) {
+        setState(() => _loading = false);
+        return;
+      }
+      if (!_podeCancelarCorrida) {
+        final remaining = _tempoRestanteCancelamento();
+        final status = _normalizarStatus(_statusCorrida);
+        final msg = remaining != null && remaining > Duration.zero && status == 'aceita'
+            ? 'Aguarde ${_formatTempoRestante(remaining)} para cancelar.'
+            : 'Corrida já aceita. Não é possível cancelar agora.';
+        setState(
+          () => _mensagem = AppMessage(
+            msg,
+            MessageTone.warning,
+          ),
+        );
+        setState(() => _loading = false);
+        return;
+      }
       try {
         final rides = RidesService();
         await rides.cancelarCorrida(_corridaIdAtual!);
@@ -885,7 +1315,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _encerrarCorrida();
         });
       } catch (e) {
-        setState(() => _mensagem = 'Erro ao cancelar: $e');
+        setState(
+          () => _mensagem = AppMessage('Erro ao cancelar: ${friendlyError(e)}', MessageTone.error),
+        );
       } finally {
         setState(() => _loading = false);
       }
@@ -900,7 +1332,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final user = ref.read(authProvider).valueOrNull;
       final perfilId = user?.perfilId ?? 0;
       if (perfilId == 0) {
-        setState(() => _mensagem = 'Perfil do usuário não encontrado.');
+        setState(
+          () => _mensagem = const AppMessage('Perfil do usuário não encontrado.', MessageTone.error),
+        );
         return;
       }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
@@ -908,15 +1342,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemLatLng = LatLng(res.lat, res.lng);
         _origemCtrl.text = res.endereco;
         _sugestoesOrigem = [];
+        await _avaliarTilesPara(_origemLatLng);
       }
       if (_destinoLatLng == null && _destinoCtrl.text.isNotEmpty) {
         final res = await _geo.forward(_destinoCtrl.text);
         _destinoLatLng = LatLng(res.lat, res.lng);
         _destinoCtrl.text = res.endereco;
         _sugestoesDestino = [];
+        await _avaliarTilesPara(_destinoLatLng);
       }
       if (_origemLatLng == null || _destinoLatLng == null) {
-        setState(() => _mensagem = 'Defina origem e destino.');
+        setState(() => _mensagem = const AppMessage('Defina origem e destino.', MessageTone.warning));
         return;
       }
 
@@ -935,16 +1371,20 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       );
 
       setState(() {
+        _atualizarServerOffset(corrida.serverTime);
         _corridaAtiva = true;
         _corridaIdAtual = corrida.id;
         _statusCorrida = corrida.status;
+        _corridaAceitaEm = null;
         _motoristaLatLng = null;
       });
       _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
     } catch (e) {
-      setState(() => _mensagem = 'Erro ao pedir corrida: $e');
+      setState(
+        () => _mensagem = AppMessage('Erro ao pedir corrida: ${friendlyError(e)}', MessageTone.error),
+      );
     } finally {
       setState(() => _loading = false);
     }
@@ -1093,78 +1533,114 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: _origemLatLng ?? _destinoLatLng ?? const LatLng(-22.763, -43.106),
-                      initialZoom: 14,
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: _tileUrl,
-                        userAgentPackageName: 'com.example.vai_paqueta_app',
-                        tileProvider: _tileProvider,
-                        minZoom: _tileMinZoom ?? 0,
-                        maxZoom: _tileMaxZoom ?? double.infinity,
-                        minNativeZoom: _tileMinNativeZoom ?? 0,
-                        maxNativeZoom: _tileMaxNativeZoom ?? 19,
+                child: Builder(
+                  builder: (context) {
+                    final bounds = MapTileConfig.tilesBounds;
+                    final rawPins = MapViewport.collectPins([_origemLatLng, _destinoLatLng, _motoristaLatLng]);
+                    final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                    final center = MapViewport.clampCenter(
+                      MapViewport.centerForPins(pins),
+                      bounds,
+                    );
+                    final zoom = MapViewport.zoomForPins(
+                      pins,
+                      minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                      maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                      fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                    );
+                    final fitBounds = MapViewport.boundsForPins(pins);
+                    final fit = fitBounds == null
+                        ? null
+                        : CameraFit.bounds(
+                            bounds: fitBounds,
+                            padding: const EdgeInsets.all(24),
+                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                          );
+                    final key = ValueKey(
+                      'pass-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                    );
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: FlutterMap(
+                        key: key,
+                        options: MapOptions(
+                          initialCenter: center,
+                          initialZoom: zoom,
+                          initialCameraFit: fit,
+                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                          cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: _tileUrl,
+                            userAgentPackageName: 'com.example.vai_paqueta_app',
+                            tileProvider: _buildTileProvider(),
+                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                            minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                            maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                            tileBounds: bounds,
+                          ),
+                          if (_origemLatLng != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _origemLatLng!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.place, color: Colors.green, size: 36),
+                                ),
+                              ],
+                            ),
+                          if (_destinoLatLng != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _destinoLatLng!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.flag, color: Colors.red, size: 32),
+                                ),
+                              ],
+                            ),
+                          if (_motoristaLatLng != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _motoristaLatLng!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.local_taxi, color: Colors.orange, size: 34),
+                                ),
+                              ],
+                            ),
+                          if (_rota.length >= 2)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: _rota,
+                                  strokeWidth: 4,
+                                  color: Colors.blueAccent,
+                                ),
+                              ],
+                            ),
+                          if (_rotaMotorista.length >= 2)
+                            PolylineLayer(
+                              polylines: <Polyline>[
+                                Polyline(
+                                  points: _rotaMotorista,
+                                  strokeWidth: 3,
+                                  color: Colors.orangeAccent,
+                                ),
+                              ],
+                            ),
+                        ],
                       ),
-                      if (_origemLatLng != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _origemLatLng!,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.place, color: Colors.green, size: 36),
-                            ),
-                          ],
-                        ),
-                      if (_destinoLatLng != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _destinoLatLng!,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.flag, color: Colors.red, size: 32),
-                            ),
-                          ],
-                        ),
-                      if (_motoristaLatLng != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _motoristaLatLng!,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.local_taxi, color: Colors.orange, size: 34),
-                            ),
-                          ],
-                        ),
-                      if (_rota.length >= 2)
-                        PolylineLayer(
-                          polylines: [
-                            Polyline(
-                              points: _rota,
-                              strokeWidth: 4,
-                              color: Colors.blueAccent,
-                            ),
-                          ],
-                        ),
-                      if (_rotaMotorista.length >= 2)
-                        PolylineLayer(
-                          polylines: <Polyline>[
-                            Polyline(
-                              points: _rotaMotorista,
-                              strokeWidth: 3,
-                              color: Colors.orangeAccent,
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -1203,6 +1679,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                               dense: true,
                               title: Text(s.endereco),
                               onTap: () {
+                                _clearInputMessage();
                                 setState(() {
                                   _origemCtrl.text = s.endereco;
                                   _origemLatLng = LatLng(s.lat, s.lng);
@@ -1239,6 +1716,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                               dense: true,
                               title: Text(s.endereco),
                               onTap: () {
+                                _clearInputMessage();
                                 setState(() {
                                   _destinoCtrl.text = s.endereco;
                                   _destinoLatLng = LatLng(s.lat, s.lng);
@@ -1250,7 +1728,19 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                         ),
                       ),
                     const SizedBox(height: 8),
-                    if (_mensagem != null) Text(_mensagem!),
+                    if (_mensagem != null)
+                      MessageBanner(
+                        message: _mensagem!,
+                        onClose: _clearMessage,
+                      ),
+                    if (_cancelamentoBloqueado()) ...[
+                      const SizedBox(height: 8),
+                      _buildCancelCountdown(context, compact: true),
+                    ],
+                    if (_finalizacaoBloqueada()) ...[
+                      const SizedBox(height: 8),
+                      _buildFinalizarCountdown(context, compact: true),
+                    ],
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
                       onPressed: _loading || (_corridaAtiva && !_podeCancelarCorrida) ? null : _pedirCorrida,
@@ -1263,7 +1753,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                         _loading
                             ? 'Enviando...'
                             : _corridaAtiva
-                                ? (_podeCancelarCorrida ? 'Cancelar corrida' : 'Corrida em andamento')
+                                ? (_podeCancelarCorrida
+                                    ? 'Cancelar'
+                                    : 'Corrida em andamento')
                                 : 'Pedir corrida',
                       ),
                     ),
@@ -1280,16 +1772,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
 class _TileSource {
   final String template;
-  final TileProvider provider;
   final bool usingAssets;
   final double? minZoom;
   final double? maxZoom;
   final int? minNativeZoom;
   final int? maxNativeZoom;
 
-  const _TileSource({
+  _TileSource({
     required this.template,
-    required this.provider,
     required this.usingAssets,
     this.minZoom,
     this.maxZoom,

@@ -45,5 +45,16 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Usado para enviar sua localizacao no app.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Permite enviar sua localizacao mesmo com o app bloqueado.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Permite enviar sua localizacao mesmo com o app bloqueado.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

@@ -24,7 +24,9 @@ from .serializers import (
 ACTIVE_STATUSES = ["aguardando", "aceita", "em_andamento"]
 PING_MAX_AGE_MINUTES = 5
 DISTANCIA_MAX_INICIO_KM = 0.25  # motorista precisa estar próximo da origem para iniciar
+TEMPO_CANCELAMENTO_APOS_ACEITE = timedelta(minutes=2)
 TEMPO_CANCELAMENTO_APOS_INICIO = timedelta(minutes=1)
+TEMPO_FINALIZAR_PASSAGEIRO = timedelta(minutes=3)
 MAX_MOTORISTAS_TENTADOS = 50
 AUTO_MATCH_RADIUS_KM = 3.0
 AUTO_MATCH_LIMIT = 50
@@ -382,14 +384,6 @@ class CorridaViewSet(viewsets.ModelViewSet):
                     {"detail": f"Corrida não pode ser iniciada no status {corrida.status}."},
                     status=status.HTTP_409_CONFLICT,
                 )
-            dist_km = self._dist_motorista_origem_km(corrida)
-            if dist_km is None:
-                return Response({"detail": "Sem localização recente do motorista para iniciar."}, status=status.HTTP_409_CONFLICT)
-            if dist_km > DISTANCIA_MAX_INICIO_KM:
-                return Response(
-                    {"detail": f"Aproxime-se do ponto de origem para iniciar (distância atual ~{dist_km:.2f}km)."},
-                    status=status.HTTP_409_CONFLICT,
-                )
             corrida.status = "em_andamento"
             corrida.save(update_fields=["status", "atualizado_em"])
             return Response(CorridaSerializer(corrida).data)
@@ -401,16 +395,34 @@ class CorridaViewSet(viewsets.ModelViewSet):
             if self._corrida_expirada(corrida):
                 return Response({"detail": "Corrida expirada."}, status=status.HTTP_409_CONFLICT)
             motorista_id = request.data.get("motorista_id")
-            if request.user.is_staff and not motorista_id:
-                return Response({"detail": "motorista_id é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-            motorista = _perfil_autorizado(request, motorista_id, tipo="ecotaxista")
-            if not corrida.motorista or corrida.motorista_id != motorista.id:
-                return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
-            if corrida.status != "em_andamento":
-                return Response(
-                    {"detail": f"Corrida não pode ser finalizada no status {corrida.status}."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+            if request.user.is_staff and motorista_id:
+                perfil = _perfil_autorizado(request, motorista_id, tipo="ecotaxista")
+            else:
+                perfil = _perfil_usuario(request.user)
+
+            if perfil.tipo == "ecotaxista":
+                if not corrida.motorista or corrida.motorista_id != perfil.id:
+                    return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
+                if corrida.status != "em_andamento":
+                    return Response(
+                        {"detail": f"Corrida não pode ser finalizada no status {corrida.status}."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            elif perfil.tipo == "passageiro":
+                if corrida.cliente_id != perfil.id:
+                    return Response({"detail": "Somente o passageiro pode finalizar esta corrida."}, status=status.HTTP_403_FORBIDDEN)
+                if corrida.status != "em_andamento":
+                    return Response(
+                        {"detail": f"Corrida não pode ser finalizada no status {corrida.status}."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                if datetime.now(timezone.utc) - corrida.atualizado_em < TEMPO_FINALIZAR_PASSAGEIRO:
+                    return Response(
+                        {"detail": "Aguarde 3 minutos para finalizar a corrida."},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                return Response({"detail": "Perfil inválido para finalizar corrida."}, status=status.HTTP_403_FORBIDDEN)
             corrida.status = "concluida"
             corrida.motoristas_tentados = []
             corrida.save(update_fields=["status", "atualizado_em", "motoristas_tentados"])
@@ -436,7 +448,11 @@ class CorridaViewSet(viewsets.ModelViewSet):
 
         # Bloqueios por status
         if corrida.status == "aceita":
-            return Response({"detail": "Corrida já aceita pelo motorista. Não é possível cancelar agora."}, status=status.HTTP_403_FORBIDDEN)
+            if datetime.now(timezone.utc) - corrida.atualizado_em < TEMPO_CANCELAMENTO_APOS_ACEITE:
+                return Response(
+                    {"detail": "Aguarde 2 minutos após o aceite do motorista para cancelar."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         if corrida.status == "em_andamento":
             if datetime.now(timezone.utc) - corrida.atualizado_em < TEMPO_CANCELAMENTO_APOS_INICIO:
                 return Response(

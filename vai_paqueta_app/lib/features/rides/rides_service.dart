@@ -16,6 +16,8 @@ class CorridaResumo {
   final String? destinoEndereco;
   final String? motoristaNome;
   final String? motoristaTelefone;
+  final DateTime? atualizadoEm;
+  final DateTime? serverTime;
 
   CorridaResumo({
     required this.id,
@@ -31,6 +33,8 @@ class CorridaResumo {
     this.destinoEndereco,
     this.motoristaNome,
     this.motoristaTelefone,
+    this.atualizadoEm,
+    this.serverTime,
   });
 
   factory CorridaResumo.fromJson(Map<String, dynamic> json) {
@@ -67,6 +71,8 @@ class CorridaResumo {
       destinoEndereco: (json['destino_endereco'] as String?)?.trim(),
       motoristaNome: motoristaNome,
       motoristaTelefone: motoristaTelefone,
+      atualizadoEm: _dt(json['atualizado_em']),
+      serverTime: _dt(json['server_time']),
     );
   }
 }
@@ -164,6 +170,10 @@ class RidesService {
 
   Future<void> cancelarCorrida(int corridaId) async {
     await _dio.post('/corridas/$corridaId/cancelar/');
+  }
+
+  Future<void> finalizarCorrida(int corridaId) async {
+    await _dio.post('/corridas/$corridaId/finalizar/');
   }
 
   Future<CorridaResumo?> obterCorrida(int corridaId) async {

@@ -11,7 +11,12 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
+import '../../core/map_viewport.dart';
+import '../../services/driver_background_service.dart';
+import '../../services/notification_service.dart';
+import '../../widgets/message_banner.dart';
 import '../auth/auth_provider.dart';
 import 'driver_service.dart';
 
@@ -23,15 +28,17 @@ class DriverPage extends ConsumerStatefulWidget {
 }
 
 class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObserver {
-  String? _status;
+  AppMessage? _status;
   bool _enviando = false;
   LatLng? _posicao;
-  TileProvider _tileProvider = NetworkTileProvider();
-  String _tileUrl = MapTileConfig.networkTemplate;
-  double? _tileMinZoom;
-  double? _tileMaxZoom;
+  bool _tileUsingAssets = MapTileConfig.useAssets;
+  String _tileUrl = MapTileConfig.useAssets ? MapTileConfig.assetsTemplate : MapTileConfig.networkTemplate;
   int? _tileMinNativeZoom;
   int? _tileMaxNativeZoom;
+  int? _assetsMinNativeZoom;
+  int? _assetsMaxNativeZoom;
+  bool _usandoFallbackRede = false;
+  bool _alertaTiles = false;
   Timer? _pingTimer;
   Timer? _pollTimer;
   bool _modalAberto = false;
@@ -39,7 +46,23 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _trocandoPerfil = false;
   bool _appPausado = false;
   StateSetter? _modalSetState;
+  bool _backgroundAtivo = false;
+  StreamSubscription<String?>? _notificationTapSub;
+
+  void _clearStatus() {
+    if (!mounted) {
+      _status = null;
+      return;
+    }
+    setState(() => _status = null);
+  }
+
+  TileProvider _buildTileProvider() {
+    return _tileUsingAssets ? AssetTileProvider() : NetworkTileProvider();
+  }
   Future<void> _logout() async {
+    await DriverBackgroundService.stop();
+    _backgroundAtivo = false;
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
     context.go('/auth');
@@ -52,12 +75,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-        setState(() => _status = 'Permissão de localização negada.');
+        setState(() => _status = const AppMessage('Permissão de localização negada.', MessageTone.error));
         return null;
       }
       return await Geolocator.getCurrentPosition();
     } catch (e) {
-      setState(() => _status = 'Erro ao obter localização: $e');
+      setState(() => _status = AppMessage('Erro ao obter localização: ${friendlyError(e)}', MessageTone.error));
       return null;
     }
   }
@@ -66,27 +89,28 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (MapTileConfig.useAssets) {
       final manifest = await _carregarManifesto();
       final zooms = _extrairZooms(manifest);
-      if (zooms.isNotEmpty) {
-        final minZoom = zooms.reduce((a, b) => a < b ? a : b);
-        final maxZoom = zooms.reduce((a, b) => a > b ? a : b);
-        setState(() {
-          _tileProvider = AssetTileProvider();
-          _tileUrl = MapTileConfig.assetsTemplate;
-          _tileMinZoom = minZoom.toDouble();
-          _tileMaxZoom = maxZoom.toDouble();
-          _tileMinNativeZoom = minZoom;
-          _tileMaxNativeZoom = maxZoom;
-        });
-        return;
-      }
+      final minZoom = zooms.isNotEmpty ? zooms.reduce((a, b) => a < b ? a : b) : MapTileConfig.assetsMinZoom;
+      final maxZoom = zooms.isNotEmpty ? zooms.reduce((a, b) => a > b ? a : b) : MapTileConfig.assetsMaxZoom;
+      if (!mounted) return;
+      setState(() {
+        _tileUsingAssets = true;
+        _tileUrl = MapTileConfig.assetsTemplate;
+        _tileMinNativeZoom = minZoom;
+        _tileMaxNativeZoom = maxZoom;
+        _assetsMinNativeZoom = _tileMinNativeZoom;
+        _assetsMaxNativeZoom = _tileMaxNativeZoom;
+        _usandoFallbackRede = false;
+      });
+      await _avaliarTilesPara(_posicao ?? LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng));
+      return;
     }
+    if (!mounted) return;
     setState(() {
-      _tileProvider = NetworkTileProvider();
+      _tileUsingAssets = false;
       _tileUrl = MapTileConfig.networkTemplate;
-      _tileMinZoom = null;
-      _tileMaxZoom = null;
       _tileMinNativeZoom = null;
       _tileMaxNativeZoom = null;
+      _usandoFallbackRede = false;
     });
   }
 
@@ -163,6 +187,59 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     return '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
   }
 
+  Future<bool> _tileLocalDisponivel(LatLng pos) async {
+    final path = MapTileConfig.assetPathForLatLng(
+      lat: pos.latitude,
+      lng: pos.longitude,
+      zoom: MapTileConfig.assetsSampleZoom,
+    );
+    try {
+      await rootBundle.load(path);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _avaliarTilesPara(LatLng? pos) async {
+    if (!MapTileConfig.useAssets || pos == null) return;
+    final ok = await _tileLocalDisponivel(pos);
+    if (!mounted) return;
+    if (ok) {
+      if (_usandoFallbackRede) {
+        setState(() {
+          _tileUsingAssets = true;
+          _tileUrl = MapTileConfig.assetsTemplate;
+          _tileMinNativeZoom = _assetsMinNativeZoom ?? MapTileConfig.assetsMinZoom;
+          _tileMaxNativeZoom = _assetsMaxNativeZoom ?? MapTileConfig.assetsMaxZoom;
+          _usandoFallbackRede = false;
+        });
+      }
+      _alertaTiles = false;
+      return;
+    }
+    if (MapTileConfig.allowNetworkFallback) {
+      setState(() {
+        _tileUsingAssets = false;
+        _tileUrl = MapTileConfig.networkTemplate;
+        _tileMinNativeZoom = null;
+        _tileMaxNativeZoom = null;
+        _usandoFallbackRede = true;
+        _status = const AppMessage('Mapa offline indisponível aqui. Usando mapa online.', MessageTone.info);
+      });
+      return;
+    }
+    if (!_alertaTiles) {
+      setState(() {
+        _status = const AppMessage(
+          'Área fora do mapa offline. Ajuste o GPS ou baixe mais tiles.',
+          MessageTone.warning,
+        );
+      });
+      _alertaTiles = true;
+    }
+  }
+
   String? _buildWhatsAppLink(String? telefone) {
     final digits = (telefone ?? '').replaceAll(RegExp(r'\D+'), '');
     if (digits.isEmpty) return null;
@@ -180,7 +257,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final uri = Uri.parse(link);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!ok && mounted) {
-      setState(() => _status = 'Não foi possível abrir o WhatsApp.');
+      setState(() => _status = const AppMessage('Não foi possível abrir o WhatsApp.', MessageTone.error));
     }
   }
 
@@ -216,8 +293,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       if (!mounted) return;
       setState(() {
         _posicao = LatLng(pos.latitude, pos.longitude);
-        _status = 'Posição atualizada';
+        _status = const AppMessage('Posição atualizada.', MessageTone.success);
       });
+      await _avaliarTilesPara(_posicao);
     }
   }
 
@@ -225,6 +303,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NotificationService.requestPermissions();
+    _notificationTapSub = NotificationService.onNotificationTap.listen(_onNotificationTap);
+    final pendingTap = NotificationService.consumePendingPayload();
+    if (pendingTap != null) {
+      _onNotificationTap(pendingTap);
+    }
     _configurarFonteTiles();
     _atualizarPosicao();
     _verificarCorrida();
@@ -237,6 +321,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     WidgetsBinding.instance.removeObserver(this);
     _pingTimer?.cancel();
     _pollTimer?.cancel();
+    DriverBackgroundService.stop();
+    _backgroundAtivo = false;
+    _notificationTapSub?.cancel();
     super.dispose();
   }
 
@@ -247,11 +334,26 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _appPausado = true;
       _pingTimer?.cancel();
       _pollTimer?.cancel();
+      final user = ref.read(authProvider).valueOrNull;
+      final perfilId = user?.perfilId ?? 0;
+      final perfilTipo = user?.perfilTipo ?? '';
+      if (perfilId != 0 && perfilTipo == 'ecotaxista') {
+        DriverBackgroundService.start(perfilId: perfilId, perfilTipo: perfilTipo);
+        _backgroundAtivo = true;
+      }
     } else if (state == AppLifecycleState.resumed && _appPausado) {
       _appPausado = false;
+      if (_backgroundAtivo) {
+        DriverBackgroundService.stop();
+        _backgroundAtivo = false;
+      }
       _atualizarPosicao();
+      _verificarCorrida();
       _iniciarAutoPing();
       _iniciarPollingCorrida();
+      if (_corridaAtual != null && !_modalAberto) {
+        _mostrarModalCorrida(_corridaAtual!);
+      }
     }
   }
 
@@ -269,7 +371,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final perfilId = user?.perfilId ?? 0;
     final perfilTipo = user?.perfilTipo;
     if (perfilId == 0 || perfilTipo != 'ecotaxista') {
-      if (mounted) setState(() => _status = 'Use um perfil de ecotaxista para enviar pings.');
+      if (mounted) {
+        setState(
+          () => _status = const AppMessage(
+            'Use um perfil de ecotaxista para enviar pings.',
+            MessageTone.warning,
+          ),
+        );
+      }
       return;
     }
 
@@ -295,10 +404,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         precisao: pos.accuracy,
       );
       if (!silencioso && mounted) {
-        setState(() => _status = 'Ping enviado!');
+        setState(() => _status = const AppMessage('Ping enviado!', MessageTone.success));
+      } else if (silencioso && mounted) {
+        if (_status?.tone == MessageTone.error) {
+          setState(() => _status = null);
+        }
       }
     } catch (e) {
-      if (mounted) setState(() => _status = 'Erro ao enviar ping: $e');
+      if (mounted) {
+        setState(() => _status = AppMessage('Erro ao enviar ping: ${friendlyError(e)}', MessageTone.error));
+      }
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
@@ -308,7 +423,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _pingTimer?.cancel();
     _enviarPing(silencioso: true);
     _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _enviarPing(silencioso: true));
-    setState(() => _status = 'Auto ping a cada 10s ligado');
+    setState(() => _status = const AppMessage('Auto ping a cada 10s ligado.', MessageTone.info));
   }
 
   void _iniciarPollingCorrida() {
@@ -316,8 +431,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _verificarCorrida());
   }
 
-  Future<void> _verificarCorrida() async {
-    final user = ref.read(authProvider).valueOrNull;
+  Future<void> _verificarCorrida({bool force = false}) async {
+    if (_appPausado && !force) return;
+    final authState = ref.read(authProvider);
+    var user = authState.valueOrNull;
+    if (user == null && authState.isLoading) {
+      try {
+        user = await ref.read(authProvider.future);
+      } catch (_) {
+        return;
+      }
+    }
     final perfilId = user?.perfilId ?? 0;
     if (perfilId == 0 || user?.perfilTipo != 'ecotaxista') return;
     try {
@@ -340,7 +464,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
     } catch (e) {
       // silencioso para polling
-      debugPrint('Erro ao verificar corrida: $e');
+      debugPrint('Erro ao verificar corrida: ${friendlyError(e)}');
     }
   }
 
@@ -535,60 +659,103 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                 height: 220,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: FlutterMap(
-                                    options: MapOptions(
-                                      initialCenter: origem ?? motoristaPos ?? destino ?? const LatLng(-22.763, -43.106),
-                                      initialZoom: 14,
-                                      interactionOptions: const InteractionOptions(flags: ~InteractiveFlag.rotate),
-                                    ),
-                                    children: [
-                                      TileLayer(
-                                        urlTemplate: _tileUrl,
-                                        tileProvider: _tileProvider,
-                                        userAgentPackageName: 'com.example.vai_paqueta_app',
-                                        minZoom: _tileMinZoom ?? 0,
-                                        maxZoom: _tileMaxZoom ?? double.infinity,
-                                        minNativeZoom: _tileMinNativeZoom ?? 0,
-                                        maxNativeZoom: _tileMaxNativeZoom ?? 19,
-                                      ),
-                                      MarkerLayer(
-                                        markers: [
-                                          if (origem != null)
-                                            Marker(
-                                              point: origem,
-                                              width: 36,
-                                              height: 36,
-                                              child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                  child: Builder(
+                                    builder: (context) {
+                                      final bounds = MapTileConfig.tilesBounds;
+                                      final rawPins = MapViewport.collectPins([origem, destino, motoristaPos]);
+                                      final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                                      final center = MapViewport.clampCenter(
+                                        MapViewport.centerForPins(pins),
+                                        bounds,
+                                      );
+                                      final zoom = MapViewport.zoomForPins(
+                                        pins,
+                                        minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                        maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                        fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                                      );
+                                      final fitBounds = MapViewport.boundsForPins(pins);
+                                      final fit = fitBounds == null
+                                          ? null
+                                          : CameraFit.bounds(
+                                              bounds: fitBounds,
+                                              padding: const EdgeInsets.all(24),
+                                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                            );
+                                      final key = ValueKey(
+                                        'driver-modal-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                                      );
+                                      return FlutterMap(
+                                        key: key,
+                                        options: MapOptions(
+                                          initialCenter: center,
+                                          initialZoom: zoom,
+                                          initialCameraFit: fit,
+                                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                          cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                        ),
+                                        children: [
+                                          TileLayer(
+                                            urlTemplate: _tileUrl,
+                                            tileProvider: _buildTileProvider(),
+                                            userAgentPackageName: 'com.example.vai_paqueta_app',
+                                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                            minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                            maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                            tileBounds: bounds,
+                                          ),
+                                          MarkerLayer(
+                                            markers: [
+                                              if (origem != null)
+                                                Marker(
+                                                  point: origem,
+                                                  width: 36,
+                                                  height: 36,
+                                                  child: const Icon(Icons.place, color: Colors.green, size: 32),
+                                                ),
+                                              if (destino != null)
+                                                Marker(
+                                                  point: destino,
+                                                  width: 36,
+                                                  height: 36,
+                                                  child: const Icon(Icons.flag, color: Colors.red, size: 30),
+                                                ),
+                                              if (motoristaPos != null)
+                                                Marker(
+                                                  point: motoristaPos,
+                                                  width: 36,
+                                                  height: 36,
+                                                  child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                                ),
+                                            ],
+                                          ),
+                                          if (origem != null && motoristaPos != null)
+                                            PolylineLayer(
+                                              polylines: [
+                                                Polyline(
+                                                  points: [motoristaPos, origem],
+                                                  strokeWidth: 3,
+                                                  color: Colors.orangeAccent,
+                                                ),
+                                              ],
                                             ),
-                                          if (destino != null)
-                                            Marker(
-                                              point: destino,
-                                              width: 36,
-                                              height: 36,
-                                              child: const Icon(Icons.flag, color: Colors.red, size: 30),
-                                            ),
-                                          if (motoristaPos != null)
-                                            Marker(
-                                              point: motoristaPos,
-                                              width: 36,
-                                              height: 36,
-                                              child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                          if (origem != null && destino != null)
+                                            PolylineLayer(
+                                              polylines: [
+                                                Polyline(
+                                                  points: [origem, destino],
+                                                  strokeWidth: 3,
+                                                  color: Colors.blueAccent,
+                                                ),
+                                              ],
                                             ),
                                         ],
-                                      ),
-                                      if (origem != null && motoristaPos != null)
-                                        PolylineLayer(
-                                          polylines: [
-                                            Polyline(points: [motoristaPos, origem], strokeWidth: 3, color: Colors.orangeAccent),
-                                          ],
-                                        ),
-                                      if (origem != null && destino != null)
-                                        PolylineLayer(
-                                          polylines: [
-                                            Polyline(points: [origem, destino], strokeWidth: 3, color: Colors.blueAccent),
-                                          ],
-                                        ),
-                                    ],
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
@@ -677,7 +844,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             _modalAberto = false;
           }
           if (mounted) {
-            setState(() => _status = 'Corrida enviada para outro motorista.');
+            setState(() => _status = const AppMessage('Corrida enviada para outro motorista.', MessageTone.info));
           }
           _verificarCorrida();
           return;
@@ -689,7 +856,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
       _modalSetState?.call(() {});
       if (!mounted) return;
-      setState(() => _status = 'Status da corrida atualizado.');
+      setState(() => _status = const AppMessage('Status da corrida atualizado.', MessageTone.info));
       if (acao == 'finalizar' || (nova != null && nova['status'] == 'concluida')) {
         if (_modalAberto) {
           Navigator.of(context, rootNavigator: true).pop();
@@ -705,8 +872,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _status = 'Erro ao atualizar corrida: $e');
+      setState(() => _status = AppMessage('Erro ao atualizar corrida: ${friendlyError(e)}', MessageTone.error));
     }
+  }
+
+  void _onNotificationTap(String? payload) {
+    _verificarCorrida(force: true);
   }
 
   Future<void> _trocarParaPassageiro() async {
@@ -715,11 +886,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _status = null;
     });
     try {
+      await DriverBackgroundService.stop();
+      _backgroundAtivo = false;
       await ref.read(authProvider.notifier).atualizarPerfil(tipo: 'passageiro');
       if (!mounted) return;
       context.go('/passageiro');
     } catch (e) {
-      if (mounted) setState(() => _status = 'Erro ao trocar para Passageiro: $e');
+      if (mounted) {
+        setState(() => _status = AppMessage('Erro ao trocar para Passageiro: ${friendlyError(e)}', MessageTone.error));
+      }
     } finally {
       if (mounted) setState(() => _trocandoPerfil = false);
     }
@@ -786,7 +961,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
+            if (_status != null) ...[
+              MessageBanner(
+                message: _status!,
+                onClose: _clearStatus,
+              ),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               height: 260,
               child: ClipRRect(
@@ -796,33 +977,68 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                         color: Colors.grey.shade100,
                         child: const Center(child: Text('Localização não disponível')),
                       )
-                    : FlutterMap(
-                        options: MapOptions(
-                          initialCenter: _posicao!,
-                          initialZoom: 15,
-                          interactionOptions: const InteractionOptions(flags: ~InteractiveFlag.rotate),
-                        ),
-                        children: [
-                          TileLayer(
-                            urlTemplate: _tileUrl,
-                            tileProvider: _tileProvider,
-                            userAgentPackageName: 'com.example.vai_paqueta_app',
-                            minZoom: _tileMinZoom ?? 0,
-                            maxZoom: _tileMaxZoom ?? double.infinity,
-                            minNativeZoom: _tileMinNativeZoom ?? 0,
-                            maxNativeZoom: _tileMaxNativeZoom ?? 19,
-                          ),
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: _posicao!,
-                                width: 40,
-                                height: 40,
-                                child: const Icon(Icons.location_pin, color: Colors.red, size: 36),
+                    : Builder(
+                        builder: (context) {
+                          final bounds = MapTileConfig.tilesBounds;
+                          final rawPins = MapViewport.collectPins([_posicao]);
+                          final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                          final center = MapViewport.clampCenter(
+                            MapViewport.centerForPins(pins),
+                            bounds,
+                          );
+                          final zoom = MapViewport.zoomForPins(
+                            pins,
+                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                            fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                          );
+                          final fitBounds = MapViewport.boundsForPins(pins);
+                          final fit = fitBounds == null
+                              ? null
+                              : CameraFit.bounds(
+                                  bounds: fitBounds,
+                                  padding: const EdgeInsets.all(24),
+                                  minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                  maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                );
+                          final key = ValueKey(
+                            'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                          );
+                          return FlutterMap(
+                            key: key,
+                            options: MapOptions(
+                              initialCenter: center,
+                              initialZoom: zoom,
+                              initialCameraFit: fit,
+                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                              cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: _tileUrl,
+                                tileProvider: _buildTileProvider(),
+                                userAgentPackageName: 'com.example.vai_paqueta_app',
+                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                tileBounds: bounds,
+                              ),
+                              MarkerLayer(
+                                markers: [
+                                  Marker(
+                                    point: _posicao!,
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(Icons.location_pin, color: Colors.red, size: 36),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
-                        ],
+                          );
+                        },
                       ),
               ),
             ),

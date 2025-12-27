@@ -2445,6 +2445,7 @@ ol {
   background-color: #388E3C;
 }
 
+
 .call-action .cta-content {
   text-align: center;
   padding: 0px 50px;
@@ -2746,6 +2747,23 @@ ol {
   .footer .single-footer h3 {
     margin-bottom: 25px;
   }
+}
+
+.footer .single-footer.f-contact p {
+  color: #D2D6DC;
+  font-size: 14px;
+  line-height: 22px;
+  margin-bottom: 18px;
+}
+
+.footer .single-footer.f-contact .button {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer .single-footer.f-contact .button .btn {
+  margin-right: 0;
 }
 
 .footer .footer-newsletter {

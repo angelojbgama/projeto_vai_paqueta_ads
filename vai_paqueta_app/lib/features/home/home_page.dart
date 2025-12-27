@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/error_messages.dart';
+import '../../widgets/message_banner.dart';
 import '../auth/auth_provider.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -13,7 +15,7 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   bool _loading = false;
-  String? _mensagem;
+  AppMessage? _mensagem;
 
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
@@ -33,7 +35,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     });
     try {
       await ref.read(authProvider.notifier).atualizarPerfil(tipo: tipo);
-      setState(() => _mensagem = 'Entrou como ${tipo == "passageiro" ? "Passageiro" : "EcoTaxista"}');
+      setState(() => _mensagem = AppMessage(
+            'Entrou como ${tipo == "passageiro" ? "Passageiro" : "EcoTaxista"}',
+            MessageTone.success,
+          ));
       if (!mounted) return;
       if (tipo == 'passageiro') {
         context.go('/passageiro');
@@ -41,7 +46,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         context.go('/motorista');
       }
     } catch (e) {
-      setState(() => _mensagem = 'Erro ao registrar: $e');
+      setState(() => _mensagem = AppMessage(
+            'Erro ao registrar: ${friendlyError(e)}',
+            MessageTone.error,
+          ));
     } finally {
       setState(() => _loading = false);
     }
@@ -99,7 +107,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               auth.when(
                 data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Não autenticado'),
                 loading: () => const Text('Verificando conta...'),
-                error: (e, _) => Text('Erro de conta: $e'),
+                error: (e, _) => Text('Erro de conta: ${friendlyError(e)}'),
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -127,7 +135,10 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
               if (_mensagem != null) ...[
                 const SizedBox(height: 16),
-                Text(_mensagem!),
+                MessageBanner(
+                  message: _mensagem!,
+                  onClose: () => setState(() => _mensagem = null),
+                ),
               ],
             ],
           ),

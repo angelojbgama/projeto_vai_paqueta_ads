@@ -6,7 +6,6 @@ from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
@@ -79,8 +78,6 @@ def _clear_jwt_cookies(response: Response) -> None:
 class RegisterView(APIView):
     permission_classes = []
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
 
     def post(self, request):
         use_cookies = request.headers.get("X-Use-Cookies") == "1" or bool(request.data.get("use_cookies"))
@@ -129,8 +126,6 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = []
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
 
     def post(self, request):
         use_cookies = request.headers.get("X-Use-Cookies") == "1" or bool(request.data.get("use_cookies"))
@@ -189,8 +184,6 @@ class MeView(APIView):
 class LogoutView(APIView):
     permission_classes = []
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
 
     def post(self, request):
         refresh = request.data.get("refresh") or request.COOKIES.get("refresh_token") or ""
@@ -213,8 +206,6 @@ class LogoutView(APIView):
 class CookieTokenRefreshView(APIView):
     permission_classes = []
     authentication_classes = []
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "auth"
 
     def post(self, request):
         data = {}
