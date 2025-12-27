@@ -11,4 +11,18 @@ services:
       - ./vai_paqueta_backend/.env
     volumes:
       - ./vai_paqueta_backend/db.sqlite3:/app/db.sqlite3
+      - staticfiles:/app/staticfiles
     restart: unless-stopped
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    depends_on:
+      - web
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - staticfiles:/static:ro
+    restart: unless-stopped
+
+volumes:
+  staticfiles:
