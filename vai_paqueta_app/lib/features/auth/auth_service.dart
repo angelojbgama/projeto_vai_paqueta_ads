@@ -160,4 +160,23 @@ class AuthService {
     }
     await AuthStorage.clearTokens();
   }
+
+  Future<void> deleteAccount({
+    required String password,
+    required String passwordConfirm,
+  }) async {
+    final resp = await _dio.delete(
+      '/auth/me/',
+      data: {
+        'password': password,
+        'password_confirm': passwordConfirm,
+      },
+      options: Options(validateStatus: (_) => true),
+    );
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      final detail = (resp.data is Map<String, dynamic>) ? resp.data['detail'] : null;
+      throw Exception(detail ?? 'Erro ao excluir conta.');
+    }
+    await AuthStorage.clearTokens();
+  }
 }

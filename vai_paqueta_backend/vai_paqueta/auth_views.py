@@ -1,9 +1,11 @@
 import re
 import uuid
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db import connection, transaction
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,7 +13,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
-from corridas.models import Perfil, UserContato
+from corridas.models import Corrida, LocalizacaoPing, Perfil, UserContato
 
 
 def _perfil_para_usuario(user: User) -> Perfil:
@@ -98,6 +100,7 @@ class RegisterView(APIView):
         use_cookies = request.headers.get("X-Use-Cookies") == "1" or bool(request.data.get("use_cookies"))
         email = (request.data.get("email") or "").strip().lower()
         password = request.data.get("password") or ""
+        password_confirm = request.data.get("password_confirm") or request.data.get("passwordConfirm") or ""
         nome = (request.data.get("nome") or "").strip()
         ddi = (request.data.get("ddi") or "").strip()
         ddd = (request.data.get("ddd") or "").strip()
@@ -115,6 +118,12 @@ class RegisterView(APIView):
                     {"detail": "ddi, ddd e numero são obrigatórios."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+        if password_confirm and password != password_confirm:
+            return Response(
+                {"detail": "As senhas não conferem."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not email or not password or not telefone or not nome:
             return Response(
@@ -218,6 +227,74 @@ class MeView(APIView):
         perfil.save()
 
         return Response({"user": _user_payload(user)})
+
+    def delete(self, request):
+        """
+        Exclui a conta autenticada e dados vinculados.
+        """
+        user: User = request.user
+        password = request.data.get("password") or ""
+        password_confirm = request.data.get("password_confirm") or request.data.get("passwordConfirm") or ""
+        if password or password_confirm:
+            if not password or not password_confirm:
+                return Response(
+                    {"detail": "Informe e confirme a senha."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if password != password_confirm:
+                return Response(
+                    {"detail": "As senhas não conferem."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not user.check_password(password):
+                return Response(
+                    {"detail": "Senha inválida."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        refresh = request.data.get("refresh") or request.COOKIES.get("refresh_token") or ""
+        if refresh:
+            try:
+                token = RefreshToken(refresh)
+                token.blacklist()
+            except TokenError:
+                pass
+        with transaction.atomic():
+            perfil = getattr(user, "perfil_app", None)
+            if perfil:
+                Corrida.objects.filter(cliente=perfil).delete()
+                Corrida.objects.filter(motorista=perfil).update(motorista=None)
+                LocalizacaoPing.objects.filter(perfil=perfil).delete()
+                perfil.delete()
+            UserContato.objects.filter(user=user).delete()
+            user.groups.clear()
+            user.user_permissions.clear()
+            if "authtoken_token" in connection.introspection.table_names():
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM authtoken_token WHERE user_id = %s", [user.id])
+            try:
+                LogEntry = apps.get_model("admin", "LogEntry")
+                LogEntry.objects.filter(user_id=user.id).delete()
+            except LookupError:
+                pass
+            try:
+                Token = apps.get_model("authtoken", "Token")
+                Token.objects.filter(user_id=user.id).delete()
+            except LookupError:
+                pass
+            try:
+                from rest_framework_simplejwt.token_blacklist.models import (
+                    BlacklistedToken,
+                    OutstandingToken,
+                )
+
+                BlacklistedToken.objects.filter(token__user_id=user.id).delete()
+                OutstandingToken.objects.filter(user_id=user.id).delete()
+            except Exception:  # noqa: BLE001
+                pass
+            user.delete()
+        response = Response({"detail": "Conta excluída."}, status=status.HTTP_200_OK)
+        _clear_jwt_cookies(response)
+        return response
 
 
 class LogoutView(APIView):

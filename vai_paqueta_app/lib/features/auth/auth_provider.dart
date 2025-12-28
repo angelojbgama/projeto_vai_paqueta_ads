@@ -92,4 +92,21 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     await _service.logout();
     state = const AsyncData(null);
   }
+
+  Future<void> deleteAccount({
+    required String password,
+    required String passwordConfirm,
+  }) async {
+    state = const AsyncLoading();
+    try {
+      await _service.deleteAccount(
+        password: password,
+        passwordConfirm: passwordConfirm,
+      );
+      state = const AsyncData(null);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
 }

@@ -42,6 +42,29 @@ class ApiClient {
           }
           handler.next(options);
         },
+        onResponse: (response, handler) async {
+          final status = response.statusCode;
+          final requestOptions = response.requestOptions;
+          final path = requestOptions.path;
+          final isRefresh = path.contains('/auth/token/refresh/');
+          final isLogin = path.contains('/auth/login/');
+          final isRegister = path.contains('/auth/register/');
+          if (status == 401 && !isRefresh && !isLogin && !isRegister && requestOptions.extra['retry'] != true) {
+            try {
+              final newAccess = await _refreshToken();
+              if (newAccess != null && newAccess.isNotEmpty) {
+                requestOptions.headers['Authorization'] = 'Bearer $newAccess';
+                requestOptions.extra['retry'] = true;
+                final newResponse = await _dio.fetch(requestOptions);
+                return handler.resolve(newResponse);
+              }
+            } catch (_) {
+              // Falha ao renovar, segue com a resposta original.
+            }
+            await AuthStorage.clearTokens();
+          }
+          handler.next(response);
+        },
         onError: (error, handler) async {
           final status = error.response?.statusCode;
           final requestOptions = error.requestOptions;

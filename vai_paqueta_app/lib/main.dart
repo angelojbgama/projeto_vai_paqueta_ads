@@ -5,6 +5,8 @@ import 'app_router.dart';
 import 'services/driver_background_service.dart';
 import 'services/notification_service.dart';
 
+final _router = buildRouter();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initialize();
@@ -17,7 +19,6 @@ class VaiPaquetaApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final router = buildRouter();
     return MaterialApp.router(
       title: 'Vai Paquetá',
       debugShowCheckedModeBanner: false,
@@ -25,7 +26,7 @@ class VaiPaquetaApp extends ConsumerWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green.shade700),
         useMaterial3: true,
       ),
-      routerConfig: router,
+      routerConfig: _router,
     );
   }
 }

@@ -19,9 +19,12 @@ class ProfileEditPage extends ConsumerStatefulWidget {
 class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   final _nomeCtrl = TextEditingController();
   final _dddNumeroCtrl = TextEditingController();
+  final _deletePasswordCtrl = TextEditingController();
+  final _deleteConfirmCtrl = TextEditingController();
   String _selectedDdi = '55';
   late final Future<List<PhoneCountry>> _countriesFuture;
   bool _saving = false;
+  bool _deleting = false;
   AppMessage? _mensagem;
   int? _lastUserId;
 
@@ -35,6 +38,8 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   void dispose() {
     _nomeCtrl.dispose();
     _dddNumeroCtrl.dispose();
+    _deletePasswordCtrl.dispose();
+    _deleteConfirmCtrl.dispose();
     super.dispose();
   }
 
@@ -192,6 +197,113 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     }
   }
 
+  Future<void> _confirmarExcluirConta() async {
+    String? errorText;
+    Map<String, String>? result;
+    _deletePasswordCtrl.text = '';
+    _deleteConfirmCtrl.text = '';
+    result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void clearError() {
+              if (errorText != null) {
+                setDialogState(() => errorText = null);
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('Excluir conta'),
+              scrollable: true,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Ao confirmar, todos os seus dados serão removidos definitivamente.',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _deletePasswordCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Senha',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => clearError(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _deleteConfirmCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirmar senha',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => clearError(),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(null),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final password = _deletePasswordCtrl.text;
+                    final confirm = _deleteConfirmCtrl.text;
+                    if (password.isEmpty || confirm.isEmpty) {
+                      setDialogState(() => errorText = 'Informe e confirme a senha.');
+                      return;
+                    }
+                    if (password != confirm) {
+                      setDialogState(() => errorText = 'As senhas não conferem.');
+                      return;
+                    }
+                    Navigator.of(context).pop({'password': password, 'confirm': confirm});
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('Excluir conta'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result == null) return;
+    final password = result['password'] ?? '';
+    final confirm = result['confirm'] ?? '';
+    setState(() {
+      _deleting = true;
+      _mensagem = null;
+    });
+    try {
+      await ref.read(authProvider.notifier).deleteAccount(
+            password: password,
+            passwordConfirm: confirm,
+          );
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/auth');
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _mensagem = AppMessage('Erro ao excluir: ${friendlyError(e)}', MessageTone.error));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
   void _clearErrorMessage() {
     if (_mensagem?.tone == MessageTone.error) {
       setState(() => _mensagem = null);
@@ -335,6 +447,15 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   ),
                 ],
               ),
+              if (loggedIn) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _deleting ? null : _confirmarExcluirConta,
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  icon: const Icon(Icons.delete_forever),
+                  label: Text(_deleting ? 'Excluindo...' : 'Excluir conta'),
+                ),
+              ],
               if (_mensagem != null) ...[
                 const SizedBox(height: 12),
                 MessageBanner(

@@ -197,17 +197,14 @@
                 <div class="mb-2">
                   <label class="vp-label">Telefone</label>
                   <div class="row g-2">
-                    <div class="col-6 col-md-5">
+                    <div class="col-5 col-md-4">
                       <select class="form-select" id="reg-ddi"></select>
                     </div>
-                    <div class="col-3 col-md-2">
-                      <input class="form-control" id="reg-ddd" placeholder="DDD" inputmode="numeric">
-                    </div>
-                    <div class="col-3 col-md-5">
-                      <input class="form-control" id="reg-numero" placeholder="Número" inputmode="numeric">
+                    <div class="col-7 col-md-8">
+                      <input class="form-control" id="reg-telefone" placeholder="DDD + Número" inputmode="numeric">
                     </div>
                   </div>
-                  <small class="vp-muted">Selecione o país e informe DDD e número.</small>
+                  <small class="vp-muted">Selecione o país e informe DDD e número no mesmo campo.</small>
                 </div>
                 <div class="mb-2">
                   <label class="vp-label">E-mail</label>
@@ -216,6 +213,10 @@
                 <div class="mb-3">
                   <label class="vp-label">Senha</label>
                   <input class="form-control" type="password" id="reg-password" placeholder="mínimo 6 caracteres">
+                </div>
+                <div class="mb-3">
+                  <label class="vp-label">Confirmar senha</label>
+                  <input class="form-control" type="password" id="reg-password-confirm" placeholder="repita a senha">
                 </div>
                 <button class="btn btn-success w-100" id="btn-register">Criar e entrar</button>
               </div>
@@ -343,17 +344,14 @@
               <div class="mb-2">
                 <label class="vp-label">Telefone</label>
                 <div class="row g-2">
-                  <div class="col-6 col-md-5">
+                  <div class="col-5 col-md-4">
                     <select class="form-select" id="perfil-ddi"></select>
                   </div>
-                  <div class="col-3 col-md-2">
-                    <input class="form-control" id="perfil-ddd" placeholder="DDD" inputmode="numeric">
-                  </div>
-                  <div class="col-3 col-md-5">
-                    <input class="form-control" id="perfil-numero" placeholder="Número" inputmode="numeric">
+                  <div class="col-7 col-md-8">
+                    <input class="form-control" id="perfil-telefone" placeholder="DDD + Número" inputmode="numeric">
                   </div>
                 </div>
-                <small class="vp-muted">Selecione o país e informe DDD e número.</small>
+                <small class="vp-muted">Selecione o país e informe DDD e número no mesmo campo.</small>
               </div>
               <div class="mb-2">
                 <label class="vp-label">Tipo do perfil</label>
@@ -363,6 +361,7 @@
                 </select>
               </div>
               <button class="btn btn-success w-100" id="btn-update-profile">Salvar perfil</button>
+              <button class="btn btn-outline-danger w-100 mt-2" id="btn-delete-account">Excluir conta</button>
             </div>
 
           </div>
@@ -535,6 +534,28 @@
       </div>
     </div>
   </div>
+  <div class="vp-modal-backdrop" id="delete-account-modal">
+    <div class="vp-modal">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Excluir conta</h5>
+        <span class="vp-badge">Privacidade</span>
+      </div>
+      <p class="vp-muted mb-2">Ao confirmar, todos os seus dados serão removidos definitivamente.</p>
+      <div class="mb-2">
+        <label class="vp-modal-label" for="delete-password">Senha</label>
+        <input class="form-control" type="password" id="delete-password" autocomplete="current-password" placeholder="Digite sua senha">
+      </div>
+      <div class="mb-2">
+        <label class="vp-modal-label" for="delete-password-confirm">Confirmar senha</label>
+        <input class="form-control" type="password" id="delete-password-confirm" autocomplete="current-password" placeholder="Digite novamente">
+      </div>
+      <div class="vp-muted text-danger" id="delete-account-error"></div>
+      <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
+        <button class="btn btn-outline-secondary btn-sm" id="btn-cancel-delete">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="btn-confirm-delete">Excluir conta</button>
+      </div>
+    </div>
+  </div>
   <script>
     const state = {
       user: null,
@@ -624,7 +645,7 @@
         const option = document.createElement('option');
         option.value = country.code;
         const flag = country.flag || isoToFlag(country.iso2);
-        option.textContent = `${flag ? `${flag} ` : ''}+${country.code} ${country.name}`;
+        option.textContent = `${flag ? `${flag} ` : ''}+${country.code}`;
         selectEl.appendChild(option);
       });
       selectEl.value = initialValue || DEFAULT_DDI;
@@ -636,9 +657,13 @@
     }
 
     function parsePhoneParts(rawPhone) {
-      const digits = (rawPhone || '').toString().replace(/\D+/g, '');
+      const raw = (rawPhone || '').toString().trim();
+      const digits = raw.replace(/\D+/g, '');
       if (!digits) {
         return { ddi: DEFAULT_DDI, ddd: '', numero: '' };
+      }
+      if (!raw.startsWith('+') && digits.length >= 8 && digits.length <= 11) {
+        return { ddi: DEFAULT_DDI, ddd: digits.slice(0, 2), numero: digits.slice(2) };
       }
       const ddiCodes = getCountryOptions()
         .map((c) => c.code)
@@ -673,6 +698,32 @@
       return { ddi, ddd, numero };
     }
 
+    function formatDddNumero(ddd, numero) {
+      if (!ddd && !numero) return '';
+      if (!numero) return ddd;
+      if (!ddd) return numero;
+      return `${ddd} ${numero}`;
+    }
+
+    function splitDddNumero(ddi, raw) {
+      const match = String(raw || '').match(/(\d{1,5})\D+(\d{4,})/);
+      if (match) {
+        return { ddd: match[1], numero: match[2] };
+      }
+      const digits = String(raw || '').replace(/\D+/g, '');
+      if (!digits) return { ddd: '', numero: '' };
+      if (ddi === '55' && digits.length >= 3) {
+        return { ddd: digits.slice(0, 2), numero: digits.slice(2) };
+      }
+      if (ddi === '1' && digits.length >= 4) {
+        return { ddd: digits.slice(0, 3), numero: digits.slice(3) };
+      }
+      if (digits.length >= 3) {
+        return { ddd: digits.slice(0, 2), numero: digits.slice(2) };
+      }
+      return { ddd: '', numero: '' };
+    }
+
     function setPhoneFields(prefix, rawPhone) {
       const parts = parsePhoneParts(rawPhone);
       const ddiEl = document.getElementById(`${prefix}-ddi`);
@@ -681,17 +732,15 @@
       } else if (ddiEl) {
         ddiEl.value = parts.ddi;
       }
-      const dddEl = document.getElementById(`${prefix}-ddd`);
-      const numeroEl = document.getElementById(`${prefix}-numero`);
-      if (dddEl) dddEl.value = parts.ddd;
-      if (numeroEl) numeroEl.value = parts.numero;
+      const phoneEl = document.getElementById(`${prefix}-telefone`);
+      if (phoneEl) phoneEl.value = formatDddNumero(parts.ddd, parts.numero);
     }
 
     function getPhoneFields(prefix) {
       const ddi = (document.getElementById(`${prefix}-ddi`)?.value || '').trim();
-      const ddd = (document.getElementById(`${prefix}-ddd`)?.value || '').trim();
-      const numero = (document.getElementById(`${prefix}-numero`)?.value || '').trim();
-      return { ddi, ddd, numero };
+      const telefone = (document.getElementById(`${prefix}-telefone`)?.value || '').trim();
+      const parts = splitDddNumero(ddi, telefone);
+      return { ddi, ddd: parts.ddd || '', numero: parts.numero || '' };
     }
 
     function loadSession() {
@@ -772,6 +821,10 @@
       const logoutBtn = document.getElementById('btn-logout');
       if (logoutBtn) {
         logoutBtn.classList.toggle('d-none', !state.user);
+      }
+      const deleteBtn = document.getElementById('btn-delete-account');
+      if (deleteBtn) {
+        deleteBtn.classList.toggle('d-none', !state.user);
       }
     }
 
@@ -952,13 +1005,16 @@
 
     document.getElementById('btn-register').addEventListener('click', async () => {
       const phone = getPhoneFields('reg');
+      const password = document.getElementById('reg-password').value;
+      const passwordConfirm = document.getElementById('reg-password-confirm').value;
       const body = {
         nome: document.getElementById('reg-nome').value.trim(),
         ddi: phone.ddi,
         ddd: phone.ddd,
         numero: phone.numero,
         email: document.getElementById('reg-email').value.trim(),
-        password: document.getElementById('reg-password').value,
+        password,
+        password_confirm: passwordConfirm,
         tipo: 'passageiro',
       };
       const btn = document.getElementById('btn-register');
@@ -966,6 +1022,12 @@
         setLoading(btn, true);
         if (!body.ddi || !body.ddd || !body.numero) {
           throw new Error('Informe DDI, DDD e número do telefone.');
+        }
+        if (!password || !passwordConfirm) {
+          throw new Error('Informe e confirme a senha.');
+        }
+        if (password !== passwordConfirm) {
+          throw new Error('As senhas não conferem.');
         }
         const data = await api('/api/auth/register/', {
           method: 'POST',
@@ -1018,6 +1080,57 @@
         // Sem toast de sucesso para evitar janelas extras.
       } catch (e) {
         toast(e.message, true);
+      } finally {
+        setLoading(btn, false);
+      }
+    });
+
+    function toggleDeleteModal(show) {
+      const modal = document.getElementById('delete-account-modal');
+      const errorEl = document.getElementById('delete-account-error');
+      const passwordInput = document.getElementById('delete-password');
+      const confirmInput = document.getElementById('delete-password-confirm');
+      if (!modal) return;
+      if (errorEl) errorEl.textContent = '';
+      if (passwordInput) passwordInput.value = '';
+      if (confirmInput) confirmInput.value = '';
+      modal.style.display = show ? 'flex' : 'none';
+    }
+
+    document.getElementById('btn-delete-account').addEventListener('click', () => {
+      if (!state.user) return;
+      toggleDeleteModal(true);
+    });
+
+    document.getElementById('btn-cancel-delete').addEventListener('click', () => {
+      toggleDeleteModal(false);
+    });
+
+    document.getElementById('btn-confirm-delete').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-confirm-delete');
+      const errorEl = document.getElementById('delete-account-error');
+      const passwordInput = document.getElementById('delete-password');
+      const confirmInput = document.getElementById('delete-password-confirm');
+      try {
+        setLoading(btn, true);
+        const password = passwordInput ? passwordInput.value : '';
+        const passwordConfirm = confirmInput ? confirmInput.value : '';
+        if (!password || !passwordConfirm) {
+          throw new Error('Informe e confirme a senha.');
+        }
+        if (password !== passwordConfirm) {
+          throw new Error('As senhas não conferem.');
+        }
+        await api('/api/auth/me/', {
+          method: 'DELETE',
+          body: { password, password_confirm: passwordConfirm },
+        });
+        toggleDeleteModal(false);
+        logout();
+      } catch (e) {
+        if (errorEl) {
+          errorEl.textContent = e.message || 'Não foi possível excluir a conta.';
+        }
       } finally {
         setLoading(btn, false);
       }
