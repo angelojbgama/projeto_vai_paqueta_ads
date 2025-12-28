@@ -17,7 +17,7 @@ class PhoneCountry {
 
   String get label {
     final flagLabel = flag.isNotEmpty ? '$flag ' : '';
-    return '${flagLabel}+${ddi} ${name.isNotEmpty ? name : ddi}';
+    return '${flagLabel}+${ddi}';
   }
 }
 

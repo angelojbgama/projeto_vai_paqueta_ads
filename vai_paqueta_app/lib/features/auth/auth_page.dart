@@ -262,7 +262,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            flex: 2,
+                            flex: 5,
                             child: TextField(
                               controller: _dddNumeroCtrl,
                               keyboardType: TextInputType.phone,
