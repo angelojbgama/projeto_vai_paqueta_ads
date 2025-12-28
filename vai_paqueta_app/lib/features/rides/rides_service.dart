@@ -5,6 +5,7 @@ import '../../services/api_client.dart';
 class CorridaResumo {
   final int id;
   final String status;
+  final int lugares;
   final double? origemLat;
   final double? origemLng;
   final double? destinoLat;
@@ -22,6 +23,7 @@ class CorridaResumo {
   CorridaResumo({
     required this.id,
     required this.status,
+    required this.lugares,
     this.origemLat,
     this.origemLng,
     this.destinoLat,
@@ -60,6 +62,7 @@ class CorridaResumo {
     return CorridaResumo(
       id: json['id'] as int,
       status: json['status'] as String,
+      lugares: (json['lugares'] as num?)?.toInt() ?? 1,
       origemLat: _d(json['origem_lat']),
       origemLng: _d(json['origem_lng']),
       destinoLat: _d(json['destino_lat']),
@@ -120,6 +123,7 @@ class RidesService {
     required double origemLng,
     required double destinoLat,
     required double destinoLng,
+    required int lugares,
     String origemEndereco = '',
     String destinoEndereco = '',
   }) async {
@@ -129,6 +133,7 @@ class RidesService {
       'origem_lng': origemLng,
       'destino_lat': destinoLat,
       'destino_lng': destinoLng,
+      'lugares': lugares,
       'origem_endereco': origemEndereco,
       'destino_endereco': destinoEndereco,
     });

@@ -36,6 +36,7 @@ class CorridaSerializer(serializers.ModelSerializer):
             "cliente",
             "motorista",
             "status",
+            "lugares",
             "origem_lat",
             "origem_lng",
             "origem_endereco",
@@ -49,7 +50,7 @@ class CorridaSerializer(serializers.ModelSerializer):
             "atualizado_em",
             "server_time",
         ]
-        read_only_fields = ["id", "cliente", "motorista", "status", "criado_em", "atualizado_em"]
+        read_only_fields = ["id", "cliente", "motorista", "status", "lugares", "criado_em", "atualizado_em"]
 
     def _ultimo_ping(self, obj):
         if not obj.motorista:
@@ -93,6 +94,7 @@ class CorridaCreateSerializer(serializers.Serializer):
     destino_lat = serializers.DecimalField(max_digits=9, decimal_places=6)
     destino_lng = serializers.DecimalField(max_digits=9, decimal_places=6)
     destino_endereco = serializers.CharField(required=False, allow_blank=True)
+    lugares = serializers.IntegerField(min_value=1, max_value=2)
 
 
 class CorridaStatusSerializer(serializers.Serializer):

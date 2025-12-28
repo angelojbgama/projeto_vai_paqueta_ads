@@ -1,5 +1,6 @@
 import uuid
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -55,6 +56,11 @@ class Corrida(models.Model):
         on_delete=models.SET_NULL,
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="aguardando")
+    lugares = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(2)],
+        help_text="Quantidade de lugares solicitados (1-2).",
+    )
     origem_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     origem_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     destino_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)

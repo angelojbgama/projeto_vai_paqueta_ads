@@ -241,13 +241,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   String? _buildWhatsAppLink(String? telefone) {
-    final digits = (telefone ?? '').replaceAll(RegExp(r'\D+'), '');
+    final raw = (telefone ?? '').trim();
+    final digits = raw.replaceAll(RegExp(r'\D+'), '');
     if (digits.isEmpty) return null;
     var normalized = digits;
-    if (digits.length <= 11 && !digits.startsWith('55')) {
+    if (!raw.startsWith('+') && digits.length <= 11 && !digits.startsWith('55')) {
       normalized = '55$digits';
     }
-    if (normalized.length < 12) return null;
+    if (normalized.length < 8 || normalized.length > 15) return null;
     return 'https://wa.me/$normalized';
   }
 
@@ -363,6 +364,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  String _formatarLugares(int lugares) {
+    return lugares == 1 ? '1 lugar' : '$lugares lugares';
   }
 
   Future<void> _enviarPing({bool silencioso = false}) async {
@@ -625,6 +637,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                     ),
                                   ],
                                 );
+                                final lugares = _asInt(corridaAtual['lugares']) ?? 1;
+                                final lugaresLabel = _formatarLugares(lugares);
                                 final routeCard = _infoBox(
                                   context,
                                   'Rota',
@@ -632,6 +646,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                     Text('Origem: $origemTexto', style: Theme.of(context).textTheme.bodyMedium),
                                     const SizedBox(height: 4),
                                     Text('Destino: $destinoTexto', style: Theme.of(context).textTheme.bodyMedium),
+                                    const SizedBox(height: 4),
+                                    Text('Lugares: $lugaresLabel', style: Theme.of(context).textTheme.bodyMedium),
                                   ],
                                 );
                                 if (constraints.maxWidth >= 520) {

@@ -48,6 +48,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   String? _statusCorrida;
   DateTime? _corridaAceitaEm;
   DateTime? _corridaIniciadaEm;
+  int _corridaLugares = 1;
   bool _modalAberto = false;
   StateSetter? _modalSetState;
   bool _tileUsingAssets = MapTileConfig.useAssets;
@@ -59,6 +60,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _usandoFallbackRede = false;
   bool _alertaTiles = false;
   bool _posCarregada = false;
+  int _lugaresSolicitados = 1;
   final GeoService _geo = GeoService();
   List<GeoResult> _sugestoesOrigem = [];
   List<GeoResult> _sugestoesDestino = [];
@@ -133,6 +135,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       default:
         return 'Status atualizado.';
     }
+  }
+
+  String _formatarLugares(int lugares) {
+    return lugares == 1 ? '1 lugar' : '$lugares lugares';
   }
 
   DateTime _nowServer() {
@@ -262,13 +268,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   String? _buildWhatsAppLink(String? telefone) {
-    final digits = (telefone ?? '').replaceAll(RegExp(r'\D+'), '');
+    final raw = (telefone ?? '').trim();
+    final digits = raw.replaceAll(RegExp(r'\D+'), '');
     if (digits.isEmpty) return null;
     var normalized = digits;
-    if (digits.length <= 11 && !digits.startsWith('55')) {
+    if (!raw.startsWith('+') && digits.length <= 11 && !digits.startsWith('55')) {
       normalized = '55$digits';
     }
-    if (normalized.length < 12) return null;
+    if (normalized.length < 8 || normalized.length > 15) return null;
     return 'https://wa.me/$normalized';
   }
 
@@ -288,6 +295,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _statusCorrida = null;
     _corridaAceitaEm = null;
     _corridaIniciadaEm = null;
+    _corridaLugares = 1;
     _motoristaLatLng = null;
     _motoristaNome = null;
     _motoristaTelefone = null;
@@ -295,6 +303,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _destinoEnderecoCorrida = null;
     _rotaMotorista = [];
     _rota = [];
+    _lugaresSolicitados = 1;
     if (limparEnderecos) {
       _origemCtrl.clear();
       _destinoCtrl.clear();
@@ -595,6 +604,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _corridaAtiva = true;
           _corridaIdAtual = current.id;
           _statusCorrida = current.status;
+          _corridaLugares = current.lugares;
           _corridaAceitaEm = nextStatus == 'aceita'
               ? (_corridaAceitaEm ?? current.atualizadoEm ?? _nowServer())
               : null;
@@ -621,6 +631,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           if (_destinoCtrl.text.trim().isEmpty && current.destinoEndereco != null && current.destinoEndereco!.isNotEmpty) {
             _destinoCtrl.text = current.destinoEndereco!;
           }
+          _lugaresSolicitados = current.lugares;
         });
         _sincronizarModalCorrida();
         _avaliarTilesPara(_origemLatLng ?? _destinoLatLng);
@@ -675,6 +686,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       setState(() {
         _atualizarServerOffset(corrida.serverTime);
         _statusCorrida = corrida.status;
+        _corridaLugares = corrida.lugares;
         _corridaAceitaEm = nextStatus == 'aceita'
             ? (_corridaAceitaEm ?? corrida.atualizadoEm ?? _nowServer())
             : null;
@@ -707,6 +719,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (_destinoCtrl.text.trim().isEmpty && corrida.destinoEndereco != null && corrida.destinoEndereco!.isNotEmpty) {
           _destinoCtrl.text = corrida.destinoEndereco!;
         }
+        _lugaresSolicitados = corrida.lugares;
       });
       _sincronizarModalCorrida();
       _gerenciarTimerCancelamento();
@@ -892,6 +905,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               Text('Origem: $origem', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: 4),
+              Text('Lugares: ${_formatarLugares(_corridaLugares)}', style: Theme.of(context).textTheme.bodyMedium),
             ],
           ),
         ],
@@ -1337,6 +1352,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         );
         return;
       }
+      if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
+        setState(() => _mensagem = const AppMessage('Selecione 1 ou 2 lugares.', MessageTone.warning));
+        return;
+      }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
         final res = await _geo.forward(_origemCtrl.text);
         _origemLatLng = LatLng(res.lat, res.lng);
@@ -1366,6 +1385,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         origemLng: _round6(_origemLatLng!.longitude),
         destinoLat: _round6(_destinoLatLng!.latitude),
         destinoLng: _round6(_destinoLatLng!.longitude),
+        lugares: _lugaresSolicitados,
         origemEndereco: _origemCtrl.text,
         destinoEndereco: _destinoCtrl.text,
       );
@@ -1377,6 +1397,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _statusCorrida = corrida.status;
         _corridaAceitaEm = null;
         _motoristaLatLng = null;
+        _corridaLugares = corrida.lugares;
+        _lugaresSolicitados = corrida.lugares;
       });
       _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
@@ -1727,6 +1749,30 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                           },
                         ),
                       ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      value: _lugaresSolicitados,
+                      decoration: const InputDecoration(
+                        labelText: 'Lugares',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('1 lugar')),
+                        DropdownMenuItem(value: 2, child: Text('2 lugares')),
+                      ],
+                      onChanged: _corridaAtiva || _loading
+                          ? null
+                          : (value) {
+                              if (value == null) return;
+                              _clearInputMessage();
+                              setState(() => _lugaresSolicitados = value);
+                            },
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Máximo de 2 lugares por corrida.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                    ),
                     const SizedBox(height: 8),
                     if (_mensagem != null)
                       MessageBanner(

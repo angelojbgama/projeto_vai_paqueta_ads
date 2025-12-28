@@ -1,3 +1,4 @@
+import re
 import uuid
 
 from django.conf import settings
@@ -45,6 +46,20 @@ def _token_payload(user: User) -> dict:
         "refresh": str(refresh),
     }
 
+def _digits(value: str) -> str:
+    return re.sub(r"\D+", "", value or "")
+
+
+def _format_phone(ddi: str, ddd: str, numero: str) -> str | None:
+    ddi_digits = _digits(ddi)
+    ddd_digits = _digits(ddd)
+    numero_digits = _digits(numero)
+    if not ddi_digits or not ddd_digits or not numero_digits:
+        return None
+    if len(ddi_digits) > 4 or len(ddd_digits) > 5 or len(numero_digits) < 4:
+        return None
+    return f"+{ddi_digits} ({ddd_digits}) {numero_digits}"
+
 
 def _set_jwt_cookies(response: Response, tokens: dict) -> None:
     access = tokens.get("access")
@@ -84,10 +99,22 @@ class RegisterView(APIView):
         email = (request.data.get("email") or "").strip().lower()
         password = request.data.get("password") or ""
         nome = (request.data.get("nome") or "").strip()
+        ddi = (request.data.get("ddi") or "").strip()
+        ddd = (request.data.get("ddd") or "").strip()
+        numero = (request.data.get("numero") or "").strip()
         telefone = (request.data.get("telefone") or "").strip()
         tipo = (request.data.get("tipo") or "passageiro").strip() or "passageiro"
         device_uuid = (request.data.get("device_uuid") or "").strip()
         plataforma = (request.data.get("plataforma") or "").strip()
+
+        parts_filled = any([ddi, ddd, numero])
+        if parts_filled:
+            telefone = _format_phone(ddi, ddd, numero) or ""
+            if not telefone:
+                return Response(
+                    {"detail": "ddi, ddd e numero são obrigatórios."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if not email or not password or not telefone or not nome:
             return Response(
@@ -160,9 +187,21 @@ class MeView(APIView):
         """
         user: User = request.user
         nome = (request.data.get("nome") or "").strip()
+        ddi = (request.data.get("ddi") or "").strip()
+        ddd = (request.data.get("ddd") or "").strip()
+        numero = (request.data.get("numero") or "").strip()
         telefone = (request.data.get("telefone") or "").strip()
         tipo = (request.data.get("tipo") or "").strip()
         plataforma = (request.data.get("plataforma") or "").strip()
+
+        parts_filled = any([ddi, ddd, numero])
+        if parts_filled:
+            telefone = _format_phone(ddi, ddd, numero) or ""
+            if not telefone:
+                return Response(
+                    {"detail": "ddi, ddd e numero são obrigatórios."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if nome:
             user.first_name = nome

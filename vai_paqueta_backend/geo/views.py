@@ -128,3 +128,38 @@ class ForwardGeocodeView(APIView):
             )
         except Exception as exc:  # noqa: BLE001
             return Response({"detail": f"Falha no geocoding: {exc}"}, status=500)
+
+
+class CountryListView(APIView):
+    """
+    Lista países com DDI (código internacional) para o seletor de telefone.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request):
+        try:
+            import phonenumbers
+        except ImportError:
+            return Response({"detail": "Biblioteca phonenumbers não instalada."}, status=500)
+
+        try:
+            import pycountry
+        except ImportError:
+            pycountry = None
+
+        countries = []
+        for region in sorted(phonenumbers.SUPPORTED_REGIONS):
+            code = phonenumbers.country_code_for_region(region)
+            if not code:
+                continue
+            name = region
+            if pycountry:
+                country = pycountry.countries.get(alpha_2=region)
+                if country:
+                    name = country.name
+            countries.append({"iso2": region, "name": name, "ddi": str(code)})
+
+        countries.sort(key=lambda item: item["name"])
+        return Response({"countries": countries})

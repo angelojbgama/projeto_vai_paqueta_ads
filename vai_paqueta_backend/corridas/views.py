@@ -333,6 +333,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
 
         corrida = Corrida.objects.create(
             cliente=perfil,
+            lugares=data["lugares"],
             origem_lat=data["origem_lat"],
             origem_lng=data["origem_lng"],
             destino_lat=data["destino_lat"],

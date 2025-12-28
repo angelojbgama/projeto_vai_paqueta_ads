@@ -45,7 +45,9 @@ class AuthService {
     required String email,
     required String password,
     String nome = '',
-    String telefone = '',
+    String ddi = '',
+    String ddd = '',
+    String numero = '',
   }) async {
     final resp = await _dio.post(
       '/auth/register/',
@@ -53,7 +55,9 @@ class AuthService {
         'email': email.trim(),
         'password': password,
         'nome': nome.trim(),
-        'telefone': telefone.trim(),
+        'ddi': ddi.trim(),
+        'ddd': ddd.trim(),
+        'numero': numero.trim(),
       },
       options: Options(validateStatus: (_) => true),
     );
@@ -113,7 +117,9 @@ class AuthService {
 
   Future<AuthUser> atualizarPerfil({
     String? nome,
-    String? telefone,
+    String? ddi,
+    String? ddd,
+    String? numero,
     String? tipo,
     String? deviceUuid,
     String? plataforma,
@@ -122,7 +128,9 @@ class AuthService {
       '/auth/me/',
       data: {
         if (nome != null) 'nome': nome,
-        if (telefone != null) 'telefone': telefone,
+        if (ddi != null) 'ddi': ddi,
+        if (ddd != null) 'ddd': ddd,
+        if (numero != null) 'numero': numero,
         if (tipo != null) 'tipo': tipo,
         if (deviceUuid != null) 'device_uuid': deviceUuid,
         if (plataforma != null) 'plataforma': plataforma,

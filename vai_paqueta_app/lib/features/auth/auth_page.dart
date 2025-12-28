@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/error_messages.dart';
+import '../../core/phone_countries.dart';
 import '../../widgets/message_banner.dart';
 import 'auth_provider.dart';
 
@@ -18,7 +20,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _nomeCtrl = TextEditingController();
-  final _telefoneCtrl = TextEditingController();
+  final _dddNumeroCtrl = TextEditingController();
+  String _selectedDdi = '55';
+  late final Future<List<PhoneCountry>> _countriesFuture;
   bool _isRegister = false;
   bool _loading = false;
   bool _showPassword = false;
@@ -33,7 +37,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     _passwordCtrl.addListener(_clearErrorMessage);
     _confirmPasswordCtrl.addListener(_clearErrorMessage);
     _nomeCtrl.addListener(_clearErrorMessage);
-    _telefoneCtrl.addListener(_clearErrorMessage);
+    _dddNumeroCtrl.addListener(_clearErrorMessage);
+    _countriesFuture = PhoneCountryService.load();
   }
 
   @override
@@ -42,7 +47,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     _passwordCtrl.dispose();
     _confirmPasswordCtrl.dispose();
     _nomeCtrl.dispose();
-    _telefoneCtrl.dispose();
+    _dddNumeroCtrl.dispose();
     super.dispose();
   }
 
@@ -56,6 +61,34 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     setState(() => _mensagem = AppMessage(text, tone));
   }
 
+  String _digitsOnly(String value) {
+    return value.replaceAll(RegExp(r'\D+'), '');
+  }
+
+  _DddNumero _splitDddNumero(String ddi, String raw) {
+    final match = RegExp(r'(\d{1,5})\D+(\d{4,})').firstMatch(raw);
+    if (match != null) {
+      return _DddNumero(
+        ddd: match.group(1) ?? '',
+        numero: match.group(2) ?? '',
+      );
+    }
+    final digits = _digitsOnly(raw);
+    if (digits.isEmpty) {
+      return const _DddNumero(ddd: '', numero: '');
+    }
+    if (ddi == '55' && digits.length >= 3) {
+      return _DddNumero(ddd: digits.substring(0, 2), numero: digits.substring(2));
+    }
+    if (ddi == '1' && digits.length >= 4) {
+      return _DddNumero(ddd: digits.substring(0, 3), numero: digits.substring(3));
+    }
+    if (digits.length >= 3) {
+      return _DddNumero(ddd: digits.substring(0, 2), numero: digits.substring(2));
+    }
+    return const _DddNumero(ddd: '', numero: '');
+  }
+
   Future<void> _submit() async {
     setState(() {
       _loading = true;
@@ -65,11 +98,18 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       final email = _emailCtrl.text.trim();
       final senha = _passwordCtrl.text;
       final nome = _nomeCtrl.text.trim();
-      final telefone = _telefoneCtrl.text.trim();
+      final ddi = _digitsOnly(_selectedDdi);
+      final split = _splitDddNumero(ddi, _dddNumeroCtrl.text);
+      final ddd = _digitsOnly(split.ddd);
+      final numero = _digitsOnly(split.numero);
       final senhaConfirmar = _confirmPasswordCtrl.text;
       if (_isRegister) {
-        if (nome.isEmpty || telefone.isEmpty || email.isEmpty || senha.isEmpty || senhaConfirmar.isEmpty) {
-          _setMessage('Preencha nome, telefone, e-mail e as duas senhas.', MessageTone.error);
+        if (nome.isEmpty || email.isEmpty || senha.isEmpty || senhaConfirmar.isEmpty) {
+          _setMessage('Preencha nome, e-mail e as duas senhas.', MessageTone.error);
+          return;
+        }
+        if (ddi.isEmpty || ddd.isEmpty || numero.isEmpty) {
+          _setMessage('Informe DDI, DDD e número do telefone.', MessageTone.error);
           return;
         }
       } else {
@@ -92,7 +132,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       }
       final notifier = ref.read(authProvider.notifier);
       if (_isRegister) {
-        await notifier.register(email, senha, nome: nome, telefone: telefone);
+        await notifier.register(email, senha, nome: nome, ddi: ddi, ddd: ddd, numero: numero);
         _setMessage('Cadastro realizado com sucesso.', MessageTone.success);
       } else {
         await notifier.login(email, senha);
@@ -181,13 +221,63 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: _telefoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Telefone',
-                      border: OutlineInputBorder(),
-                    ),
+                  FutureBuilder<List<PhoneCountry>>(
+                    future: _countriesFuture,
+                    builder: (context, snapshot) {
+                      final countries = snapshot.data ?? PhoneCountryService.fallback;
+                      var selected = _selectedDdi;
+                      if (!countries.any((c) => c.ddi == selected)) {
+                        selected = countries.first.ddi;
+                        if (snapshot.hasData) {
+                          _selectedDdi = selected;
+                        }
+                      }
+                      return Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: DropdownButtonFormField<String>(
+                              value: selected,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'DDI',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: countries
+                                  .map(
+                                    (c) => DropdownMenuItem<String>(
+                                      value: c.ddi,
+                                      child: Text(c.label),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: _loading
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      setState(() => _selectedDdi = value);
+                                      _clearErrorMessage();
+                                    },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _dddNumeroCtrl,
+                              keyboardType: TextInputType.phone,
+                              decoration: const InputDecoration(
+                                labelText: 'DDD + Número',
+                                border: OutlineInputBorder(),
+                              ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'[0-9\s()-]')),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -243,4 +333,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       ),
     );
   }
+}
+
+class _DddNumero {
+  final String ddd;
+  final String numero;
+
+  const _DddNumero({required this.ddd, required this.numero});
 }

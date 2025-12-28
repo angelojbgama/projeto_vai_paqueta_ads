@@ -196,7 +196,18 @@
                 </div>
                 <div class="mb-2">
                   <label class="vp-label">Telefone</label>
-                  <input class="form-control" id="reg-telefone" placeholder="(xx) xxxxx-xxxx">
+                  <div class="row g-2">
+                    <div class="col-6 col-md-5">
+                      <select class="form-select" id="reg-ddi"></select>
+                    </div>
+                    <div class="col-3 col-md-2">
+                      <input class="form-control" id="reg-ddd" placeholder="DDD" inputmode="numeric">
+                    </div>
+                    <div class="col-3 col-md-5">
+                      <input class="form-control" id="reg-numero" placeholder="Número" inputmode="numeric">
+                    </div>
+                  </div>
+                  <small class="vp-muted">Selecione o país e informe DDD e número.</small>
                 </div>
                 <div class="mb-2">
                   <label class="vp-label">E-mail</label>
@@ -256,6 +267,14 @@
                 <label class="vp-label">Destino</label>
                 <input class="form-control" id="destino-end" list="addresses-list" placeholder="Escolha um endereço de destino">
                 <small class="vp-muted">Sugestões vindas do mapa de Paquetá.</small>
+              </div>
+              <div class="mb-3">
+                <label class="vp-label">Lugares</label>
+                <select class="form-select" id="passenger-seats">
+                  <option value="1">1 pessoa</option>
+                  <option value="2">2 pessoas</option>
+                </select>
+                <small class="vp-muted">Os eco-táxis comportam até 2 lugares.</small>
               </div>
               <input type="hidden" id="origem-lat">
               <input type="hidden" id="origem-lng">
@@ -323,7 +342,18 @@
               </div>
               <div class="mb-2">
                 <label class="vp-label">Telefone</label>
-                <input class="form-control" id="perfil-telefone" placeholder="(xx) xxxxx-xxxx">
+                <div class="row g-2">
+                  <div class="col-6 col-md-5">
+                    <select class="form-select" id="perfil-ddi"></select>
+                  </div>
+                  <div class="col-3 col-md-2">
+                    <input class="form-control" id="perfil-ddd" placeholder="DDD" inputmode="numeric">
+                  </div>
+                  <div class="col-3 col-md-5">
+                    <input class="form-control" id="perfil-numero" placeholder="Número" inputmode="numeric">
+                  </div>
+                </div>
+                <small class="vp-muted">Selecione o país e informe DDD e número.</small>
               </div>
               <div class="mb-2">
                 <label class="vp-label">Tipo do perfil</label>
@@ -458,6 +488,7 @@
           <div class="vp-modal-label">Rota</div>
           <div class="vp-modal-sub" id="ride-modal-origem">Origem: —</div>
           <div class="vp-modal-sub" id="ride-modal-destino">Destino: —</div>
+          <div class="vp-modal-sub" id="ride-modal-seats">Lugares: —</div>
         </div>
       </div>
       <div class="mt-3 d-flex justify-content-end gap-2 flex-wrap">
@@ -493,6 +524,7 @@
           <div class="vp-modal-label">Rota</div>
           <div class="vp-modal-sub" id="driver-modal-origem">Origem: —</div>
           <div class="vp-modal-sub" id="driver-modal-destino">Destino: —</div>
+          <div class="vp-modal-sub" id="driver-modal-seats">Lugares: —</div>
         </div>
       </div>
       <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
@@ -526,8 +558,144 @@
     };
     let refreshPromise = null;
     const ADDRESSES_URL = "{% static 'landing/data/addresses.json' %}";
+    const DEFAULT_DDI = '55';
+    const FALLBACK_COUNTRY_OPTIONS = [
+      { code: '55', name: 'Brasil', iso2: 'BR' },
+    ];
+    let COUNTRY_OPTIONS = [];
+    let countryOptionsPromise = null;
+
+    function isoToFlag(iso2) {
+      if (!iso2 || iso2.length !== 2) return '';
+      const base = 127397;
+      const chars = iso2.toUpperCase().split('').map((c) => base + c.charCodeAt(0));
+      return String.fromCodePoint(...chars);
+    }
+
+    function normalizeCountryOptions(list) {
+      return (Array.isArray(list) ? list : [])
+        .map((item) => {
+          const code = String(item.ddi || item.code || '').trim();
+          if (!code) return null;
+          const iso2 = String(item.iso2 || item.country || '').trim().toUpperCase();
+          const name = String(item.name || item.nome || iso2 || `+${code}`).trim();
+          return {
+            code,
+            name,
+            iso2,
+            flag: isoToFlag(iso2),
+          };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    function getCountryOptions() {
+      return COUNTRY_OPTIONS.length ? COUNTRY_OPTIONS : FALLBACK_COUNTRY_OPTIONS;
+    }
+
+    async function loadCountryOptions() {
+      if (!countryOptionsPromise) {
+        countryOptionsPromise = fetch('/api/geo/countries/')
+          .then(async (res) => {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || res.statusText);
+            const list = Array.isArray(data) ? data : data.countries || [];
+            const normalized = normalizeCountryOptions(list);
+            if (normalized.length) {
+              COUNTRY_OPTIONS = normalized;
+            }
+          })
+          .catch((err) => {
+            console.warn('Falha ao carregar lista de países', err);
+          })
+          .finally(() => {
+            initPhoneSelects();
+            if (state.user) setPhoneFields('perfil', state.user.telefone || '');
+          });
+      }
+      return countryOptionsPromise;
+    }
+
+    function buildDdiSelect(selectEl, initialValue) {
+      if (!selectEl) return;
+      selectEl.innerHTML = '';
+      getCountryOptions().forEach((country) => {
+        const option = document.createElement('option');
+        option.value = country.code;
+        const flag = country.flag || isoToFlag(country.iso2);
+        option.textContent = `${flag ? `${flag} ` : ''}+${country.code} ${country.name}`;
+        selectEl.appendChild(option);
+      });
+      selectEl.value = initialValue || DEFAULT_DDI;
+    }
+
+    function initPhoneSelects() {
+      buildDdiSelect(document.getElementById('reg-ddi'), DEFAULT_DDI);
+      buildDdiSelect(document.getElementById('perfil-ddi'), DEFAULT_DDI);
+    }
+
+    function parsePhoneParts(rawPhone) {
+      const digits = (rawPhone || '').toString().replace(/\D+/g, '');
+      if (!digits) {
+        return { ddi: DEFAULT_DDI, ddd: '', numero: '' };
+      }
+      const ddiCodes = getCountryOptions()
+        .map((c) => c.code)
+        .sort((a, b) => b.length - a.length);
+      let ddi = '';
+      for (const code of ddiCodes) {
+        if (digits.startsWith(code)) {
+          ddi = code;
+          break;
+        }
+      }
+      let rest = digits;
+      if (ddi) {
+        rest = digits.slice(ddi.length);
+      } else {
+        ddi = DEFAULT_DDI;
+      }
+      let ddd = '';
+      let numero = rest;
+      if (rest.length >= 4) {
+        if (ddi === '1') {
+          ddd = rest.slice(0, 3);
+          numero = rest.slice(3);
+        } else if (ddi === '55') {
+          ddd = rest.slice(0, 2);
+          numero = rest.slice(2);
+        } else {
+          ddd = rest.slice(0, 2);
+          numero = rest.slice(2);
+        }
+      }
+      return { ddi, ddd, numero };
+    }
+
+    function setPhoneFields(prefix, rawPhone) {
+      const parts = parsePhoneParts(rawPhone);
+      const ddiEl = document.getElementById(`${prefix}-ddi`);
+      if (ddiEl && !ddiEl.options.length) {
+        buildDdiSelect(ddiEl, parts.ddi);
+      } else if (ddiEl) {
+        ddiEl.value = parts.ddi;
+      }
+      const dddEl = document.getElementById(`${prefix}-ddd`);
+      const numeroEl = document.getElementById(`${prefix}-numero`);
+      if (dddEl) dddEl.value = parts.ddd;
+      if (numeroEl) numeroEl.value = parts.numero;
+    }
+
+    function getPhoneFields(prefix) {
+      const ddi = (document.getElementById(`${prefix}-ddi`)?.value || '').trim();
+      const ddd = (document.getElementById(`${prefix}-ddd`)?.value || '').trim();
+      const numero = (document.getElementById(`${prefix}-numero`)?.value || '').trim();
+      return { ddi, ddd, numero };
+    }
 
     function loadSession() {
+      loadCountryOptions();
       try {
         const u = localStorage.getItem('vp_user');
         state.user = u ? JSON.parse(u) : null;
@@ -599,7 +767,7 @@
       if (state.user) {
         document.getElementById('perfil-tipo').value = state.user.perfil_tipo || 'passageiro';
         document.getElementById('perfil-nome').value = state.user.nome || '';
-        document.getElementById('perfil-telefone').value = state.user.telefone || '';
+        setPhoneFields('perfil', state.user.telefone || '');
       }
       const logoutBtn = document.getElementById('btn-logout');
       if (logoutBtn) {
@@ -783,9 +951,12 @@
     });
 
     document.getElementById('btn-register').addEventListener('click', async () => {
+      const phone = getPhoneFields('reg');
       const body = {
         nome: document.getElementById('reg-nome').value.trim(),
-        telefone: document.getElementById('reg-telefone').value.trim(),
+        ddi: phone.ddi,
+        ddd: phone.ddd,
+        numero: phone.numero,
         email: document.getElementById('reg-email').value.trim(),
         password: document.getElementById('reg-password').value,
         tipo: 'passageiro',
@@ -793,6 +964,9 @@
       const btn = document.getElementById('btn-register');
       try {
         setLoading(btn, true);
+        if (!body.ddi || !body.ddd || !body.numero) {
+          throw new Error('Informe DDI, DDD e número do telefone.');
+        }
         const data = await api('/api/auth/register/', {
           method: 'POST',
           body,
@@ -819,9 +993,12 @@
     document.getElementById('btn-update-profile').addEventListener('click', async () => {
       if (!state.user) return toast('Faça login primeiro', true);
       const deviceField = document.getElementById('perfil-device');
+      const phone = getPhoneFields('perfil');
       const body = {
         nome: document.getElementById('perfil-nome').value.trim(),
-        telefone: document.getElementById('perfil-telefone').value.trim(),
+        ddi: phone.ddi,
+        ddd: phone.ddd,
+        numero: phone.numero,
         tipo: document.getElementById('perfil-tipo').value,
       };
       if (deviceField && deviceField.value.trim()) {
@@ -830,6 +1007,9 @@
       const btn = document.getElementById('btn-update-profile');
       try {
         setLoading(btn, true);
+        if (!body.ddi || !body.ddd || !body.numero) {
+          throw new Error('Informe DDI, DDD e número do telefone.');
+        }
         const data = await api('/api/auth/me/', { method: 'PATCH', body });
         state.user = data.user;
         saveSession();
@@ -1030,6 +1210,8 @@
       const origemLng = parseCoord(document.getElementById('origem-lng').value);
       const destinoLat = parseCoord(document.getElementById('destino-lat').value);
       const destinoLng = parseCoord(document.getElementById('destino-lng').value);
+      const seats = parseInt(document.getElementById('passenger-seats').value, 10);
+      if (![1, 2].includes(seats)) return toast('Selecione 1 ou 2 lugares.', true);
       const body = {
         perfil_id: state.user.perfil_id,
         origem_lat: origemLat,
@@ -1038,6 +1220,7 @@
         destino_lng: destinoLng,
         origem_endereco: document.getElementById('origem-end').value,
         destino_endereco: document.getElementById('destino-end').value,
+        lugares: seats,
       };
       if (!body.origem_lat || !body.origem_lng) return toast('Pegue sua localização (botão GPS) ou escolha uma origem sugerida.', true);
       if (!body.destino_lat || !body.destino_lng) return toast('Escolha um destino das sugestões para continuarmos.', true);
@@ -1124,6 +1307,11 @@
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function formatSeats(value) {
+      const seats = Number(value) || 1;
+      return seats === 1 ? '1 lugar' : `${seats} lugares`;
     }
 
     function stopCancelUnlockTimer() {
@@ -1409,13 +1597,14 @@
     }
 
     function buildWhatsAppLink(phone) {
-      const digits = (phone || '').toString().replace(/\D+/g, '');
+      const raw = (phone || '').toString().trim();
+      const digits = raw.replace(/\D+/g, '');
       if (!digits) return null;
       let normalized = digits;
-      if (digits.length <= 11 && !digits.startsWith('55')) {
+      if (!raw.startsWith('+') && digits.length <= 11 && !digits.startsWith('55')) {
         normalized = `55${digits}`;
       }
-      if (normalized.length < 12) return null;
+      if (normalized.length < 8 || normalized.length > 15) return null;
       return `https://wa.me/${normalized}`;
     }
 
@@ -1427,6 +1616,7 @@
       const driverWhatsEl = document.getElementById('ride-modal-whatsapp');
       const origemEl = document.getElementById('ride-modal-origem');
       const destinoEl = document.getElementById('ride-modal-destino');
+      const seatsEl = document.getElementById('ride-modal-seats');
       const status = formatRideStatus(corrida.status);
       const normalized = normalizeRideStatus(corrida.status);
       const motorista = corrida.motorista || {};
@@ -1446,6 +1636,7 @@
       if (statusHintEl) statusHintEl.textContent = statusHint;
       if (origemEl) origemEl.textContent = `Origem: ${origemText}`;
       if (destinoEl) destinoEl.textContent = `Destino: ${destinoText}`;
+      if (seatsEl) seatsEl.textContent = `Lugares: ${formatSeats(corrida.lugares)}`;
 
       if (showDriver) {
         if (driverNameEl) driverNameEl.textContent = motorista.nome || 'Motorista confirmado';
@@ -1478,9 +1669,14 @@
       const driverWhatsEl = document.getElementById('ride-modal-whatsapp');
       const origemEl = document.getElementById('ride-modal-origem');
       const destinoEl = document.getElementById('ride-modal-destino');
+      const seatsEl = document.getElementById('ride-modal-seats');
       const progressWrap = document.getElementById('ride-modal-cancel-progress');
       const progressBar = document.getElementById('ride-modal-cancel-progress-bar');
       const progressHint = document.getElementById('ride-modal-cancel-progress-hint');
+      const finalizeWrap = document.getElementById('ride-modal-finalize-progress');
+      const finalizeBar = document.getElementById('ride-modal-finalize-progress-bar');
+      const finalizeHint = document.getElementById('ride-modal-finalize-progress-hint');
+      const finalizeBtn = document.getElementById('modal-finalize-ride');
       if (statusEl) statusEl.textContent = 'Aguardando motorista';
       if (statusHintEl) statusHintEl.textContent = 'Aguardando confirmação do motorista.';
       if (driverNameEl) driverNameEl.textContent = 'Aguardando motorista aceitar';
@@ -1491,6 +1687,7 @@
       }
       if (origemEl) origemEl.textContent = 'Origem: —';
       if (destinoEl) destinoEl.textContent = 'Destino: —';
+      if (seatsEl) seatsEl.textContent = 'Lugares: —';
       if (progressWrap) progressWrap.classList.add('d-none');
       if (progressHint) progressHint.classList.add('d-none');
       if (progressBar) progressBar.style.width = '0%';
@@ -1578,6 +1775,7 @@
       const passengerWhatsEl = document.getElementById('driver-modal-whatsapp');
       const origemEl = document.getElementById('driver-modal-origem');
       const destinoEl = document.getElementById('driver-modal-destino');
+      const seatsEl = document.getElementById('driver-modal-seats');
       const normalized = normalizeRideStatus(corrida.status);
       const status = formatRideStatus(corrida.status);
       const passageiro = corrida.cliente || {};
@@ -1600,6 +1798,7 @@
       }
       if (origemEl) origemEl.textContent = `Origem: ${origemText}`;
       if (destinoEl) destinoEl.textContent = `Destino: ${destinoText}`;
+      if (seatsEl) seatsEl.textContent = `Lugares: ${formatSeats(corrida.lugares)}`;
     }
 
     function clearDriverModalDetails() {
@@ -1610,6 +1809,7 @@
       const passengerWhatsEl = document.getElementById('driver-modal-whatsapp');
       const origemEl = document.getElementById('driver-modal-origem');
       const destinoEl = document.getElementById('driver-modal-destino');
+      const seatsEl = document.getElementById('driver-modal-seats');
       if (statusEl) statusEl.textContent = 'Aguardando sua confirmação';
       if (statusHintEl) statusHintEl.textContent = 'Corrida aguardando sua confirmação.';
       if (passengerNameEl) passengerNameEl.textContent = '—';
@@ -1620,6 +1820,7 @@
       }
       if (origemEl) origemEl.textContent = 'Origem: —';
       if (destinoEl) destinoEl.textContent = 'Destino: —';
+      if (seatsEl) seatsEl.textContent = 'Lugares: —';
     }
 
     function renderDriverModal(corrida) {
