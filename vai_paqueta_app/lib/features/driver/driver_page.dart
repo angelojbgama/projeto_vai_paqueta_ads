@@ -973,19 +973,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (_status != null) ...[
-              MessageBanner(
-                message: _status!,
-                onClose: _clearStatus,
-              ),
-              const SizedBox(height: 12),
-            ],
             SizedBox(
-              height: 260,
+              height: 220,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: _posicao == null
@@ -1062,6 +1055,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             const Text(
               'O app envia sua localização automaticamente a cada 10s e verifica corridas atribuídas.',
             ),
+            if (_status != null) ...[
+              const SizedBox(height: 12),
+              MessageBanner(
+                message: _status!,
+                onClose: _clearStatus,
+              ),
+            ],
           ],
         ),
       ),

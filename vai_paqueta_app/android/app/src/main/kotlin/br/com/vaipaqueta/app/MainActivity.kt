@@ -1,4 +1,4 @@
-package com.example.vai_paqueta_app
+package br.com.vaipaqueta.app
 
 import io.flutter.embedding.android.FlutterActivity
 

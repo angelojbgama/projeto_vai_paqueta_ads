@@ -1623,18 +1623,18 @@ ol {
 }
 
 .header .navbar-brand img {
-  width: 160px;
+  width: 300px;
 }
 
 @media only screen and (min-width: 768px) and (max-width: 991px) {
   .header .navbar-brand img {
-    width: 170px;
+    width: 310px;
   }
 }
 
 @media (max-width: 767px) {
   .header .navbar-brand img {
-    width: 160px;
+    width: 300px;
   }
 }
 
@@ -2037,12 +2037,16 @@ ol {
 
 .hero-area .hero-content .button {
   margin-top: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
 }
 
 .hero-area .hero-content .button .btn {
   background-color: #fff;
   color: #388E3C;
-  margin-right: 12px;
+  margin-right: 0;
 }
 
 .hero-area .hero-content .button .btn i {
@@ -2198,9 +2202,8 @@ ol {
     line-height: 22px;
   }
   .hero-area .hero-content .button .btn {
-    width: 60%;
+    width: 100%;
     margin: 0;
-    margin-bottom: 7px;
   }
   .hero-area .hero-content .button .btn:last-child {
     margin: 0;
@@ -2502,13 +2505,27 @@ ol {
   }
 }
 
+@media (max-width: 767px) {
+  .call-action .cta-content .button {
+    flex-direction: column;
+  }
+  .call-action .cta-content .button .btn {
+    width: 100%;
+  }
+}
+
 .call-action .cta-content .button {
   margin-top: 40px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
 }
 
 .call-action .cta-content .button .btn {
   background-color: #fff;
   color: #388E3C;
+  margin: 0;
 }
 
 .call-action .cta-content .button .btn:hover {
@@ -2760,6 +2777,8 @@ ol {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  justify-content: center;
+  align-items: center;
 }
 
 .footer .single-footer.f-contact .button .btn {

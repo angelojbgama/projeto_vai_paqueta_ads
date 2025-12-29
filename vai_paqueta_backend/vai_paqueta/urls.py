@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from .auth_views import CookieTokenRefreshView, LoginView, LogoutView, MeView, RegisterView
-from .views import landing, webapp
+from .views import landing, privacy, webapp
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/geo/", include("geo.urls")),
     path("", landing, name="landing"),
     path("app/", webapp, name="webapp"),
+    path("privacidade/", privacy, name="privacy"),
 ]
 
 if settings.DEBUG:

@@ -51,6 +51,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   int _corridaLugares = 1;
   bool _modalAberto = false;
   StateSetter? _modalSetState;
+  bool _paymentWarningOpen = false;
+  int? _paymentWarningRideId;
   bool _tileUsingAssets = MapTileConfig.useAssets;
   String _tileUrl = MapTileConfig.useAssets ? MapTileConfig.assetsTemplate : MapTileConfig.networkTemplate;
   int? _tileMinNativeZoom;
@@ -335,6 +337,43 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       return;
     }
     _mostrarModalCorrida();
+  }
+
+  Future<void> _mostrarAvisoPagamento({int? rideId}) async {
+    if (!mounted) return;
+    if (_paymentWarningOpen) return;
+    if (rideId != null && _paymentWarningRideId == rideId) return;
+    _paymentWarningOpen = true;
+    _paymentWarningRideId = rideId;
+    FocusScope.of(context).unfocus();
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      _paymentWarningOpen = false;
+      return;
+    }
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Aviso sobre pagamento'),
+            content: const Text(
+              'O pagamento deve ser combinado diretamente entre passageiro e eco-taxista. O app apenas conecta vocês.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Entendi'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      _paymentWarningOpen = false;
+    }
   }
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
@@ -906,7 +945,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               const SizedBox(height: 4),
               Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 4),
-              Text('Lugares: ${_formatarLugares(_corridaLugares)}', style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                'Quantos lugares você precisa para essa corrida? ${_formatarLugares(_corridaLugares)}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ],
           ),
         ],
@@ -1403,6 +1445,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mostrarAvisoPagamento(rideId: corrida.id);
+      });
     } catch (e) {
       setState(
         () => _mensagem = AppMessage('Erro ao pedir corrida: ${friendlyError(e)}', MessageTone.error),
@@ -1552,9 +1597,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                height: 220,
                 child: Builder(
                   builder: (context) {
                     final bounds = MapTileConfig.tilesBounds;
@@ -1753,7 +1799,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                     DropdownButtonFormField<int>(
                       value: _lugaresSolicitados,
                       decoration: const InputDecoration(
-                        labelText: 'Lugares',
+                        labelText: 'Quantos lugares você precisa para essa corrida?',
                         border: OutlineInputBorder(),
                       ),
                       items: const [

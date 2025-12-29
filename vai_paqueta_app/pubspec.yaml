@@ -1,7 +1,7 @@
 name: vai_paqueta_app
 description: Aplicativo Flutter para o EcoTaxi "Vai Paquetá".
 publish_to: "none"
-version: 0.1.0+1
+version: 1.0.0+4
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -33,3 +33,4 @@ flutter:
   assets:
     - assets/tiles/
     - assets/addresses.json
+    - assets/logo/

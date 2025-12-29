@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/error_messages.dart';
 import '../../core/phone_countries.dart';
@@ -27,8 +28,34 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   bool _loading = false;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+  bool _acceptedTerms = false;
   AppMessage? _mensagem;
   final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static const String _privacyUrl = 'https://vaipaqueta.com.br/privacidade/';
+  static const String _termsText = '''
+Termos de Uso - Vai Paqueta
+
+1. O que o app faz
+O Vai Paqueta conecta passageiros e eco-taxistas na Ilha de Paqueta. O app nao realiza o transporte e nao e responsavel pela execucao da corrida.
+
+2. Pagamento e negociacao
+O valor, a forma de pagamento e qualquer negociacao da corrida sao de responsabilidade do passageiro e do eco-taxista. O app apenas conecta as partes e nao cobra taxa.
+
+3. Limite de lugares
+Atualmente o app aceita solicitacoes de ate 2 lugares por corrida. No futuro, pode ser possivel solicitar mais lugares; nesse caso, o app pode distribuir a solicitacao entre diferentes eco-taxistas.
+
+4. Idade minima
+Somente maiores de 18 anos podem usar o app.
+
+5. Uso responsavel
+Voce se compromete a fornecer informacoes corretas e respeitar as regras locais e os demais usuarios.
+
+6. Privacidade e dados
+Usamos dados para operar o servico, como localizacao e informacoes de cadastro. Os dados sao armazenados com seguranca e podem ser excluidos com a exclusao da conta.
+
+7. Alteracoes
+O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.
+''';
 
   @override
   void initState() {
@@ -59,6 +86,35 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   void _setMessage(String text, MessageTone tone) {
     setState(() => _mensagem = AppMessage(text, tone));
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(_privacyUrl);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      _setMessage('Nao foi possivel abrir a Politica de Privacidade.', MessageTone.error);
+    }
+  }
+
+  void _showTermsDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Termos de Uso'),
+          scrollable: true,
+          content: SingleChildScrollView(
+            child: Text(_termsText),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Fechar'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String _digitsOnly(String value) {
@@ -110,6 +166,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         }
         if (ddi.isEmpty || ddd.isEmpty || numero.isEmpty) {
           _setMessage('Informe DDI, DDD e número do telefone.', MessageTone.error);
+          return;
+        }
+        if (!_acceptedTerms) {
+          _setMessage('Aceite os Termos de Uso e a Politica de Privacidade.', MessageTone.error);
           return;
         }
       } else {
@@ -169,6 +229,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(
+                child: Image.asset(
+                  'assets/logo/logo-collor.png',
+                  height: 120,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 12),
               if (user != null) ...[
                 Text('Logado como ${user.email}', style: Theme.of(context).textTheme.titleMedium),
                 if (user.nome.isNotEmpty) Text(user.nome),
@@ -188,6 +256,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       selected: !_isRegister,
                       onSelected: (_) => setState(() {
                         _isRegister = false;
+                        _acceptedTerms = false;
                         _mensagem = null;
                       }),
                     ),
@@ -197,6 +266,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       selected: _isRegister,
                       onSelected: (_) => setState(() {
                         _isRegister = true;
+                        _acceptedTerms = false;
                         _mensagem = null;
                       }),
                     ),
@@ -306,6 +376,49 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         onPressed: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: _acceptedTerms,
+                        onChanged: _loading
+                            ? null
+                            : (value) {
+                                setState(() => _acceptedTerms = value ?? false);
+                                _clearErrorMessage();
+                              },
+                      ),
+                      Expanded(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text('Li e aceito os '),
+                            TextButton(
+                              onPressed: _showTermsDialog,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 0),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Termos de Uso'),
+                            ),
+                            const Text(' e a '),
+                            TextButton(
+                              onPressed: _openPrivacyPolicy,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(0, 0),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Politica de Privacidade'),
+                            ),
+                            const Text('.'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 16),

@@ -20,21 +20,54 @@
     }
     body { background: var(--vp-bg); color: var(--vp-muted); font-family: "Inter", sans-serif; }
     .webapp-header {
-      background: #388E3C;
+      position: relative;
+      background: #fff;
+      border-bottom: 1px solid #eef2f7;
       z-index: 2000;
+      padding: 4px 0;
+      box-shadow: none;
     }
     .webapp-header.sticky {
+      position: relative;
+      box-shadow: none;
       z-index: 2000;
+    }
+    .webapp-header .navbar {
+      min-height: 64px;
+    }
+    .webapp-header .navbar-brand {
+      padding: 0;
+      margin: 0;
+    }
+    .webapp-header .navbar-brand img {
+      height: 64px;
+      width: auto;
+      max-height: 64px;
+    }
+    .webapp-header .navbar .navbar-nav .nav-item a {
+      color: #0c1a12;
+      font-weight: 600;
+      padding: 6px 8px;
+    }
+    .webapp-header .navbar .navbar-nav .nav-item a.active {
+      color: #1f5f2c;
+    }
+    .webapp-header .navbar .navbar-nav .nav-item a::before,
+    .webapp-header .navbar .navbar-nav .nav-item a::after {
+      display: none;
+    }
+    .webapp-header .mobile-menu-btn .toggler-icon {
+      background-color: #0c1a12;
     }
     .leaflet-container {
       z-index: 1;
     }
     .webapp-main {
-      padding-top: 140px;
+      padding-top: 16px;
     }
     @media (max-width: 767px) {
       .webapp-main {
-        padding-top: 110px;
+        padding-top: 12px;
       }
     }
     .vp-card {
@@ -66,6 +99,10 @@
     .vp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 1050; display: none; align-items: center; justify-content: center; }
     .vp-modal { background: #fff; border-radius: 14px; padding: 20px; max-width: 720px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
     .vp-modal h5 { margin: 0; }
+    #payment-warning-modal { z-index: 1060; }
+    #error-modal { z-index: 1070; }
+    .vp-modal-error { border: 1px solid rgba(220, 38, 38, 0.2); }
+    .vp-badge-error { background: #dc2626; }
     #ride-modal-map,
     #driver-ride-modal-map { width: 100%; height: 260px; border-radius: 10px; border: 1px solid #e5e7eb; margin-top: 10px; }
     .vp-modal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
@@ -98,6 +135,84 @@
       background: var(--vp-primary);
       transition: width 0.4s ease;
     }
+    @media (max-width: 991px) {
+      .webapp-header .navbar-brand img {
+        height: 56px;
+        width: auto;
+        max-height: 56px;
+      }
+      .button.add-list-button {
+        width: 100%;
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+      }
+      .button.add-list-button .btn {
+        width: 100%;
+        text-align: center;
+      }
+    }
+    @media (max-width: 767px) {
+      body {
+        font-size: 16px;
+      }
+      .navbar-collapse {
+        background: #fff;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 10px;
+        box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+      }
+      .nav-pills {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .nav-pills .nav-link {
+        width: 100%;
+        text-align: center;
+      }
+      .vp-login-shell {
+        min-height: auto;
+      }
+      .vp-login-card {
+        padding: 20px;
+      }
+      .vp-login-hero {
+        padding: 16px;
+      }
+      .vp-toggle {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .vp-toggle button {
+        flex: 1;
+      }
+      .vp-grid {
+        grid-template-columns: 1fr;
+      }
+      .vp-card {
+        padding: 16px;
+      }
+      #map {
+        height: 240px;
+      }
+      #ride-modal-map,
+      #driver-ride-modal-map {
+        height: 200px;
+      }
+      .vp-modal {
+        max-height: 85vh;
+        overflow-y: auto;
+      }
+      .vp-modal-grid {
+        grid-template-columns: 1fr;
+      }
+      input,
+      select,
+      textarea {
+        font-size: 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -109,8 +224,8 @@
             <nav class="navbar navbar-expand-lg">
               <a class="navbar-brand" href="/app/">
                 <img
-                  src="{% static 'landing/assets/images/logo/logo.png' %}"
-                  data-logo-top="{% static 'landing/assets/images/logo/logo.png' %}"
+                  src="{% static 'landing/assets/images/logo/logo-collor.png' %}"
+                  data-logo-top="{% static 'landing/assets/images/logo/logo-collor.png' %}"
                   data-logo-sticky="{% static 'landing/assets/images/logo/logo-collor.png' %}"
                   alt="Vai Paquetá">
               </a>
@@ -158,11 +273,11 @@
             <div class="vp-login-hero h-100">
               <div class="vp-badge mb-2">Faça login para continuar</div>
               <div class="vp-title h4 mb-2">Peça eco-táxi pela web</div>
-              <p class="vp-muted">Mesmos fluxos do app mobile: entrar, pedir corrida, acompanhar no mapa e operar como eco-taxista.</p>
+              <p class="vp-muted">Fluxo simples do app: pedir corrida e acompanhar no mapa.</p>
               <ul class="mt-3">
-                <li>Pedir corrida com atalhos e status em tempo real.</li>
-                <li>Motorista recebe e aceita pelo app; você acompanha.</li>
-                <li>Mapa com origem, destino e posição do motorista.</li>
+                <li>Pedir corrida em poucos toques.</li>
+                <li>Motorista confirma e você acompanha.</li>
+                <li>Mapa com origem, destino e posição.</li>
               </ul>
             </div>
           </div>
@@ -218,6 +333,13 @@
                   <label class="vp-label">Confirmar senha</label>
                   <input class="form-control" type="password" id="reg-password-confirm" placeholder="repita a senha">
                 </div>
+                <div class="mb-3 form-check">
+                  <input class="form-check-input" type="checkbox" id="reg-terms">
+                  <label class="form-check-label" for="reg-terms">
+                Li e aceito os <a href="#" id="open-terms-link">Termos de Uso</a> e a
+                <a href="/privacidade/" target="_blank" rel="noopener">Política de Privacidade</a>.
+              </label>
+            </div>
                 <button class="btn btn-success w-100" id="btn-register">Criar e entrar</button>
               </div>
             </div>
@@ -391,7 +513,7 @@
             <div class="single-footer f-about">
               <div class="logo">
                 <a href="/">
-                  <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá">
+                  <img src="{% static 'landing/assets/images/logo/logo-collor.png' %}" alt="Vai Paquetá">
                 </a>
               </div>
               <p>Vai Paquetá é um piloto de mobilidade que conecta passageiros e eco-taxistas na Ilha de Paquetá,
@@ -410,6 +532,7 @@
                     <li><a href="/#impacto">Impacto esperado</a></li>
                     <li><a href="/#precos">Preços</a></li>
                     <li><a href="/#download-android">Baixar Android</a></li>
+                    <li><a href="/privacidade/">Política de Privacidade</a></li>
                   </ul>
                 </div>
                 <!-- End Single Widget -->
@@ -553,6 +676,52 @@
       <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
         <button class="btn btn-outline-secondary btn-sm" id="btn-cancel-delete">Cancelar</button>
         <button class="btn btn-danger btn-sm" id="btn-confirm-delete">Excluir conta</button>
+      </div>
+    </div>
+  </div>
+  <div class="vp-modal-backdrop" id="payment-warning-modal">
+    <div class="vp-modal">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Aviso sobre pagamento</h5>
+        <span class="vp-badge">Importante</span>
+      </div>
+      <p class="vp-muted mb-2">
+        O pagamento deve ser combinado diretamente entre passageiro e eco-taxista. O app apenas conecta vocês.
+      </p>
+      <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
+        <button class="btn btn-success btn-sm" id="btn-payment-warning-ok">Entendi</button>
+      </div>
+    </div>
+  </div>
+  <div class="vp-modal-backdrop" id="terms-modal">
+    <div class="vp-modal">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Termos de Uso</h5>
+        <span class="vp-badge">Atualizado</span>
+      </div>
+      <div class="vp-muted">
+        <p><strong>1. O que o app faz</strong><br>O Vai Paqueta conecta passageiros e eco-taxistas na Ilha de Paqueta. O app nao realiza o transporte e nao e responsavel pela execucao da corrida.</p>
+        <p><strong>2. Pagamento e negociacao</strong><br>O valor, a forma de pagamento e qualquer negociacao da corrida sao de responsabilidade do passageiro e do eco-taxista. O app apenas conecta as partes e nao cobra taxa.</p>
+        <p><strong>3. Limite de lugares</strong><br>Atualmente o app aceita solicitacoes de ate 2 lugares por corrida. No futuro, pode ser possivel solicitar mais lugares; nesse caso, o app pode distribuir a solicitacao entre diferentes eco-taxistas.</p>
+        <p><strong>4. Idade minima</strong><br>Somente maiores de 18 anos podem usar o app.</p>
+        <p><strong>5. Uso responsavel</strong><br>Voce se compromete a fornecer informacoes corretas e respeitar as regras locais e os demais usuarios.</p>
+        <p><strong>6. Privacidade e dados</strong><br>Usamos dados para operar o servico, como localizacao e informacoes de cadastro. Os dados sao armazenados com seguranca e podem ser excluidos com a exclusao da conta.</p>
+        <p><strong>7. Alteracoes</strong><br>O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
+        <button class="btn btn-success btn-sm" id="btn-terms-ok">Entendi</button>
+      </div>
+    </div>
+  </div>
+  <div class="vp-modal-backdrop" id="error-modal">
+    <div class="vp-modal vp-modal-error">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="vp-title mb-0">Ops, algo deu errado</h5>
+        <span class="vp-badge vp-badge-error">Erro</span>
+      </div>
+      <p class="vp-muted mb-2" id="error-modal-message">Não foi possível completar a ação.</p>
+      <div class="d-flex flex-wrap gap-2 mt-3 justify-content-end">
+        <button class="btn btn-danger btn-sm" id="btn-error-modal-ok">Fechar</button>
       </div>
     </div>
   </div>
@@ -857,6 +1026,17 @@
       }
     }
 
+    function getCookie(name) {
+      const cookie = document.cookie || '';
+      const parts = cookie.split(';').map((c) => c.trim());
+      for (const part of parts) {
+        if (part.startsWith(`${name}=`)) {
+          return decodeURIComponent(part.substring(name.length + 1));
+        }
+      }
+      return '';
+    }
+
     // Toggle login/cadastro
     document.querySelectorAll('#auth-toggle button').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -865,14 +1045,19 @@
         const mode = btn.dataset.auth;
         document.getElementById('auth-login-form').classList.toggle('d-none', mode !== 'login');
         document.getElementById('auth-register-form').classList.toggle('d-none', mode !== 'register');
+        const termsEl = document.getElementById('reg-terms');
+        if (termsEl) termsEl.checked = false;
       });
     });
 
     async function refreshAccessToken() {
       if (!refreshPromise) {
+        const csrfToken = getCookie('csrftoken');
+        const headers = { 'Content-Type': 'application/json', 'X-Use-Cookies': '1' };
+        if (csrfToken) headers['X-CSRFToken'] = csrfToken;
         refreshPromise = fetch('/api/auth/token/refresh/', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Use-Cookies': '1' },
+          headers,
           credentials: 'include',
         })
           .then(async (res) => {
@@ -893,6 +1078,10 @@
 
     async function api(path, { method = 'GET', body, retry = false, headers = {} } = {}) {
       const mergedHeaders = { 'Content-Type': 'application/json', ...headers };
+      const csrfToken = getCookie('csrftoken');
+      if (csrfToken && !mergedHeaders['X-CSRFToken']) {
+        mergedHeaders['X-CSRFToken'] = csrfToken;
+      }
       const res = await fetch(path, {
         method,
         headers: mergedHeaders,
@@ -925,8 +1114,37 @@
       btn.innerHTML = loading ? '<span class="spinner-border spinner-border-sm"></span>' : btn.dataset.original;
     }
 
+    let errorModalOpen = false;
+    let errorModalLastMessage = '';
+    let errorModalLastAt = 0;
+    const ERROR_MODAL_COOLDOWN_MS = 4000;
+
+    function showErrorModal(message) {
+      const modal = document.getElementById('error-modal');
+      const messageEl = document.getElementById('error-modal-message');
+      if (!modal || !messageEl) return;
+      const msg = (message || '').trim() || 'Não foi possível completar a ação.';
+      const now = Date.now();
+      if (errorModalOpen && msg === errorModalLastMessage) return;
+      if (!errorModalOpen && msg === errorModalLastMessage && now - errorModalLastAt < ERROR_MODAL_COOLDOWN_MS) return;
+      messageEl.textContent = msg;
+      modal.style.display = 'flex';
+      errorModalOpen = true;
+      errorModalLastMessage = msg;
+      errorModalLastAt = now;
+    }
+
+    function hideErrorModal() {
+      const modal = document.getElementById('error-modal');
+      if (!modal) return;
+      modal.style.display = 'none';
+      errorModalOpen = false;
+    }
+
     function toast(_msg, _isError = false) {
-      // Toasts desativados no web app.
+      if (_isError) {
+        showErrorModal(_msg);
+      }
     }
 
     // Tabs
@@ -1007,6 +1225,7 @@
       const phone = getPhoneFields('reg');
       const password = document.getElementById('reg-password').value;
       const passwordConfirm = document.getElementById('reg-password-confirm').value;
+      const termsAccepted = document.getElementById('reg-terms')?.checked;
       const body = {
         nome: document.getElementById('reg-nome').value.trim(),
         ddi: phone.ddi,
@@ -1028,6 +1247,9 @@
         }
         if (password !== passwordConfirm) {
           throw new Error('As senhas não conferem.');
+        }
+        if (!termsAccepted) {
+          throw new Error('Aceite os Termos de Uso para continuar.');
         }
         const data = await api('/api/auth/register/', {
           method: 'POST',
@@ -1097,6 +1319,31 @@
       modal.style.display = show ? 'flex' : 'none';
     }
 
+    function togglePaymentWarningModal(show) {
+      const modal = document.getElementById('payment-warning-modal');
+      if (!modal) return;
+      modal.style.display = show ? 'flex' : 'none';
+    }
+
+    function toggleTermsModal(show) {
+      const modal = document.getElementById('terms-modal');
+      if (!modal) return;
+      modal.style.display = show ? 'flex' : 'none';
+    }
+
+    function bindErrorModal() {
+      const modal = document.getElementById('error-modal');
+      const btn = document.getElementById('btn-error-modal-ok');
+      if (btn) {
+        btn.addEventListener('click', () => hideErrorModal());
+      }
+      if (modal) {
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal) hideErrorModal();
+        });
+      }
+    }
+
     document.getElementById('btn-delete-account').addEventListener('click', () => {
       if (!state.user) return;
       toggleDeleteModal(true);
@@ -1135,6 +1382,30 @@
         setLoading(btn, false);
       }
     });
+
+    document.getElementById('btn-payment-warning-ok').addEventListener('click', () => {
+      togglePaymentWarningModal(false);
+    });
+
+    const termsLink = document.getElementById('open-terms-link');
+    if (termsLink) {
+      termsLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        toggleTermsModal(true);
+      });
+    }
+    const termsOk = document.getElementById('btn-terms-ok');
+    if (termsOk) {
+      termsOk.addEventListener('click', () => toggleTermsModal(false));
+    }
+    const termsModal = document.getElementById('terms-modal');
+    if (termsModal) {
+      termsModal.addEventListener('click', (event) => {
+        if (event.target === termsModal) toggleTermsModal(false);
+      });
+    }
+
+    bindErrorModal();
 
     // GPS helper
     async function requestOriginGps(opts = {}) {
@@ -1342,9 +1613,11 @@
         setLoading(btn, true);
         const corrida = await api('/api/corridas/solicitar/', { method: 'POST', body });
         renderPassengerRide(corrida);
+        togglePaymentWarningModal(true);
       } catch (e) {
         if (e.status === 409 && e.data?.corrida) {
           renderPassengerRide(e.data.corrida);
+          togglePaymentWarningModal(true);
           toast(e.message);
         } else {
           toast(e.message, true);
@@ -2185,26 +2458,12 @@
     function initWebappHeader() {
       const header = document.querySelector('.navbar-area');
       if (!header) return;
-      const logo = header.querySelector('.navbar-brand img');
-      const topLogo = logo?.getAttribute('data-logo-top') || logo?.src;
-      const stickyLogo = logo?.getAttribute('data-logo-sticky') || logo?.src;
       const toggler = header.querySelector('.mobile-menu-btn');
       if (toggler) {
         toggler.addEventListener('click', () => {
           toggler.classList.toggle('active');
         });
       }
-      const onScroll = () => {
-        if (window.pageYOffset > header.offsetTop) {
-          header.classList.add('sticky');
-          if (logo && stickyLogo) logo.src = stickyLogo;
-        } else {
-          header.classList.remove('sticky');
-          if (logo && topLogo) logo.src = topLogo;
-        }
-      };
-      window.addEventListener('scroll', onScroll, { passive: true });
-      onScroll();
     }
 
     // Init

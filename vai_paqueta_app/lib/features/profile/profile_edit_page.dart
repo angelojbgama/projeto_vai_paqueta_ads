@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/error_messages.dart';
 import '../../core/phone_countries.dart';
@@ -17,6 +18,7 @@ class ProfileEditPage extends ConsumerStatefulWidget {
 }
 
 class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
+  static const String _privacyUrl = 'https://vaipaqueta.com.br/privacidade/';
   final _nomeCtrl = TextEditingController();
   final _dddNumeroCtrl = TextEditingController();
   final _deletePasswordCtrl = TextEditingController();
@@ -310,6 +312,14 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
     }
   }
 
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(_privacyUrl);
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      setState(() => _mensagem = const AppMessage('Nao foi possivel abrir a Politica de Privacidade.', MessageTone.error));
+    }
+  }
+
   void _voltar() {
     final user = ref.read(authProvider).valueOrNull;
     if (user == null) {
@@ -442,7 +452,10 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                     child: ElevatedButton.icon(
                       onPressed: _saving || !loggedIn ? null : _salvar,
                       icon: const Icon(Icons.save),
-                      label: Text(_saving ? 'Salvando...' : 'Salvar alterações'),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(_saving ? 'Salvando...' : 'Salvar alterações'),
+                      ),
                     ),
                   ),
                 ],
@@ -456,6 +469,12 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   label: Text(_deleting ? 'Excluindo...' : 'Excluir conta'),
                 ),
               ],
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _openPrivacyPolicy,
+                icon: const Icon(Icons.privacy_tip_outlined),
+                label: const Text('Politica de Privacidade'),
+              ),
               if (_mensagem != null) ...[
                 const SizedBox(height: 12),
                 MessageBanner(

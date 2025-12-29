@@ -17,27 +17,12 @@ Author: GrayGrids
 
 
     /*=====================================
-    Sticky
+    Scroll helpers
     ======================================= */
     window.onscroll = function () {
-        var header_navbar = document.querySelector(".navbar-area");
-        var sticky = header_navbar.offsetTop;
-
-        var logo = document.querySelector('.navbar-brand img');
-        if (logo) {
-          var topLogo = logo.getAttribute('data-logo-top') || logo.src;
-          var stickyLogo = logo.getAttribute('data-logo-sticky') || logo.src;
-          if (window.pageYOffset > sticky) {
-            header_navbar.classList.add("sticky");
-            logo.src = stickyLogo;
-          } else {
-            header_navbar.classList.remove("sticky");
-            logo.src = topLogo;
-          }
-        }
-
         // show or hide the back-top-top button
         var backToTo = document.querySelector(".scroll-top");
+        if (!backToTo) return;
         if (document.body.scrollTop > 50 || document.documentElement.scrollTop > 50) {
             backToTo.style.display = "flex";
         } else {

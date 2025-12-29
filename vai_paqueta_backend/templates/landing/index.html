@@ -18,6 +18,175 @@
     <link rel="stylesheet" href="{% static 'landing/assets/css/tiny-slider.css' %}" />
     <link rel="stylesheet" href="{% static 'landing/assets/css/glightbox.min.css' %}" />
     <link rel="stylesheet" href="{% static 'landing/assets/css/main.css' %}" />
+    <style>
+        .header.navbar-area {
+            position: relative;
+            background: #fff;
+            border-bottom: 1px solid #eef2f7;
+            padding: 4px 0;
+            z-index: 1200;
+        }
+        .header.navbar-area.sticky {
+            position: relative;
+            box-shadow: none;
+        }
+        .header .navbar {
+            min-height: 64px;
+        }
+        .header .navbar-brand img {
+            width: auto;
+            height: 64px;
+            max-height: 64px;
+        }
+        .header .navbar-brand {
+            padding: 0;
+            margin: 0;
+        }
+        .header .navbar .navbar-nav .nav-item a {
+            color: #0c1a12;
+            font-weight: 600;
+            padding: 6px 8px;
+        }
+        .header .navbar .navbar-nav .nav-item a.active {
+            color: #1f5f2c;
+        }
+        .header .navbar .navbar-nav .nav-item a::before,
+        .header .navbar .navbar-nav .nav-item a::after {
+            display: none;
+        }
+        .header .mobile-menu-btn .toggler-icon {
+            background-color: #0c1a12;
+        }
+        .header .button .btn {
+            border: 2px solid #388E3C;
+            color: #388E3C;
+            background: transparent;
+        }
+        .header .button .btn:hover {
+            background: #388E3C;
+            color: #fff;
+        }
+        .call-action-light {
+            background: #fff;
+        }
+        .call-action-light .cta-content h2 {
+            color: #0c1a12;
+        }
+        .call-action-light .cta-content p {
+            color: #475569;
+        }
+        .call-action.call-action-light .cta-content .button .btn {
+            background: #388E3C;
+            color: #fff;
+            border: 2px solid #388E3C;
+        }
+        .call-action.call-action-light .cta-content .button .btn:hover {
+            background: #2e7d32;
+            border-color: #2e7d32;
+            color: #fff;
+        }
+        .call-action.call-action-light .cta-content .button .btn.btn-alt {
+            background: transparent !important;
+            color: #388E3C !important;
+            border: 2px solid #388E3C;
+        }
+        .call-action.call-action-light .cta-content .button .btn.btn-alt:hover {
+            background: #388E3C !important;
+            color: #fff !important;
+        }
+        .hero-area {
+            padding: 90px 0 90px 0;
+        }
+        @media (max-width: 991px) {
+            .navbar-collapse {
+                max-height: calc(100vh - 120px);
+                overflow-y: auto;
+                padding: 12px 14px 140px;
+                background: #fff;
+                border-radius: 14px;
+                margin-top: 10px;
+                box-shadow: 0 12px 26px rgba(0,0,0,0.08);
+            }
+            .hero-area {
+                padding: 80px 0 70px 0;
+            }
+            .navbar-nav .nav-item + .nav-item {
+                margin-top: 6px;
+            }
+            .navbar-nav .nav-item a {
+                display: block;
+                width: 100%;
+                padding: 10px 12px;
+                border-radius: 10px;
+                font-weight: 600;
+                color: #0c1a12;
+            }
+            .navbar-nav .nav-item a.active,
+            .navbar-nav .nav-item a:focus,
+            .navbar-nav .nav-item a:hover {
+                background: rgba(56,142,60,0.12);
+                color: #1f5f2c;
+            }
+        }
+        @media (max-width: 767px) {
+            .header .navbar-brand img {
+                width: auto;
+                height: 56px;
+                max-height: 56px;
+            }
+            body {
+                font-size: 16px;
+            }
+            .hero-area {
+                padding: 70px 0 50px 0;
+            }
+            .hero-area .hero-content {
+                text-align: center;
+            }
+            .hero-area .button {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                align-items: stretch;
+            }
+            .hero-area .button .btn {
+                width: 100%;
+                margin: 0;
+            }
+            .section-title h2 {
+                font-size: 24px;
+                line-height: 1.2;
+            }
+            .section-title p {
+                font-size: 15px;
+            }
+            .single-feature {
+                padding: 18px 16px;
+            }
+            .footer .button {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .footer .button .btn {
+                width: 100%;
+            }
+            input,
+            select,
+            textarea {
+                font-size: 16px;
+            }
+        }
+        @media (max-width: 575px) {
+            .hero-area .hero-content h1 {
+                font-size: 28px;
+                line-height: 1.15;
+            }
+            .hero-area .hero-content p {
+                font-size: 15px;
+            }
+        }
+    </style>
 
 </head>
 
@@ -43,8 +212,8 @@
                         <nav class="navbar navbar-expand-lg">
                             <a class="navbar-brand" href="#home">
                                 <img
-                                    src="{% static 'landing/assets/images/logo/logo.png' %}"
-                                    data-logo-top="{% static 'landing/assets/images/logo/logo.png' %}"
+                                    src="{% static 'landing/assets/images/logo/logo-collor.png' %}"
+                                    data-logo-top="{% static 'landing/assets/images/logo/logo-collor.png' %}"
                                     data-logo-sticky="{% static 'landing/assets/images/logo/logo-collor.png' %}"
                                     alt="Vai Paquetá">
                             </a>
@@ -70,10 +239,6 @@
                                             aria-label="Ir para a seção de impacto">Impacto</a>
                                     </li>
                                     <li class="nav-item">
-                                        <a href="#precos" class="page-scroll"
-                                            aria-label="Ir para a seção de preços">Preços</a>
-                                    </li>
-                                    <li class="nav-item">
                                         <a href="#download-android" class="page-scroll"
                                             aria-label="Ir para a seção de download">Baixar Android</a>
                                     </li>
@@ -83,7 +248,7 @@
                                     </li>
                                 </ul>
                             </div> <!-- navbar collapse -->
-                            <div class="button add-list-button">
+                            <div class="button add-list-button d-none d-lg-flex">
                                 <a href="#download-android" class="btn me-2">Baixar para Android</a>
                                 <a href="{% url 'webapp' %}" class="btn">Abrir Web App</a>
                             </div>
@@ -108,6 +273,7 @@
                             próximo.</p>
                         <div class="button wow fadeInLeft" data-wow-delay=".8s">
                             <a href="#download-android" class="btn"><i class="lni lni-android"></i> Baixar para Android</a>
+                            <a href="{% url 'webapp' %}" class="btn btn-alt d-lg-none"><i class="lni lni-mobile"></i> Abrir Web App</a>
                             <a href="#features" class="btn btn-alt"><i class="lni lni-mobile"></i> Ver como funciona</a>
                         </div>
                     </div>
@@ -245,94 +411,8 @@
     </section>
     <!-- End Achievement Area -->
 
-    <!-- Start Pricing Table Area -->
-    <section id="precos" class="pricing-table section">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <div class="section-title">
-                        <h3 class="wow zoomIn" data-wow-delay=".2s">Preços</h3>
-                        <h2 class="wow fadeInUp" data-wow-delay=".4s">Uso gratuito para passageiros e eco-taxistas</h2>
-                        <p class="wow fadeInUp" data-wow-delay=".6s">O app não cobra tarifa pela corrida. O pagamento é
-                            combinado diretamente entre passageiro e eco-taxista. A plataforma se mantém com anúncios
-                            exibidos dentro do aplicativo.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-lg-4 col-md-6 col-12">
-                    <div class="single-table wow fadeInUp" data-wow-delay=".2s">
-                        <div class="table-head">
-                            <h4 class="title">Passageiros</h4>
-                            <p>Peça corridas sem pagar taxa ao app.</p>
-                            <div class="price">
-                                <h2 class="amount">R$0<span class="duration">/uso</span></h2>
-                            </div>
-                            <div class="button">
-                                <a href="#download-android" class="btn">Baixar e pedir</a>
-                            </div>
-                        </div>
-                        <div class="table-content">
-                            <h4 class="middle-title">Inclui</h4>
-                            <ul class="table-list">
-                                <li><i class="lni lni-checkmark-circle"></i> Chamadas com atalhos (Barcas, praça).</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Acompanhamento do status e mapa.</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Contato direto com o motorista.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6 col-12">
-                    <div class="single-table wow fadeInUp" data-wow-delay=".4s">
-                        <div class="table-head">
-                            <h4 class="title">Eco-taxistas</h4>
-                            <p>Receba corridas sem pagar comissão ao app.</p>
-                            <div class="price">
-                                <h2 class="amount">R$0<span class="duration">/corrida</span></h2>
-                            </div>
-                            <div class="button">
-                                <a href="#contato" class="btn">Cadastro</a>
-                            </div>
-                        </div>
-                        <div class="table-content">
-                            <h4 class="middle-title">Inclui</h4>
-                            <ul class="table-list">
-                                <li><i class="lni lni-checkmark-circle"></i> Chamadas organizadas por proximidade.</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Sem tarifas sobre o valor cobrado.</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Canal direto com passageiros.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-4 col-md-6 col-12">
-                    <div class="single-table wow fadeInUp" data-wow-delay=".6s">
-                        <div class="table-head">
-                            <h4 class="title">Anunciantes</h4>
-                            <p>Espaços de mídia que financiam a plataforma.</p>
-                            <div class="price">
-                                <h2 class="amount">R$ sob<span class="duration"> consulta</span></h2>
-                            </div>
-                            <div class="button">
-                                <a href="#contato" class="btn">Falar sobre mídia</a>
-                            </div>
-                        </div>
-                        <div class="table-content">
-                            <h4 class="middle-title">Inclui</h4>
-                            <ul class="table-list">
-                                <li><i class="lni lni-checkmark-circle"></i> Anúncios exibidos dentro do app.</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Formatos alinhados à mobilidade local.</li>
-                                <li><i class="lni lni-checkmark-circle"></i> Relatórios de alcance básico.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-    <!--/ End Pricing Table Area -->
-
     <!-- Start Download Area -->
-    <section id="download-android" class="section call-action">
+    <section id="download-android" class="section call-action call-action-light">
         <div class="container">
             <div class="row">
                 <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
@@ -363,7 +443,7 @@
                         <div class="single-footer f-about">
                             <div class="logo">
                                 <a href="#home">
-                                    <img src="{% static 'landing/assets/images/logo/logo.png' %}" alt="Vai Paquetá">
+                                    <img src="{% static 'landing/assets/images/logo/logo-collor.png' %}" alt="Vai Paquetá">
                                 </a>
                             </div>
                             <p>Vai Paquetá é um piloto de mobilidade que conecta passageiros e eco-taxistas na Ilha de
@@ -380,7 +460,6 @@
                                     <ul>
                                         <li><a href="#features">Como funciona</a></li>
                                         <li><a href="#impacto">Impacto esperado</a></li>
-                                        <li><a href="#precos">Preços</a></li>
                                         <li><a href="#download-android">Baixar Android</a></li>
                                     </ul>
                                 </div>
@@ -394,6 +473,7 @@
                                         <li><a href="#contato">Contato e dúvidas</a></li>
                                         <li><a href="#contato">Cadastro de eco-taxista</a></li>
                                         <li><a href="#contato">Parcerias locais</a></li>
+                                        <li><a href="/privacidade/">Política de Privacidade</a></li>
                                     </ul>
                                 </div>
                                 <!-- End Single Widget -->
