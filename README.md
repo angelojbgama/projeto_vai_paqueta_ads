@@ -28,6 +28,117 @@ Regras de produto atuais:
 - Mobile: Flutter (Android).
 - Infra: Nginx, Docker, Cloudflare Tunnel.
 
+## Diagramas (PlantUML)
+
+### Arquitetura geral (Flutter + Web + Django)
+```plantuml
+@startuml
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+
+actor "Passageiro" as Passenger
+actor "Eco-taxista" as Driver
+
+package "Clientes" {
+  [Flutter App] as Flutter
+  [Web App] as Web
+  [Landing] as Landing
+}
+
+package "Backend Django" {
+  [API REST] as API
+  [Templates + Static] as Static
+  [Auth (JWT em cookie)] as Auth
+}
+
+database "SQLite" as DB
+cloud "Cloudflare Tunnel" as Tunnel
+
+Passenger --> Flutter : solicita corrida\nlogin / cadastro
+Driver --> Flutter : ativa modo motorista\nenvia localizacao
+Passenger --> Web : web app
+Passenger --> Landing : site institucional
+
+Flutter --> API : /api/auth/*\n/api/corridas/*\n/api/pings/*
+Web --> API : /api/auth/*\n/api/corridas/*
+Landing --> Static : assets + templates
+
+API --> Auth : valida JWT
+API --> DB : ler/gravar corridas
+Static --> Landing : render HTML
+
+Tunnel --> API : expor backend
+Tunnel --> Static : expor landing/web
+@enduml
+```
+
+### Fluxo de autenticacao (Flutter)
+```plantuml
+@startuml
+actor Usuario
+participant "Flutter App" as Flutter
+participant "Django API" as API
+database "SQLite" as DB
+
+Usuario -> Flutter : login/cadastro
+Flutter -> API : POST /api/auth/login/ ou /api/auth/register/
+API -> DB : valida usuario / cria conta
+DB --> API : usuario
+API --> Flutter : access + refresh
+Flutter -> Flutter : salva tokens (secure storage)
+Flutter -> API : GET /api/auth/me/
+API --> Flutter : dados do perfil
+@enduml
+```
+
+### Fluxo de corrida (passageiro -> motorista)
+```plantuml
+@startuml
+actor Passageiro
+actor "Eco-taxista" as Driver
+participant "Flutter/Web App" as Client
+participant "Django API" as API
+database "SQLite" as DB
+
+Passageiro -> Client : informar origem/destino\nquantos lugares
+Client -> API : POST /api/corridas/solicitar/
+API -> DB : criar corrida
+DB --> API : corrida criada
+API --> Client : status "aguardando"
+
+Driver -> Client : abrir app motorista
+Client -> API : GET /api/corridas/para_motorista/{id}/
+API --> Client : corrida disponivel
+Driver -> Client : aceitar corrida
+Client -> API : POST /api/corridas/aceitar/
+API -> DB : atualizar status
+API --> Client : status "em andamento"
+Passageiro -> Client : acompanha no mapa
+@enduml
+```
+
+### Envio de localizacao (modo motorista)
+```plantuml
+@startuml
+actor "Eco-taxista" as Driver
+participant "Flutter App" as Flutter
+participant "Django API" as API
+database "SQLite" as DB
+
+Driver -> Flutter : ativa modo motorista
+loop a cada 10s
+  Flutter -> API : POST /api/pings/ (lat/lng/precisao)
+  API -> DB : salva localizacao
+  API --> Flutter : ok
+end
+Driver -> Flutter : desativa modo motorista
+@enduml
+```
+
+### Renderizar os diagramas
+- Use a extensao PlantUML no VS Code ou o site https://www.plantuml.com/plantuml
+- Copie o bloco `plantuml` e gere a imagem.
+
 ## Backend (Django)
 
 ### Requisitos
