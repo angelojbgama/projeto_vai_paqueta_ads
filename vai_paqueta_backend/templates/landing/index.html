@@ -249,6 +249,9 @@
                                             aria-label="Ir para a seção Como funciona">Como funciona</a>
                                     </li>
                                     <li class="nav-item">
+                                        <a href="{% url 'tutorial' %}" aria-label="Ir para o tutorial">Tutorial</a>
+                                    </li>
+                                    <li class="nav-item">
                                         <a href="#impacto" class="page-scroll"
                                             aria-label="Ir para a seção de impacto">Impacto</a>
                                     </li>
@@ -391,7 +394,7 @@
             <div class="row">
                 <div class="col-lg-10 offset-lg-1 col-md-12 col-12">
                     <div class="title">
-                        <h2>Impacto esperado para quem vive e visita Paquetá</h2>
+                        <h2>Impacto para quem vive e visita Paquetá</h2>
                         <p>O piloto busca diminuir o tempo de espera, dar previsibilidade de chegada às barcas e
                             fortalecer a atividade econômica dos eco-taxistas.</p>
                     </div>
@@ -399,22 +402,34 @@
             </div>
             <div class="row">
                 <div class="col-lg-8 offset-lg-2 col-md-12 col-12">
-                    <div class="row">
-                        <div class="col-lg-4 col-md-4 col-12">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-4 col-md-6 col-12">
                             <div class="single-achievement wow fadeInUp" data-wow-delay=".2s">
                                 <h3 class="counter"><span id="secondo1" class="countup" cup-end="5">5</span> min</h3>
-                                <p>meta de resposta nas chamadas prioritárias</p>
+                                <p>Meta de resposta nas corridas</p>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-4 col-12">
+                        <div class="col-lg-4 col-md-6 col-12">
                             <div class="single-achievement wow fadeInUp" data-wow-delay=".4s">
-                                <h3 class="counter"><span id="secondo2" class="countup" cup-end="20">20</span>+</h3>
+                                <h3 class="counter"><span id="secondo2" class="countup" cup-end="{{ ecotaxistas_count|default:'0' }}">{{ ecotaxistas_count|default:"0" }}</span></h3>
                                 <p>eco-taxistas convidados para o piloto</p>
                             </div>
                         </div>
-                        <div class="col-lg-4 col-md-4 col-12">
+                        <div class="col-lg-4 col-md-6 col-12">
                             <div class="single-achievement wow fadeInUp" data-wow-delay=".6s">
-                                <h3 class="counter"><span id="secondo3" class="countup" cup-end="3">3</span></h3>
+                                <h3 class="counter"><span id="secondo3" class="countup" cup-end="{{ passageiros_count|default:'0' }}">{{ passageiros_count|default:"0" }}</span></h3>
+                                <p>passageiros convidados para o piloto</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 col-12">
+                            <div class="single-achievement wow fadeInUp" data-wow-delay=".6s">
+                                <h3 class="counter"><span id="secondo4" class="countup" cup-end="{{ corridas_concluidas_count|default:'0' }}">{{ corridas_concluidas_count|default:"0" }}</span></h3>
+                                <p>corridas concluidas</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 col-12">
+                            <div class="single-achievement wow fadeInUp" data-wow-delay=".6s">
+                                <h3 class="counter"><span id="secondo5" class="countup" cup-end="3">3</span></h3>
                                 <p>atalhos rápidos (Barcas e pontos centrais)</p>
                             </div>
                         </div>
@@ -486,6 +501,7 @@
                                 <div class="single-footer f-link">
                                     <h3>Aplicativo</h3>
                                     <ul>
+                                        <li><a href="{% url 'tutorial' %}">Tutorial do app</a></li>
                                         <li><a href="#features">Como funciona</a></li>
                                         <li><a href="#impacto">Impacto esperado</a></li>
                                         <li><a href="#download-android">Baixar Android</a></li>

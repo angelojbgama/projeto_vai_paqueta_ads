@@ -1,0 +1,360 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="no-js" lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>Tutorial do App | Vai Paquetá</title>
+    <meta name="description" content="Tutorial do app Vai Paquetá com explicação das principais telas." />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" type="image/x-icon" href="{% static 'landing/assets/images/favicon.png' %}" />
+
+    <link rel="stylesheet" href="{% static 'landing/assets/css/bootstrap.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/LineIcons.2.0.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/animate.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/tiny-slider.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/glightbox.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'landing/assets/css/main.css' %}" />
+    <style>
+        .header.navbar-area {
+            position: relative;
+            background: #fff;
+            border-bottom: 1px solid #eef2f7;
+            padding: 4px 0;
+        }
+        .header .navbar {
+            min-height: 64px;
+        }
+        .header .navbar-brand img {
+            width: auto;
+            height: 64px;
+            max-height: 64px;
+        }
+        .tutorial-actions .btn {
+            border: 2px solid #388E3C;
+            color: #388E3C;
+            background: transparent;
+        }
+        .tutorial-actions .btn:hover {
+            background: #388E3C;
+            color: #fff;
+        }
+        .tutorial-hero {
+            padding: 72px 0 48px;
+            background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+        }
+        .tutorial-hero h1 {
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+        }
+        .tutorial-hero p {
+            color: #475569;
+            margin-bottom: 0;
+        }
+        .tutorial-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #1f5f2c;
+            background: rgba(56, 142, 60, 0.12);
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin-bottom: 14px;
+        }
+        .tutorial-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .tutorial-links a {
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-weight: 600;
+            color: #0c1a12;
+            transition: all 0.2s ease;
+        }
+        .tutorial-links a:hover {
+            border-color: #388E3C;
+            color: #fff;
+            background: #388E3C;
+        }
+        .tutorial-section {
+            padding: 48px 0;
+        }
+        .tutorial-section.alt {
+            background: #f8fafc;
+        }
+        .tutorial-section-title {
+            margin-bottom: 24px;
+        }
+        .tutorial-section-title h2 {
+            font-size: 1.7rem;
+            margin-bottom: 8px;
+        }
+        .tutorial-section-title p {
+            color: #475569;
+            margin: 0;
+        }
+        .tutorial-grid {
+            display: grid;
+            gap: 20px;
+        }
+        .tutorial-card {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+            padding: 24px;
+            display: grid;
+            grid-template-columns: minmax(0, 220px) 1fr;
+            gap: 24px;
+            align-items: center;
+        }
+        .tutorial-card img {
+            width: 100%;
+            height: auto;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+        }
+        .tutorial-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+        .tutorial-card p {
+            color: #475569;
+            margin: 0;
+        }
+        @media (max-width: 991px) {
+            .tutorial-card {
+                grid-template-columns: 1fr;
+            }
+            .tutorial-card img {
+                max-width: 260px;
+                margin: 0 auto;
+            }
+        }
+        @media (max-width: 767px) {
+            .header .navbar-brand img {
+                height: 56px;
+                max-height: 56px;
+            }
+            .tutorial-hero {
+                padding: 56px 0 36px;
+            }
+            .tutorial-hero h1 {
+                font-size: 1.8rem;
+            }
+            .tutorial-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .tutorial-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header navbar-area">
+        <div class="container">
+            <nav class="navbar">
+                <a class="navbar-brand" href="/">
+                    <img src="{% static 'landing/assets/images/logo/logo-collor.png' %}" alt="Vai Paquetá">
+                </a>
+                <div class="d-flex gap-2 tutorial-actions">
+                    <a class="btn" href="/">Voltar ao site</a>
+                    <a class="btn" href="{% url 'webapp' %}">Abrir web app</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <section class="tutorial-hero">
+        <div class="container">
+            <div class="tutorial-hero-content">
+                <span class="tutorial-eyebrow">Tutorial</span>
+                <h1>Como usar o Vai Paquetá</h1>
+                <p>Confira as principais telas do app e o que fazer em cada etapa.</p>
+                <div class="tutorial-links">
+                    <a href="#acesso">Primeiro acesso</a>
+                    <a href="#passageiro">Fluxo do passageiro</a>
+                    <a href="#ecotaxista">Fluxo do eco-taxista</a>
+                    <a href="#perfil">Perfil e ajustes</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="acesso" class="tutorial-section">
+        <div class="container">
+            <div class="tutorial-section-title">
+                <h2>Primeiro acesso</h2>
+                <p>Entre no app ou crie sua conta rapidamente.</p>
+            </div>
+            <div class="tutorial-grid">
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/login-portrait.png' %}" alt="Tela de login do app" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Login</h3>
+                        <p>Entre com seu e-mail e senha. Se ainda não tem conta, siga para o cadastro.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/registro-portrait.png' %}" alt="Tela de cadastro do app" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Cadastro</h3>
+                        <p>Crie sua conta, escolha o perfil (passageiro ou eco-taxista) e confirme seus dados.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="passageiro" class="tutorial-section alt">
+        <div class="container">
+            <div class="tutorial-section-title">
+                <h2>Fluxo do passageiro</h2>
+                <p>Solicite uma corrida e acompanhe o status pelo mapa.</p>
+            </div>
+            <div class="tutorial-grid">
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro-portrait.png' %}" alt="Tela principal do passageiro" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Solicitar corrida</h3>
+                        <p>Informe origem e destino, escolha um atalho se quiser e envie o pedido de eco-táxi.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro-navbar-portrait.png' %}" alt="Barra superior do passageiro com atalhos" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Atalhos da barra superior</h3>
+                        <p>Seta amarela: editar perfil. Seta vermelha: logout para sair da conta. Seta azul: trocar o tipo de usuário (passageiro ou eco-taxista).</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro_notificacaocorrida-portrait.png' %}" alt="Notificação de corrida para passageiro" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Notificações</h3>
+                        <p>Essa notificação sempre será exibida para o passageiro, reforçando que o app não tem meio de pagamento. O pagamento deve ser feito diretamente entre passageiro e eco-taxista.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro_corrida_EcoAceitou-portrait.png' %}" alt="Eco-taxista aceitou a corrida" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Eco-taxista aceitou</h3>
+                        <p>Veja quem aceitou, com nome e contato para alinhar detalhes pelo WhatsApp.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro_corrida_AguardandoIniciar-portrait.png' %}" alt="Corrida aguardando iniciar" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Aguardando iniciar</h3>
+                        <p>Depois do aceite, acompanhe a chegada do motorista até o início da corrida.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/passageiro_corrida_Em_Andamento-portrait.png' %}" alt="Corrida em andamento" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Em andamento</h3>
+                        <p>Siga o trajeto pelo mapa e acompanhe o status até o destino final.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="ecotaxista" class="tutorial-section">
+        <div class="container">
+            <div class="tutorial-section-title">
+                <h2>Fluxo do eco-taxista</h2>
+                <p>Receba a chamada, aceite e finalize a corrida.</p>
+            </div>
+            <div class="tutorial-grid">
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/ecotaxista-portrait.png' %}" alt="Tela principal do eco-taxista" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Chamadas disponíveis</h3>
+                        <p>Veja as solicitações chegando e mantenha seu status de disponibilidade atualizado.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/eco_corrida_aceitar-portrait.png' %}" alt="Eco-taxista aceitando corrida" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Aceitar corrida</h3>
+                        <p>Confira origem e destino e aceite quando estiver pronto para atender.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/eco_corrida_iniciar-portrait.png' %}" alt="Eco-taxista iniciando corrida" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Iniciar corrida</h3>
+                        <p>Quando o passageiro estiver a bordo, inicie a corrida para registrar o trajeto.</p>
+                    </div>
+                </article>
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/eco_corrida_finalizar-portrait.png' %}" alt="Eco-taxista finalizando corrida" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Finalizar corrida</h3>
+                        <p>Ao chegar ao destino, finalize para encerrar o atendimento.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section id="perfil" class="tutorial-section alt">
+        <div class="container">
+            <div class="tutorial-section-title">
+                <h2>Perfil e ajustes</h2>
+                <p>Mantenha seus dados atualizados para facilitar o contato.</p>
+            </div>
+            <div class="tutorial-grid">
+                <article class="tutorial-card">
+                    <div class="tutorial-media">
+                        <img src="{% static 'tutorial/editar-portrait.png' %}" alt="Tela de edição de perfil" loading="lazy" decoding="async">
+                    </div>
+                    <div>
+                        <h3>Editar perfil</h3>
+                        <p>Atualize nome, telefone e demais informações sempre que necessário.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <script src="{% static 'landing/assets/js/bootstrap.min.js' %}"></script>
+</body>
+
+</html>

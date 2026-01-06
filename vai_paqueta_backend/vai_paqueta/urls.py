@@ -3,7 +3,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from .auth_views import CookieTokenRefreshView, LoginView, LogoutView, MeView, RegisterView
-from .views import landing, privacy, webapp
+from .views import landing, privacy, tutorial, webapp
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -17,6 +17,7 @@ urlpatterns = [
     path("", landing, name="landing"),
     path("app/", webapp, name="webapp"),
     path("privacidade/", privacy, name="privacy"),
+    path("tutorial/", tutorial, name="tutorial"),
 ]
 
 if settings.DEBUG:
