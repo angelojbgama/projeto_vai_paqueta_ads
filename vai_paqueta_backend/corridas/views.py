@@ -232,7 +232,20 @@ class CorridaViewSet(viewsets.ModelViewSet):
             )
             corrida.status = "aguardando"
             corrida.motorista = None
-            corrida.save(update_fields=["status", "motorista", "atualizado_em", "motoristas_tentados"])
+            corrida.aceita_em = None
+            corrida.iniciada_em = None
+            corrida.concluida_em = None
+            corrida.save(
+                update_fields=[
+                    "status",
+                    "motorista",
+                    "atualizado_em",
+                    "motoristas_tentados",
+                    "aceita_em",
+                    "iniciada_em",
+                    "concluida_em",
+                ]
+            )
             self._atribuir_motorista_proximo(
                 corrida,
                 excluir_motorista_id=motorista_expirado_id,
@@ -286,10 +299,23 @@ class CorridaViewSet(viewsets.ModelViewSet):
         novo_motorista = candidatos[0][1]
         corrida.motorista = novo_motorista
         corrida.status = "aguardando"
+        corrida.aceita_em = None
+        corrida.iniciada_em = None
+        corrida.concluida_em = None
         tentativa_lista = set(corrida.motoristas_tentados or [])
         tentativa_lista.add(novo_motorista.id)
         corrida.motoristas_tentados = _limitar_motoristas_tentados(list(tentativa_lista))
-        corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
+        corrida.save(
+            update_fields=[
+                "motorista",
+                "status",
+                "atualizado_em",
+                "motoristas_tentados",
+                "aceita_em",
+                "iniciada_em",
+                "concluida_em",
+            ]
+        )
         return novo_motorista
 
     def _dist_motorista_origem_km(self, corrida: Corrida) -> float | None:
@@ -365,7 +391,13 @@ class CorridaViewSet(viewsets.ModelViewSet):
                 return Response({"detail": "Corrida já atribuída a outro motorista."}, status=status.HTTP_409_CONFLICT)
             corrida.status = "aceita"
             corrida.motorista = motorista
-            corrida.save(update_fields=["status", "motorista", "atualizado_em"])
+            agora = datetime.now(timezone.utc)
+            corrida.aceita_em = agora
+            corrida.iniciada_em = None
+            corrida.concluida_em = None
+            corrida.save(
+                update_fields=["status", "motorista", "atualizado_em", "aceita_em", "iniciada_em", "concluida_em"]
+            )
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="iniciar")
@@ -381,12 +413,15 @@ class CorridaViewSet(viewsets.ModelViewSet):
             if not corrida.motorista or corrida.motorista_id != motorista.id:
                 return Response({"detail": "Corrida não atribuída a este motorista."}, status=status.HTTP_403_FORBIDDEN)
             if corrida.status != "aceita":
-                return Response(
-                    {"detail": f"Corrida não pode ser iniciada no status {corrida.status}."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+                    return Response(
+                        {"detail": f"Corrida não pode ser iniciada no status {corrida.status}."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+            agora = datetime.now(timezone.utc)
             corrida.status = "em_andamento"
-            corrida.save(update_fields=["status", "atualizado_em"])
+            corrida.aceita_em = corrida.aceita_em or agora
+            corrida.iniciada_em = corrida.iniciada_em or agora
+            corrida.save(update_fields=["status", "atualizado_em", "aceita_em", "iniciada_em"])
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="finalizar")
@@ -424,9 +459,22 @@ class CorridaViewSet(viewsets.ModelViewSet):
                     )
             else:
                 return Response({"detail": "Perfil inválido para finalizar corrida."}, status=status.HTTP_403_FORBIDDEN)
+            agora = datetime.now(timezone.utc)
             corrida.status = "concluida"
             corrida.motoristas_tentados = []
-            corrida.save(update_fields=["status", "atualizado_em", "motoristas_tentados"])
+            corrida.aceita_em = corrida.aceita_em or corrida.criado_em or agora
+            corrida.iniciada_em = corrida.iniciada_em or corrida.aceita_em or agora
+            corrida.concluida_em = agora
+            corrida.save(
+                update_fields=[
+                    "status",
+                    "atualizado_em",
+                    "motoristas_tentados",
+                    "aceita_em",
+                    "iniciada_em",
+                    "concluida_em",
+                ]
+            )
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="cancelar")
@@ -481,11 +529,24 @@ class CorridaViewSet(viewsets.ModelViewSet):
         excluir_id = request.data.get("excluir_motorista_id")
         corrida.motorista = None
         corrida.status = "aguardando"
+        corrida.aceita_em = None
+        corrida.iniciada_em = None
+        corrida.concluida_em = None
         if excluir_id:
             corrida.motoristas_tentados = _limitar_motoristas_tentados(
                 (corrida.motoristas_tentados or []) + [int(excluir_id)]
             )
-        corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
+        corrida.save(
+            update_fields=[
+                "motorista",
+                "status",
+                "atualizado_em",
+                "motoristas_tentados",
+                "aceita_em",
+                "iniciada_em",
+                "concluida_em",
+            ]
+        )
         self._atribuir_motorista_proximo(
             corrida,
             excluir_motorista_id=int(excluir_id) if excluir_id else None,
@@ -508,10 +569,23 @@ class CorridaViewSet(viewsets.ModelViewSet):
 
         corrida.motorista = None
         corrida.status = "aguardando"
+        corrida.aceita_em = None
+        corrida.iniciada_em = None
+        corrida.concluida_em = None
         corrida.motoristas_tentados = _limitar_motoristas_tentados(
             (corrida.motoristas_tentados or []) + [motorista.id]
         )
-        corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
+        corrida.save(
+            update_fields=[
+                "motorista",
+                "status",
+                "atualizado_em",
+                "motoristas_tentados",
+                "aceita_em",
+                "iniciada_em",
+                "concluida_em",
+            ]
+        )
         self._atribuir_motorista_proximo(corrida, excluir_motorista_id=motorista.id, allow_reset=False)
         return Response(CorridaSerializer(corrida).data)
 
@@ -534,8 +608,35 @@ class CorridaViewSet(viewsets.ModelViewSet):
             corrida.motoristas_tentados = _limitar_motoristas_tentados(
                 (corrida.motoristas_tentados or []) + [corrida.motorista_id]
             )
+        agora = datetime.now(timezone.utc)
+        if novo_status == "aceita":
+            corrida.aceita_em = agora
+            corrida.iniciada_em = None
+            corrida.concluida_em = None
+        elif novo_status == "em_andamento":
+            corrida.aceita_em = corrida.aceita_em or agora
+            corrida.iniciada_em = corrida.iniciada_em or agora
+            corrida.concluida_em = None
+        elif novo_status == "concluida":
+            corrida.aceita_em = corrida.aceita_em or corrida.criado_em or agora
+            corrida.iniciada_em = corrida.iniciada_em or corrida.aceita_em or agora
+            corrida.concluida_em = agora
+        elif novo_status in ["aguardando", "rejeitada"]:
+            corrida.aceita_em = None
+            corrida.iniciada_em = None
+            corrida.concluida_em = None
         corrida.status = novo_status
-        corrida.save(update_fields=["status", "motorista", "atualizado_em", "motoristas_tentados"])
+        corrida.save(
+            update_fields=[
+                "status",
+                "motorista",
+                "atualizado_em",
+                "motoristas_tentados",
+                "aceita_em",
+                "iniciada_em",
+                "concluida_em",
+            ]
+        )
         return Response(CorridaSerializer(corrida).data)
 
     @action(

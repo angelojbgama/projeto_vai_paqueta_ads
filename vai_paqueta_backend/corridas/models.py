@@ -56,6 +56,9 @@ class Corrida(models.Model):
         on_delete=models.SET_NULL,
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="aguardando")
+    aceita_em = models.DateTimeField(null=True, blank=True)
+    iniciada_em = models.DateTimeField(null=True, blank=True)
+    concluida_em = models.DateTimeField(null=True, blank=True)
     lugares = models.PositiveSmallIntegerField(
         default=1,
         validators=[MinValueValidator(1), MaxValueValidator(2)],
