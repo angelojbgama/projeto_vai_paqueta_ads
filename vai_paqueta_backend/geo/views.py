@@ -218,6 +218,28 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return radius * c
 
 
+def _densify_road_points(points: list[tuple[float, float]], max_segment_m: float) -> list[tuple[float, float]]:
+    if max_segment_m <= 0 or len(points) < 2:
+        return points
+    densified: list[tuple[float, float]] = [points[0]]
+    for lat_next, lng_next in points[1:]:
+        lat_prev, lng_prev = densified[-1]
+        segment_dist = _haversine_m(lat_prev, lng_prev, lat_next, lng_next)
+        if segment_dist <= max_segment_m:
+            densified.append((lat_next, lng_next))
+            continue
+        steps = int(math.ceil(segment_dist / max_segment_m))
+        for step in range(1, steps + 1):
+            t = step / steps
+            densified.append(
+                (
+                    lat_prev + (lat_next - lat_prev) * t,
+                    lng_prev + (lng_next - lng_prev) * t,
+                )
+            )
+    return densified
+
+
 def _dedup_points(points: list[dict[str, float]]) -> list[dict[str, float]]:
     deduped: list[dict[str, float]] = []
     for point in points:
@@ -390,6 +412,7 @@ def _build_graph(roads: list[list[tuple[float, float]]], snap_decimals: int) -> 
     nodes: list[tuple[float, float]] = []
     node_index: dict[tuple[float, float], int] = {}
     edges: dict[int, list[tuple[int, float]]] = {}
+    densify_max = float(getattr(settings, "ROADS_DENSIFY_MAX_SEGMENT_M", 0.0))
 
     def get_node_id(lat: float, lng: float) -> int:
         key = (round(lat, snap_decimals), round(lng, snap_decimals))
@@ -401,8 +424,9 @@ def _build_graph(roads: list[list[tuple[float, float]]], snap_decimals: int) -> 
         return node_id
 
     for road in roads:
+        densified_road = _densify_road_points(road, densify_max) if densify_max > 0 else road
         prev_id: int | None = None
-        for lat, lng in road:
+        for lat, lng in densified_road:
             node_id = get_node_id(lat, lng)
             if prev_id is not None and prev_id != node_id:
                 lat1, lng1 = nodes[prev_id]

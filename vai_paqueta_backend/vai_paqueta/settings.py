@@ -137,3 +137,5 @@ ROADS_GEOJSON_PATH = os.environ.get("ROADS_GEOJSON_PATH", str(BASE_DIR / "geo" /
 ROADS_SNAP_DECIMALS = int(os.environ.get("ROADS_SNAP_DECIMALS", "5"))
 ROADS_CONNECT_RADIUS = float(os.environ.get("ROADS_CONNECT_RADIUS", "12.0"))
 ROADS_TRACE_DISTANCE = float(os.environ.get("ROADS_TRACE_DISTANCE", "25.0"))
+# Distância máxima entre vértices antes de gerar pontos extras na malha manual.
+ROADS_DENSIFY_MAX_SEGMENT_M = float(os.environ.get("ROADS_DENSIFY_MAX_SEGMENT_M", "15.0"))
