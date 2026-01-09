@@ -16,6 +16,7 @@ import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../services/driver_background_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/route_service.dart';
 import '../../widgets/message_banner.dart';
 import '../auth/auth_provider.dart';
 import 'driver_service.dart';
@@ -41,6 +42,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _alertaTiles = false;
   Timer? _pingTimer;
   Timer? _pollTimer;
+  final RouteService _routeService = RouteService();
+  List<LatLng> _rotaMotorista = [];
+  List<LatLng> _rotaCorrida = [];
+  String? _rotaMotoristaKey;
+  String? _rotaCorridaKey;
   bool _modalAberto = false;
   Map<String, dynamic>? _corridaAtual;
   bool _trocandoPerfil = false;
@@ -112,6 +118,66 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _tileMaxNativeZoom = null;
       _usandoFallbackRede = false;
     });
+  }
+
+  String _buildRouteKey(LatLng start, LatLng end) {
+    return '${start.latitude.toStringAsFixed(6)},${start.longitude.toStringAsFixed(6)}'
+        '|${end.latitude.toStringAsFixed(6)},${end.longitude.toStringAsFixed(6)}';
+  }
+
+  Future<List<LatLng>> _fetchRoute(LatLng start, LatLng end) async {
+    return _routeService.fetchRoute(start: start, end: end);
+  }
+
+  Future<void> _carregarRotaMotorista(LatLng start, LatLng end) async {
+    final key = _buildRouteKey(start, end);
+    if (_rotaMotoristaKey == key) return;
+    _rotaMotoristaKey = key;
+    final rota = await _fetchRoute(start, end);
+    if (!mounted) return;
+    setState(() => _rotaMotorista = rota);
+    _modalSetState?.call(() {});
+  }
+
+  Future<void> _carregarRotaCorrida(LatLng origem, LatLng destino) async {
+    final key = _buildRouteKey(origem, destino);
+    if (_rotaCorridaKey == key) return;
+    _rotaCorridaKey = key;
+    final rota = await _fetchRoute(origem, destino);
+    if (!mounted) return;
+    setState(() => _rotaCorrida = rota);
+    _modalSetState?.call(() {});
+  }
+
+  void _limparRotas() {
+    if (!mounted) return;
+    setState(() {
+      _rotaMotorista = [];
+      _rotaCorrida = [];
+      _rotaMotoristaKey = null;
+      _rotaCorridaKey = null;
+    });
+    _modalSetState?.call(() {});
+  }
+
+  void _atualizarRotas(Map<String, dynamic> corrida) {
+    final origem = _latLngFromMap(corrida, 'origem_lat', 'origem_lng');
+    final destino = _latLngFromMap(corrida, 'destino_lat', 'destino_lng');
+    if (origem != null && destino != null) {
+      _carregarRotaCorrida(origem, destino);
+    } else {
+      _rotaCorridaKey = null;
+      if (mounted) setState(() => _rotaCorrida = []);
+    }
+    final status = _normalizarStatus(corrida['status'] as String?);
+    final motorista = _posicao ?? _latLngFromMap(corrida, 'motorista_lat', 'motorista_lng');
+    final alvo = status == 'em_andamento' ? destino : origem;
+    if (motorista != null && alvo != null) {
+      _carregarRotaMotorista(motorista, alvo);
+    } else {
+      _rotaMotoristaKey = null;
+      if (mounted) setState(() => _rotaMotorista = []);
+    }
   }
 
   Future<Map<String, dynamic>?> _carregarManifesto() async {
@@ -297,6 +363,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _status = const AppMessage('Posição atualizada.', MessageTone.success);
       });
       await _avaliarTilesPara(_posicao);
+      if (_corridaAtual != null) {
+        _atualizarRotas(_corridaAtual!);
+      }
     }
   }
 
@@ -364,6 +433,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value);
     return null;
+  }
+
+  LatLng? _latLngFromMap(Map<String, dynamic> data, String latKey, String lngKey) {
+    final lat = _asDouble(data[latKey]);
+    final lng = _asDouble(data[lngKey]);
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
   }
 
   int? _asInt(dynamic value) {
@@ -461,6 +537,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       final corrida = await service.corridaAtribuida(perfilId);
       if (corrida != null && corrida.isNotEmpty) {
         _corridaAtual = corrida;
+        _atualizarRotas(corrida);
         if (_modalAberto) {
           _modalSetState?.call(() {});
         } else {
@@ -468,6 +545,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         }
       } else {
         _corridaAtual = null;
+        _limparRotas();
         if (_modalAberto && mounted) {
           Navigator.of(context, rootNavigator: true).pop();
           _modalAberto = false;
@@ -749,21 +827,21 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                                 ),
                                             ],
                                           ),
-                                          if (origem != null && motoristaPos != null)
+                                          if (_rotaMotorista.length >= 2)
                                             PolylineLayer(
                                               polylines: [
                                                 Polyline(
-                                                  points: [motoristaPos, origem],
+                                                  points: _rotaMotorista,
                                                   strokeWidth: 3,
                                                   color: Colors.orangeAccent,
                                                 ),
                                               ],
                                             ),
-                                          if (origem != null && destino != null)
+                                          if (_rotaCorrida.length >= 2)
                                             PolylineLayer(
                                               polylines: [
                                                 Polyline(
-                                                  points: [origem, destino],
+                                                  points: _rotaCorrida,
                                                   strokeWidth: 3,
                                                   color: Colors.blueAccent,
                                                 ),
@@ -869,11 +947,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
       if (nova != null) {
         _corridaAtual = nova;
+        _atualizarRotas(nova);
       }
       _modalSetState?.call(() {});
       if (!mounted) return;
       setState(() => _status = const AppMessage('Status da corrida atualizado.', MessageTone.info));
       if (acao == 'finalizar' || (nova != null && nova['status'] == 'concluida')) {
+        _limparRotas();
         if (_modalAberto) {
           Navigator.of(context, rootNavigator: true).pop();
           _modalAberto = false;
@@ -1035,6 +1115,26 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                 maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
                                 tileBounds: bounds,
                               ),
+                              if (_rotaMotorista.length >= 2)
+                                PolylineLayer(
+                                  polylines: [
+                                    Polyline(
+                                      points: _rotaMotorista,
+                                      strokeWidth: 3,
+                                      color: Colors.orangeAccent,
+                                    ),
+                                  ],
+                                ),
+                              if (_rotaCorrida.length >= 2)
+                                PolylineLayer(
+                                  polylines: [
+                                    Polyline(
+                                      points: _rotaCorrida,
+                                      strokeWidth: 3,
+                                      color: Colors.blueAccent,
+                                    ),
+                                  ],
+                                ),
                               MarkerLayer(
                                 markers: [
                                   Marker(

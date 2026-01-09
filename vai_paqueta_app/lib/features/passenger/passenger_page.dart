@@ -18,6 +18,7 @@ import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../widgets/message_banner.dart';
 import '../../services/geo_service.dart';
+import '../../services/route_service.dart';
 import '../rides/rides_service.dart';
 import '../auth/auth_provider.dart';
 
@@ -64,9 +65,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _posCarregada = false;
   int _lugaresSolicitados = 1;
   final GeoService _geo = GeoService();
+  final RouteService _routeService = RouteService();
   List<GeoResult> _sugestoesOrigem = [];
   List<GeoResult> _sugestoesDestino = [];
   final Distance _distance = const Distance();
+  String? _rotaKey;
+  String? _rotaMotoristaKey;
   List<_EnderecoOffline> _enderecosOffline = [];
   bool _enderecosCarregados = false;
   Timer? _debounceOrigem;
@@ -305,6 +309,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _destinoEnderecoCorrida = null;
     _rotaMotorista = [];
     _rota = [];
+    _rotaKey = null;
+    _rotaMotoristaKey = null;
     _lugaresSolicitados = 1;
     if (limparEnderecos) {
       _origemCtrl.clear();
@@ -439,6 +445,35 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _destinoLatLng ??
         LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     await _avaliarTilesPara(referencia);
+  }
+
+  String _buildRouteKey(LatLng start, LatLng end) {
+    return '${start.latitude.toStringAsFixed(6)},${start.longitude.toStringAsFixed(6)}'
+        '|${end.latitude.toStringAsFixed(6)},${end.longitude.toStringAsFixed(6)}';
+  }
+
+  Future<List<LatLng>> _fetchRoute(LatLng start, LatLng end) async {
+    return _routeService.fetchRoute(start: start, end: end);
+  }
+
+  Future<void> _carregarRotaCorrida(LatLng origem, LatLng destino) async {
+    final key = _buildRouteKey(origem, destino);
+    if (_rotaKey == key) return;
+    _rotaKey = key;
+    final rota = await _fetchRoute(origem, destino);
+    if (!mounted) return;
+    setState(() => _rota = rota);
+    _modalSetState?.call(() {});
+  }
+
+  Future<void> _carregarRotaMotorista(LatLng start, LatLng end) async {
+    final key = _buildRouteKey(start, end);
+    if (_rotaMotoristaKey == key) return;
+    _rotaMotoristaKey = key;
+    final rota = await _fetchRoute(start, end);
+    if (!mounted) return;
+    setState(() => _rotaMotorista = rota);
+    _modalSetState?.call(() {});
   }
 
   _TileSource _buildNetworkSource() {
@@ -662,7 +697,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           }
           if (current.motoristaLat != null && current.motoristaLng != null) {
             _motoristaLatLng = LatLng(current.motoristaLat!, current.motoristaLng!);
-            _atualizarRotaMotorista(current.status);
           }
           if (_origemCtrl.text.trim().isEmpty && current.origemEndereco != null && current.origemEndereco!.isNotEmpty) {
             _origemCtrl.text = current.origemEndereco!;
@@ -673,6 +707,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _lugaresSolicitados = current.lugares;
         });
         _sincronizarModalCorrida();
+        if (_origemLatLng != null && _destinoLatLng != null) {
+          _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
+        }
+        if (_motoristaLatLng != null) {
+          _atualizarRotaMotorista(current.status);
+        }
         _avaliarTilesPara(_origemLatLng ?? _destinoLatLng);
         _salvarCorridaLocal(current.id);
         _iniciarPollingCorrida();
@@ -744,7 +784,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         if (corrida.motoristaLat != null && corrida.motoristaLng != null) {
           _motoristaLatLng = LatLng(corrida.motoristaLat!, corrida.motoristaLng!);
-          _atualizarRotaMotorista(corrida.status);
         } else {
           _motoristaLatLng = null;
           _rotaMotorista = [];
@@ -761,6 +800,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _lugaresSolicitados = corrida.lugares;
       });
       _sincronizarModalCorrida();
+      if (_origemLatLng != null && _destinoLatLng != null) {
+        _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
+      }
+      if (_motoristaLatLng != null) {
+        _atualizarRotaMotorista(corrida.status);
+      }
       _gerenciarTimerCancelamento();
       _gerenciarTimerFinalizacao();
       return true;
@@ -1154,22 +1199,27 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
   }
 
-  void _atualizarRotaMotorista(String status) {
-    if (_motoristaLatLng == null) {
-      _rotaMotorista = [];
+  void _atualizarRotaMotorista(String? status) {
+    final motorista = _motoristaLatLng;
+    if (motorista == null) {
+      if (!mounted) return;
+      setState(() {
+        _rotaMotorista = [];
+        _rotaMotoristaKey = null;
+      });
       return;
     }
-    LatLng? alvo;
-    if (status == 'em_andamento') {
-      alvo = _destinoLatLng;
-    } else {
-      alvo = _origemLatLng;
-    }
+    final normalized = _normalizarStatus(status);
+    final alvo = normalized == 'em_andamento' ? _destinoLatLng : _origemLatLng;
     if (alvo == null) {
-      _rotaMotorista = [];
+      if (!mounted) return;
+      setState(() {
+        _rotaMotorista = [];
+        _rotaMotoristaKey = null;
+      });
       return;
     }
-    _rotaMotorista = [_motoristaLatLng!, alvo];
+    _carregarRotaMotorista(motorista, alvo);
   }
 
   Future<void> _salvarCorridaLocal(int? corridaId) async {
@@ -1417,8 +1467,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         return;
       }
 
-      final rota = _aStarRoute(_origemLatLng!, _destinoLatLng!);
-      setState(() => _rota = rota);
+      await _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
 
       final rides = RidesService();
       final corrida = await rides.solicitar(

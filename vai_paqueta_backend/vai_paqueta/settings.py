@@ -130,3 +130,10 @@ CORS_ALLOW_CREDENTIALS = os.environ.get("DJANGO_CORS_ALLOW_CREDENTIALS", "0").lo
     "true",
     "yes",
 )
+
+# Caminhos para os dados de vias desenhadas manualmente.
+ROADS_JSON_PATH = os.environ.get("ROADS_JSON_PATH", str(BASE_DIR / "geo" / "roads.json"))
+ROADS_GEOJSON_PATH = os.environ.get("ROADS_GEOJSON_PATH", str(BASE_DIR / "geo" / "roads.geojson"))
+ROADS_SNAP_DECIMALS = int(os.environ.get("ROADS_SNAP_DECIMALS", "5"))
+ROADS_CONNECT_RADIUS = float(os.environ.get("ROADS_CONNECT_RADIUS", "12.0"))
+ROADS_TRACE_DISTANCE = float(os.environ.get("ROADS_TRACE_DISTANCE", "25.0"))
