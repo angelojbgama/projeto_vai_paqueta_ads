@@ -1,0 +1,707 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Road Tracer</title>
+    <link rel="stylesheet" href="/static/leaflet/leaflet.css" />
+    <style>
+      :root {
+        --ink: #0b1220;
+        --muted: #475569;
+        --panel: #f8fafc;
+        --panel-2: #e2e8f0;
+        --accent: #f97316;
+        --accent-2: #0ea5e9;
+        --line: #cbd5e1;
+        --shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+        color: var(--ink);
+        background: radial-gradient(circle at 20% 20%, #fff7ed 0%, #f8fafc 45%, #e2e8f0 100%);
+        display: flex;
+      }
+      #sidebar {
+        width: 340px;
+        padding: 16px;
+        background: linear-gradient(160deg, rgba(248, 250, 252, 0.98), rgba(226, 232, 240, 0.92));
+        border-right: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        overflow: auto;
+        animation: slideIn 360ms ease-out;
+      }
+      #map {
+        flex: 1;
+      }
+      h1 {
+        font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+        font-size: 22px;
+        margin: 0 0 6px 0;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .status {
+        font-size: 12px;
+        padding: 8px 10px;
+        border: 1px dashed var(--line);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.7);
+        margin-bottom: 12px;
+      }
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      button {
+        border: 1px solid transparent;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-weight: 600;
+        cursor: pointer;
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+        border-color: var(--line);
+      }
+      button.primary {
+        background: linear-gradient(120deg, var(--accent), #fb923c);
+        color: #fff;
+      }
+      button.secondary {
+        background: linear-gradient(120deg, var(--accent-2), #38bdf8);
+        color: #fff;
+      }
+      .field {
+        margin-bottom: 10px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      input[type="color"] {
+        width: 100%;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0;
+        background: #fff;
+      }
+      .road-list {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 8px;
+        background: #fff;
+        margin-bottom: 12px;
+        max-height: 220px;
+        overflow: auto;
+      }
+      .road-item {
+        width: 100%;
+        border: 1px solid transparent;
+        background: #f8fafc;
+        border-radius: 10px;
+        padding: 6px 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .road-item.active {
+        border-color: var(--accent);
+        background: #fff7ed;
+      }
+      .road-item:last-child {
+        margin-bottom: 0;
+      }
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 1px solid #fff;
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.2);
+      }
+      .road-name {
+        flex: 1;
+        text-align: left;
+        font-weight: 600;
+      }
+      .road-count {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .export {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 120px;
+        resize: vertical;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+        background: #f8fafc;
+      }
+      .footer {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+      .point-marker {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        background: #fff;
+        border: 2px solid var(--ink);
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <aside id="sidebar">
+      <h1>Road Tracer</h1>
+      <div class="hint">
+        Clique no mapa para adicionar pontos. Duplo clique para parar de desenhar. Arraste pontos para ajustar.
+      </div>
+      <div class="status" id="status">Carregando configuracao...</div>
+      <div class="controls">
+        <button class="primary" id="btn-new">Nova via</button>
+        <button id="btn-draw">Desenhar</button>
+        <button id="btn-undo">Desfazer ponto</button>
+        <button id="btn-delete">Excluir via</button>
+      </div>
+      <div class="field">
+        <label for="road-name">Nome da via</label>
+        <input id="road-name" type="text" placeholder="Ex: Rua Principal" />
+      </div>
+      <div class="field">
+        <label for="road-color">Cor</label>
+        <input id="road-color" type="color" value="#f97316" />
+      </div>
+      <div class="road-list" id="road-list"></div>
+      <div class="export">
+        <button class="secondary" id="btn-export">Exportar JSON</button>
+        <button class="secondary" id="btn-export-geo">Exportar GeoJSON</button>
+        <button id="btn-save">Salvar no servidor</button>
+        <label>
+          <span style="display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px;">Importar</span>
+          <input id="file-input" type="file" accept=".json,.geojson" />
+        </label>
+      </div>
+      <textarea id="output" readonly placeholder="JSON exportado aparece aqui"></textarea>
+      <div class="footer" id="output-path"></div>
+    </aside>
+    <div id="map"></div>
+    <script src="/static/leaflet/leaflet.js"></script>
+    <script>
+      (() => {
+        const elements = {
+          status: document.getElementById("status"),
+          roadName: document.getElementById("road-name"),
+          roadColor: document.getElementById("road-color"),
+          roadList: document.getElementById("road-list"),
+          output: document.getElementById("output"),
+          outputPath: document.getElementById("output-path"),
+          btnNew: document.getElementById("btn-new"),
+          btnDraw: document.getElementById("btn-draw"),
+          btnUndo: document.getElementById("btn-undo"),
+          btnDelete: document.getElementById("btn-delete"),
+          btnExport: document.getElementById("btn-export"),
+          btnExportGeo: document.getElementById("btn-export-geo"),
+          btnSave: document.getElementById("btn-save"),
+          fileInput: document.getElementById("file-input"),
+        };
+
+        const palette = ["#f97316", "#0ea5e9", "#22c55e", "#e11d48", "#a855f7", "#14b8a6", "#f59e0b"];
+        const pointIcon = L.divIcon({
+          className: "point-marker",
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        });
+
+        const state = {
+          map: null,
+          roads: [],
+          currentId: null,
+          drawing: false,
+          nextId: 1,
+          paletteIndex: 0,
+          config: null,
+        };
+
+        function nextColor() {
+          const color = palette[state.paletteIndex % palette.length];
+          state.paletteIndex += 1;
+          return color;
+        }
+
+        function currentRoad() {
+          return state.roads.find((road) => road.id === state.currentId) || null;
+        }
+
+        function pointsToLatLngs(points) {
+          return points.map((point) => [point.lat, point.lng]);
+        }
+
+        function roundCoord(value) {
+          return Math.round(value * 1e6) / 1e6;
+        }
+
+        function updateStatus() {
+          const road = currentRoad();
+          if (!road) {
+            elements.status.textContent = "Nenhuma via selecionada.";
+            return;
+          }
+          const mode = state.drawing ? "desenhando" : "parado";
+          elements.status.textContent = `Via ${road.id}: ${road.name} | ${road.points.length} pontos | modo ${mode}`;
+        }
+
+        function updateDrawButton() {
+          elements.btnDraw.textContent = state.drawing ? "Parar" : "Desenhar";
+        }
+
+        function setCurrentRoad(id) {
+          const previous = currentRoad();
+          if (previous) {
+            previous.polyline.setStyle({ weight: 3, opacity: 0.7 });
+            hideMarkers(previous);
+          }
+          state.currentId = id;
+          const road = currentRoad();
+          if (road) {
+            road.polyline.setStyle({ weight: 4, opacity: 1 });
+            showMarkers(road);
+            elements.roadName.value = road.name;
+            elements.roadColor.value = road.color;
+          } else {
+            elements.roadName.value = "";
+            elements.roadColor.value = "#f97316";
+          }
+          renderRoadList();
+          updateStatus();
+        }
+
+        function updatePolyline(road) {
+          road.polyline.setLatLngs(pointsToLatLngs(road.points));
+        }
+
+        function rebuildMarkers(road) {
+          road.markers.forEach((marker) => state.map.removeLayer(marker));
+          road.markers = road.points.map((point, index) => {
+            const marker = L.marker([point.lat, point.lng], {
+              icon: pointIcon,
+              draggable: true,
+            });
+            marker.on("drag", (event) => {
+              const latlng = event.target.getLatLng();
+              road.points[index] = { lat: latlng.lat, lng: latlng.lng };
+              updatePolyline(road);
+              updateStatus();
+            });
+            marker.on("contextmenu", () => {
+              road.points.splice(index, 1);
+              updatePolyline(road);
+              showMarkers(road);
+              renderRoadList();
+              updateStatus();
+            });
+            return marker;
+          });
+        }
+
+        function showMarkers(road) {
+          rebuildMarkers(road);
+          road.markers.forEach((marker) => marker.addTo(state.map));
+        }
+
+        function hideMarkers(road) {
+          road.markers.forEach((marker) => state.map.removeLayer(marker));
+        }
+
+        function renderRoadList() {
+          elements.roadList.innerHTML = "";
+          if (!state.roads.length) {
+            const empty = document.createElement("div");
+            empty.textContent = "Nenhuma via criada ainda.";
+            empty.style.color = "var(--muted)";
+            empty.style.fontSize = "12px";
+            elements.roadList.appendChild(empty);
+            return;
+          }
+          state.roads.forEach((road) => {
+            const item = document.createElement("div");
+            item.className = "road-item" + (road.id === state.currentId ? " active" : "");
+            item.addEventListener("click", () => setCurrentRoad(road.id));
+
+            const swatch = document.createElement("span");
+            swatch.className = "swatch";
+            swatch.style.background = road.color;
+
+            const name = document.createElement("span");
+            name.className = "road-name";
+            name.textContent = road.name;
+
+            const count = document.createElement("span");
+            count.className = "road-count";
+            count.textContent = `${road.points.length} pts`;
+
+            item.appendChild(swatch);
+            item.appendChild(name);
+            item.appendChild(count);
+            elements.roadList.appendChild(item);
+          });
+        }
+
+        function createRoad(data = {}) {
+          const id = typeof data.id === "number" ? data.id : state.nextId;
+          state.nextId = Math.max(state.nextId, id + 1);
+          const road = {
+            id,
+            name: data.name || `Road ${id}`,
+            color: data.color || nextColor(),
+            points: Array.isArray(data.points)
+              ? data.points.map((point) => ({
+                  lat: Number(point.lat),
+                  lng: Number(point.lng),
+                }))
+              : [],
+            polyline: null,
+            markers: [],
+          };
+          road.polyline = L.polyline(pointsToLatLngs(road.points), {
+            color: road.color,
+            weight: 3,
+            opacity: 0.7,
+          }).addTo(state.map);
+          road.polyline.on("click", () => setCurrentRoad(road.id));
+          state.roads.push(road);
+          return road;
+        }
+
+        function addPoint(latlng) {
+          const road = currentRoad();
+          if (!road) {
+            return;
+          }
+          road.points.push({ lat: latlng.lat, lng: latlng.lng });
+          updatePolyline(road);
+          showMarkers(road);
+          renderRoadList();
+          updateStatus();
+        }
+
+        function buildPayload() {
+          return {
+            metadata: {
+              version: 1,
+              generated_at: new Date().toISOString(),
+              tile_url: state.config.tileUrl,
+              bounds: state.config.bounds,
+            },
+            roads: state.roads.map((road) => ({
+              id: road.id,
+              name: road.name,
+              color: road.color,
+              points: road.points.map((point) => ({
+                lat: roundCoord(point.lat),
+                lng: roundCoord(point.lng),
+              })),
+            })),
+          };
+        }
+
+        function buildGeoJSON() {
+          return {
+            type: "FeatureCollection",
+            features: state.roads.map((road) => ({
+              type: "Feature",
+              properties: {
+                id: road.id,
+                name: road.name,
+                color: road.color,
+              },
+              geometry: {
+                type: "LineString",
+                coordinates: road.points.map((point) => [roundCoord(point.lng), roundCoord(point.lat)]),
+              },
+            })),
+          };
+        }
+
+        function downloadFile(name, data) {
+          const blob = new Blob([data], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = name;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }
+
+        function replaceRoads(roads) {
+          state.roads.forEach((road) => {
+            state.map.removeLayer(road.polyline);
+            hideMarkers(road);
+          });
+          state.roads = [];
+          state.currentId = null;
+          roads.forEach((road) => createRoad(road));
+          if (state.roads.length) {
+            setCurrentRoad(state.roads[0].id);
+          } else {
+            renderRoadList();
+            updateStatus();
+          }
+        }
+
+        function loadFromData(data) {
+          if (!data) {
+            return;
+          }
+          if (Array.isArray(data.roads)) {
+            replaceRoads(data.roads);
+            return;
+          }
+          if (data.type === "FeatureCollection" && Array.isArray(data.features)) {
+            const roads = data.features
+              .filter((feature) => feature.geometry && feature.geometry.type === "LineString")
+              .map((feature) => ({
+                name: feature.properties && feature.properties.name ? feature.properties.name : "Road",
+                color: feature.properties && feature.properties.color ? feature.properties.color : nextColor(),
+                points: (feature.geometry.coordinates || []).map((coord) => ({
+                  lng: Number(coord[0]),
+                  lat: Number(coord[1]),
+                })),
+              }));
+            replaceRoads(roads);
+          }
+        }
+
+        async function saveToServer() {
+          const payload = buildPayload();
+          const res = await fetch("/road-tracer-save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload, null, 2),
+          });
+          if (!res.ok) {
+            elements.status.textContent = "Falha ao salvar no servidor.";
+            return;
+          }
+          const data = await res.json();
+          elements.status.textContent = data.message || "Salvo com sucesso.";
+        }
+
+        function initControls() {
+          elements.btnNew.addEventListener("click", () => {
+            const road = createRoad();
+            setCurrentRoad(road.id);
+            state.drawing = true;
+            updateDrawButton();
+            updateStatus();
+          });
+          elements.btnDraw.addEventListener("click", () => {
+            state.drawing = !state.drawing;
+            updateDrawButton();
+            updateStatus();
+          });
+          elements.btnUndo.addEventListener("click", () => {
+            const road = currentRoad();
+            if (!road || !road.points.length) {
+              return;
+            }
+            road.points.pop();
+            updatePolyline(road);
+            showMarkers(road);
+            renderRoadList();
+            updateStatus();
+          });
+          elements.btnDelete.addEventListener("click", () => {
+            const road = currentRoad();
+            if (!road) {
+              return;
+            }
+            if (!confirm("Remove current road?")) {
+              return;
+            }
+            state.map.removeLayer(road.polyline);
+            hideMarkers(road);
+            state.roads = state.roads.filter((item) => item.id !== road.id);
+            if (state.roads.length) {
+              setCurrentRoad(state.roads[0].id);
+            } else {
+              state.currentId = null;
+              renderRoadList();
+              updateStatus();
+            }
+          });
+          elements.btnExport.addEventListener("click", () => {
+            const payload = buildPayload();
+            const text = JSON.stringify(payload, null, 2);
+            elements.output.value = text;
+            downloadFile("roads.json", text);
+          });
+          elements.btnExportGeo.addEventListener("click", () => {
+            const payload = buildGeoJSON();
+            const text = JSON.stringify(payload, null, 2);
+            elements.output.value = text;
+            downloadFile("roads.geojson", text);
+          });
+          elements.btnSave.addEventListener("click", () => {
+            saveToServer().catch(() => {
+              elements.status.textContent = "Falha ao salvar no servidor.";
+            });
+          });
+          elements.fileInput.addEventListener("change", (event) => {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              try {
+                const data = JSON.parse(reader.result);
+                if (state.roads.length && !confirm("Replace existing roads?")) {
+                  return;
+                }
+                loadFromData(data);
+              } catch (err) {
+                elements.status.textContent = "Nao foi possivel carregar o arquivo.";
+              }
+            };
+            reader.readAsText(file);
+          });
+          elements.roadName.addEventListener("input", () => {
+            const road = currentRoad();
+            if (!road) {
+              return;
+            }
+            road.name = elements.roadName.value || `Road ${road.id}`;
+            renderRoadList();
+            updateStatus();
+          });
+          elements.roadColor.addEventListener("input", () => {
+            const road = currentRoad();
+            if (!road) {
+              return;
+            }
+            road.color = elements.roadColor.value;
+            road.polyline.setStyle({ color: road.color });
+            renderRoadList();
+          });
+        }
+
+        async function init() {
+          const response = await fetch("/road-tracer-config");
+          if (!response.ok) {
+            elements.status.textContent = "Falha ao carregar configuracao.";
+            return;
+          }
+          const config = await response.json();
+          state.config = config;
+          elements.outputPath.textContent = config.outputPath ? `Arquivo: ${config.outputPath}` : "";
+
+          const bounds = config.bounds
+            ? L.latLngBounds(
+                [config.bounds.south, config.bounds.west],
+                [config.bounds.north, config.bounds.east]
+              )
+            : null;
+          const center = config.center ? [config.center.lat, config.center.lng] : [0, 0];
+          state.map = L.map("map", { zoomControl: true, doubleClickZoom: false });
+          if (bounds) {
+            state.map.setMaxBounds(bounds.pad(0.05));
+            state.map.setView(center, config.defaultZoom || config.maxZoom || 16);
+          } else {
+            state.map.setView(center, config.defaultZoom || 16);
+          }
+          if (config.minZoom !== null && config.minZoom !== undefined) {
+            state.map.setMinZoom(config.minZoom);
+          }
+          if (config.maxZoom !== null && config.maxZoom !== undefined) {
+            state.map.setMaxZoom(config.maxZoom);
+          }
+
+          const layer = L.tileLayer(config.tileUrl, {
+            minZoom: config.minZoom || 0,
+            maxZoom: config.maxZoom || 19,
+            attribution: "Local tiles",
+            noWrap: true,
+          });
+          layer.addTo(state.map);
+
+          state.map.on("click", (event) => {
+            if (!state.drawing) {
+              return;
+            }
+            addPoint(event.latlng);
+          });
+          state.map.on("dblclick", () => {
+            state.drawing = false;
+            updateDrawButton();
+            updateStatus();
+          });
+
+          initControls();
+          updateDrawButton();
+          renderRoadList();
+          updateStatus();
+
+          if (config.existing) {
+            loadFromData(config.existing);
+          }
+        }
+
+        init().catch(() => {
+          elements.status.textContent = "Erro ao iniciar.";
+        });
+      })();
+    </script>
+  </body>
+</html>
