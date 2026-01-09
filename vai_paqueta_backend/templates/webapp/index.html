@@ -751,6 +751,21 @@
       cancelUnlockTimer: null,
       finalizeUnlockTimer: null,
       serverOffsetMs: 0,
+      routeLayers: {
+        main: { ride: null, driver: null },
+        rideModal: { ride: null, driver: null },
+        driverModal: { ride: null, driver: null },
+      },
+      routeKeys: {
+        main: { ride: null, driver: null },
+        rideModal: { ride: null, driver: null },
+        driverModal: { ride: null, driver: null },
+      },
+      routeRequests: {
+        main: { ride: 0, driver: 0 },
+        rideModal: { ride: 0, driver: 0 },
+        driverModal: { ride: 0, driver: 0 },
+      },
     };
     let refreshPromise = null;
     const ADDRESSES_URL = "{% static 'landing/data/addresses.json' %}";
@@ -2120,6 +2135,9 @@
         tryNextProvider(state.rideModalMap);
       }
       const map = state.rideModalMap;
+      let origem = null;
+      let destino = null;
+      let motorista = null;
       ['origem', 'destino', 'motorista'].forEach((k) => {
         if (state.rideModalMarkers[k]) {
           map.removeLayer(state.rideModalMarkers[k]);
@@ -2128,20 +2146,25 @@
       });
       const points = [];
       if (corrida.origem_lat && corrida.origem_lng) {
-        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(map);
+        origem = [Number(corrida.origem_lat), Number(corrida.origem_lng)];
+        const marker = L.marker(origem, { title: 'Origem' }).addTo(map);
         state.rideModalMarkers.origem = marker;
-        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+        points.push(origem);
       }
       if (corrida.destino_lat && corrida.destino_lng) {
-        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(map);
+        destino = [Number(corrida.destino_lat), Number(corrida.destino_lng)];
+        const marker = L.marker(destino, { title: 'Destino' }).addTo(map);
         state.rideModalMarkers.destino = marker;
-        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+        points.push(destino);
       }
       if (corrida.motorista_lat && corrida.motorista_lng) {
-        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista' }).addTo(map);
+        motorista = [Number(corrida.motorista_lat), Number(corrida.motorista_lng)];
+        const marker = L.marker(motorista, { title: 'Motorista' }).addTo(map);
         state.rideModalMarkers.motorista = marker;
-        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+        points.push(motorista);
       }
+      ensureRoute(map, 'rideModal', 'ride', origem, destino);
+      ensureRoute(map, 'rideModal', 'driver', motorista, origem);
       if (points.length) {
         const bounds = L.latLngBounds(points);
         map.fitBounds(bounds.pad(0.3));
@@ -2236,6 +2259,9 @@
         tryNextProvider(state.driverModalMap);
       }
       const map = state.driverModalMap;
+      let origem = null;
+      let destino = null;
+      let motorista = null;
       ['origem', 'destino', 'motorista'].forEach((k) => {
         if (state.driverModalMarkers[k]) {
           map.removeLayer(state.driverModalMarkers[k]);
@@ -2244,20 +2270,25 @@
       });
       const points = [];
       if (corrida.origem_lat && corrida.origem_lng) {
-        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(map);
+        origem = [Number(corrida.origem_lat), Number(corrida.origem_lng)];
+        const marker = L.marker(origem, { title: 'Origem' }).addTo(map);
         state.driverModalMarkers.origem = marker;
-        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+        points.push(origem);
       }
       if (corrida.destino_lat && corrida.destino_lng) {
-        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(map);
+        destino = [Number(corrida.destino_lat), Number(corrida.destino_lng)];
+        const marker = L.marker(destino, { title: 'Destino' }).addTo(map);
         state.driverModalMarkers.destino = marker;
-        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+        points.push(destino);
       }
       if (corrida.motorista_lat && corrida.motorista_lng) {
-        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], { title: 'Motorista' }).addTo(map);
+        motorista = [Number(corrida.motorista_lat), Number(corrida.motorista_lng)];
+        const marker = L.marker(motorista, { title: 'Motorista' }).addTo(map);
         state.driverModalMarkers.motorista = marker;
-        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+        points.push(motorista);
       }
+      ensureRoute(map, 'driverModal', 'ride', origem, destino);
+      ensureRoute(map, 'driverModal', 'driver', motorista, origem);
       if (points.length) {
         const bounds = L.latLngBounds(points);
         map.fitBounds(bounds.pad(0.3));
@@ -2286,6 +2317,170 @@
     });
 
     // Map
+    const ROUTE_COLORS = {
+      ride: '#0ea5e9',
+      driver: '#f97316',
+    };
+    const ROUTE_MESH_TRIM_THRESHOLD_M = 10;
+
+    function buildRouteKey(start, end) {
+      if (!start || !end) return null;
+      const fmt = (value) => Number(value).toFixed(6);
+      return `${fmt(start[0])},${fmt(start[1])}|${fmt(end[0])},${fmt(end[1])}`;
+    }
+
+    function parseRoutePoints(data) {
+      const raw = Array.isArray(data && data.route) ? data.route : [];
+      return raw
+        .map((point) => {
+          if (Array.isArray(point) && point.length >= 2) {
+            const lat = Number(point[0]);
+            const lng = Number(point[1]);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+            return [lat, lng];
+          }
+          if (point && typeof point === 'object') {
+            const lat = Number(point.lat);
+            const lng = Number(point.lng);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+            return [lat, lng];
+          }
+          return null;
+        })
+        .filter(Boolean);
+    }
+
+    function parseRouteSnap(value) {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : null;
+    }
+
+    async function fetchRoutePoints(start, end) {
+      const params = new URLSearchParams({
+        start_lat: start[0],
+        start_lng: start[1],
+        end_lat: end[0],
+        end_lng: end[1],
+      });
+      const res = await fetch(`/api/geo/route/?${params.toString()}`, { credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.detail || res.statusText);
+        err.status = res.status;
+        throw err;
+      }
+      return {
+        points: parseRoutePoints(data),
+        closestStart: data.closest_road_start,
+        closestEnd: data.closest_road_end,
+        source: data.source,
+        snapStart: parseRouteSnap(data.snap_start_m),
+        snapEnd: parseRouteSnap(data.snap_end_m),
+      };
+    }
+
+    function convertClosestRoad(entry) {
+      if (!entry || !Array.isArray(entry.points)) return null;
+      const values = entry.points
+        .map((pt) => {
+          if (!pt || typeof pt !== 'object') return null;
+          const lat = Number(pt.lat);
+          const lng = Number(pt.lng);
+          if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+          return [lat, lng];
+        })
+        .filter(Boolean);
+      return values.length >= 2 ? values : null;
+    }
+
+    function trimRouteToMesh(points, snapStart, snapEnd) {
+      if (!Array.isArray(points) || points.length < 2) {
+        return points;
+      }
+      const trimmed = points.slice();
+      const startSnap = typeof snapStart === 'number' ? snapStart : 0;
+      const endSnap = typeof snapEnd === 'number' ? snapEnd : 0;
+      if (startSnap >= ROUTE_MESH_TRIM_THRESHOLD_M && trimmed.length > 1) {
+        trimmed.shift();
+      }
+      if (endSnap >= ROUTE_MESH_TRIM_THRESHOLD_M && trimmed.length > 1) {
+        trimmed.pop();
+      }
+      return trimmed.length >= 2 ? trimmed : points;
+    }
+
+    function chooseRoutePoints(result, start, end) {
+      if (Array.isArray(result.points) && result.points.length >= 2) {
+        const trimmed = trimRouteToMesh(result.points, result.snapStart, result.snapEnd);
+        if (trimmed.length >= 2) {
+          return trimmed;
+        }
+        return result.points;
+      }
+      const fallback =
+        convertClosestRoad(result.closestStart) || convertClosestRoad(result.closestEnd);
+      if (fallback) {
+        return fallback;
+      }
+      const base = [];
+      if (start) base.push(start);
+      if (end) base.push(end);
+      return base;
+    }
+
+    function clearRouteLayer(map, layerKey, routeKey) {
+      if (!map) return;
+      const existing = state.routeLayers[layerKey][routeKey];
+      if (existing) {
+        map.removeLayer(existing);
+      }
+      state.routeLayers[layerKey][routeKey] = null;
+      state.routeKeys[layerKey][routeKey] = null;
+    }
+
+    function applyRouteLayer(map, layerKey, routeKey, points) {
+      if (!map) return;
+      const existing = state.routeLayers[layerKey][routeKey];
+      if (existing) {
+        map.removeLayer(existing);
+      }
+      if (!Array.isArray(points) || points.length < 2) {
+        state.routeLayers[layerKey][routeKey] = null;
+        return;
+      }
+      const polyline = L.polyline(points, {
+        color: ROUTE_COLORS[routeKey] || ROUTE_COLORS.ride,
+        weight: 4,
+        opacity: 0.85,
+        lineJoin: 'round',
+        lineCap: 'round',
+      });
+      polyline.addTo(map);
+      state.routeLayers[layerKey][routeKey] = polyline;
+    }
+
+    async function ensureRoute(map, layerKey, routeKey, start, end) {
+      if (!map || !hasLeaflet()) return;
+      if (!start || !end) {
+        clearRouteLayer(map, layerKey, routeKey);
+        return;
+      }
+      const key = buildRouteKey(start, end);
+      if (state.routeKeys[layerKey][routeKey] === key) return;
+      state.routeKeys[layerKey][routeKey] = key;
+      const requestId = ++state.routeRequests[layerKey][routeKey];
+      try {
+        const result = await fetchRoutePoints(start, end);
+        if (state.routeRequests[layerKey][routeKey] !== requestId) return;
+        const displayPoints = chooseRoutePoints(result, start, end);
+        applyRouteLayer(map, layerKey, routeKey, displayPoints);
+      } catch (e) {
+        console.warn('Falha ao calcular rota', e);
+        if (state.routeRequests[layerKey][routeKey] !== requestId) return;
+        applyRouteLayer(map, layerKey, routeKey, [start, end]);
+      }
+    }
+
     function hasLeaflet() {
       if (typeof L === 'undefined') {
         console.warn('Leaflet não carregou (sem rede?). Mapa desativado.');
@@ -2364,23 +2559,31 @@
       if (!corrida) {
         const statusEl = document.getElementById('map-status');
         if (statusEl) statusEl.textContent = 'Origem/destino serão exibidos aqui.';
+        clearRouteLayer(state.map, 'main', 'ride');
+        clearRouteLayer(state.map, 'main', 'driver');
         return;
       }
       const points = [];
+      let origem = null;
+      let destino = null;
+      let motorista = null;
       if (corrida.origem_lat && corrida.origem_lng) {
-        const marker = L.marker([Number(corrida.origem_lat), Number(corrida.origem_lng)], { title: 'Origem' }).addTo(state.map);
+        origem = [Number(corrida.origem_lat), Number(corrida.origem_lng)];
+        const marker = L.marker(origem, { title: 'Origem' }).addTo(state.map);
         marker.bindPopup('Origem');
         state.markers.origem = marker;
-        points.push([Number(corrida.origem_lat), Number(corrida.origem_lng)]);
+        points.push(origem);
       }
       if (corrida.destino_lat && corrida.destino_lng) {
-        const marker = L.marker([Number(corrida.destino_lat), Number(corrida.destino_lng)], { title: 'Destino' }).addTo(state.map);
+        destino = [Number(corrida.destino_lat), Number(corrida.destino_lng)];
+        const marker = L.marker(destino, { title: 'Destino' }).addTo(state.map);
         marker.bindPopup('Destino');
         state.markers.destino = marker;
-        points.push([Number(corrida.destino_lat), Number(corrida.destino_lng)]);
+        points.push(destino);
       }
       if (corrida.motorista_lat && corrida.motorista_lng) {
-        const marker = L.marker([Number(corrida.motorista_lat), Number(corrida.motorista_lng)], {
+        motorista = [Number(corrida.motorista_lat), Number(corrida.motorista_lng)];
+        const marker = L.marker(motorista, {
           title: 'Motorista',
           icon: L.icon({
             iconUrl: "{% static 'leaflet/images/marker-icon.png' %}",
@@ -2389,8 +2592,10 @@
         }).addTo(state.map);
         marker.bindPopup('Motorista');
         state.markers.motorista = marker;
-        points.push([Number(corrida.motorista_lat), Number(corrida.motorista_lng)]);
+        points.push(motorista);
       }
+      ensureRoute(state.map, 'main', 'ride', origem, destino);
+      ensureRoute(state.map, 'main', 'driver', motorista, origem);
       if (points.length) {
         const bounds = L.latLngBounds(points);
         state.map.fitBounds(bounds.pad(0.3));
