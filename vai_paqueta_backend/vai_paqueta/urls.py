@@ -6,7 +6,7 @@ from .auth_views import CookieTokenRefreshView, LoginView, LogoutView, MeView, R
 from .views import (
     landing,
     privacy,
-    tutorial,
+    relatorio_lab, relatorio_lab_svg, tutorial,
     webapp,
     webapp_manifest,
     webapp_service_worker,
@@ -27,6 +27,8 @@ urlpatterns = [
     path("app/sw.js", webapp_service_worker, name="webapp_sw"),
     path("privacidade/", privacy, name="privacy"),
     path("tutorial/", tutorial, name="tutorial"),
+    path("relatorio/lab/", relatorio_lab, name="relatorio_lab"),
+    path("relatorio/lab/svg", relatorio_lab_svg, name="relatorio_lab_svg"),
 ]
 
 if settings.DEBUG:

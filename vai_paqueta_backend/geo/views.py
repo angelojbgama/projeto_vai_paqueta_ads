@@ -474,13 +474,13 @@ def _load_road_graph() -> tuple[RoadGraph | None, list[dict[str, object]] | None
     ]
     path, data, error = _load_json_from_candidates(candidates)
     if error is not None:
-        return None, f"Erro ao ler {path}: {error}"
+        return None, None, f"Erro ao ler {path}: {error}"
     if data is None or path is None:
-        return None, "Arquivo de vias nao encontrado."
+        return None, None, "Arquivo de vias nao encontrado."
     try:
         mtime = path.stat().st_mtime
     except OSError:
-        return None, "Falha ao ler arquivo de vias."
+        return None, None, "Falha ao ler arquivo de vias."
 
     with _ROAD_GRAPH_LOCK:
         if _ROAD_GRAPH_CACHE["path"] == path and _ROAD_GRAPH_CACHE["mtime"] == mtime:
@@ -544,6 +544,53 @@ class RoadsGeoJSONView(APIView):
         return Response(data)
 
 
+def calculate_route_payload(start_lat: float, start_lng: float, end_lat: float, end_lng: float) -> dict[str, object]:
+    """
+    Shared helper that mirrors RouteView, returning the same payload so the SVG renderer
+    can reuse the path trimming logic from the frontend.
+    """
+    fallback = [
+        {"lat": _round6(start_lat), "lng": _round6(start_lng)},
+        {"lat": _round6(end_lat), "lng": _round6(end_lng)},
+    ]
+    graph, roads, info = _load_road_graph()
+    if graph is None:
+        return {"source": "fallback", "route": fallback, "detail": info}
+
+    start_id, start_dist = graph.nearest_node(start_lat, start_lng)
+    end_id, end_dist = graph.nearest_node(end_lat, end_lng)
+    if start_id is None or end_id is None:
+        return {"source": "fallback", "route": fallback, "detail": "Vias insuficientes."}
+
+    path, distance = graph.shortest_path(start_id, end_id)
+    if not path:
+        return {"source": "fallback", "route": fallback, "detail": "Sem caminho encontrado."}
+
+    route = [{"lat": _round6(start_lat), "lng": _round6(start_lng)}]
+    for node_id in path:
+        lat, lng = graph.nodes[node_id]
+        route.append({"lat": _round6(lat), "lng": _round6(lng)})
+    route.append({"lat": _round6(end_lat), "lng": _round6(end_lng)})
+    route = _dedup_points(route)
+    payload: dict[str, object] = {
+        "source": "roads",
+        "route": route,
+        "distance_m": round(distance, 2),
+        "snap_start_m": None if start_dist is None else round(start_dist, 2),
+        "snap_end_m": None if end_dist is None else round(end_dist, 2),
+    }
+    trace_distance = float(getattr(settings, "ROADS_TRACE_DISTANCE", 30.0))
+    if roads and (start_dist is None or start_dist > trace_distance):
+        start_road = _find_nearest_road_entry(roads, start_lat, start_lng)
+        if start_road:
+            payload["closest_road_start"] = start_road
+    if roads and (end_dist is None or end_dist > trace_distance):
+        end_road = _find_nearest_road_entry(roads, end_lat, end_lng)
+        if end_road:
+            payload["closest_road_end"] = end_road
+    return payload
+
+
 class RouteView(APIView):
     """
     Calcula a rota mais curta entre dois pontos usando as vias desenhadas.
@@ -564,51 +611,5 @@ class RouteView(APIView):
         if start_lat is None or start_lng is None or end_lat is None or end_lng is None:
             return Response({"detail": "Parâmetros start_lat, start_lng, end_lat e end_lng são obrigatórios."}, status=400)
 
-        graph, roads, info = _load_road_graph()
-        if graph is None:
-            fallback = [
-                {"lat": _round6(start_lat), "lng": _round6(start_lng)},
-                {"lat": _round6(end_lat), "lng": _round6(end_lng)},
-            ]
-            return Response({"source": "fallback", "route": fallback, "detail": info}, status=200)
-
-        start_id, start_dist = graph.nearest_node(start_lat, start_lng)
-        end_id, end_dist = graph.nearest_node(end_lat, end_lng)
-        if start_id is None or end_id is None:
-            fallback = [
-                {"lat": _round6(start_lat), "lng": _round6(start_lng)},
-                {"lat": _round6(end_lat), "lng": _round6(end_lng)},
-            ]
-            return Response({"source": "fallback", "route": fallback, "detail": "Vias insuficientes."}, status=200)
-
-        path, distance = graph.shortest_path(start_id, end_id)
-        if not path:
-            fallback = [
-                {"lat": _round6(start_lat), "lng": _round6(start_lng)},
-                {"lat": _round6(end_lat), "lng": _round6(end_lng)},
-            ]
-            return Response({"source": "fallback", "route": fallback, "detail": "Sem caminho encontrado."}, status=200)
-
-        route = [{"lat": _round6(start_lat), "lng": _round6(start_lng)}]
-        for node_id in path:
-            lat, lng = graph.nodes[node_id]
-            route.append({"lat": _round6(lat), "lng": _round6(lng)})
-        route.append({"lat": _round6(end_lat), "lng": _round6(end_lng)})
-        route = _dedup_points(route)
-        payload = {
-            "source": "roads",
-            "route": route,
-            "distance_m": round(distance, 2),
-            "snap_start_m": None if start_dist is None else round(start_dist, 2),
-            "snap_end_m": None if end_dist is None else round(end_dist, 2),
-        }
-        trace_distance = float(getattr(settings, "ROADS_TRACE_DISTANCE", 30.0))
-        if roads and (start_dist is None or start_dist > trace_distance):
-            start_road = _find_nearest_road_entry(roads, start_lat, start_lng)
-            if start_road:
-                payload["closest_road_start"] = start_road
-        if roads and (end_dist is None or end_dist > trace_distance):
-            end_road = _find_nearest_road_entry(roads, end_lat, end_lng)
-            if end_road:
-                payload["closest_road_end"] = end_road
+        payload = calculate_route_payload(start_lat, start_lng, end_lat, end_lng)
         return Response(payload)

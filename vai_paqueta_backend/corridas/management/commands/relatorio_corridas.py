@@ -10,6 +10,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from corridas.models import Corrida, LocalizacaoPing, UserContato
+from geo import views as geo_views
+
+_ROUTE_MESH_TRIM_THRESHOLD_M = 10
 
 
 class Command(BaseCommand):
@@ -148,6 +151,72 @@ class Command(BaseCommand):
         y = (1 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2
         return x * n * 256, y * n * 256
 
+    def _coord_from_decimal(self, lat, lng):
+        if lat is None or lng is None:
+            return None
+        try:
+            return float(lat), float(lng)
+        except (TypeError, ValueError):
+            return None
+
+    def _trim_route_to_mesh(self, points, snap_start, snap_end):
+        if not isinstance(points, list) or len(points) < 2:
+            return points
+        trimmed = points[:]
+        start_snap = snap_start if isinstance(snap_start, (int, float)) else 0
+        end_snap = snap_end if isinstance(snap_end, (int, float)) else 0
+        if start_snap >= _ROUTE_MESH_TRIM_THRESHOLD_M and len(trimmed) > 1:
+            trimmed = trimmed[1:]
+        if end_snap >= _ROUTE_MESH_TRIM_THRESHOLD_M and len(trimmed) > 1:
+            trimmed = trimmed[:-1]
+        return trimmed if len(trimmed) >= 2 else points
+
+    def _convert_closest_road(self, entry):
+        if not entry or not isinstance(entry.get("points"), list):
+            return None
+        values = []
+        for pt in entry.get("points", []):
+            if not isinstance(pt, dict):
+                continue
+            lat = pt.get("lat")
+            lng = pt.get("lng")
+            if lat is None or lng is None:
+                continue
+            try:
+                values.append((float(lat), float(lng)))
+            except (TypeError, ValueError):
+                continue
+        return values if len(values) >= 2 else None
+
+    def _choose_route_points(self, payload, start, end):
+        if not payload:
+            return []
+        points = payload.get("route") or []
+        trimmed = self._trim_route_to_mesh(points, payload.get("snap_start_m"), payload.get("snap_end_m"))
+        if isinstance(trimmed, list) and len(trimmed) >= 2:
+            coords = []
+            for pt in trimmed:
+                lat = pt.get("lat")
+                lng = pt.get("lng")
+                if lat is None or lng is None:
+                    continue
+                try:
+                    coords.append((float(lat), float(lng)))
+                except (TypeError, ValueError):
+                    continue
+            if len(coords) >= 2:
+                return coords
+        fallback = self._convert_closest_road(payload.get("closest_road_start"))
+        if not fallback:
+            fallback = self._convert_closest_road(payload.get("closest_road_end"))
+        if fallback:
+            return fallback
+        base = []
+        if start:
+            base.append(start)
+        if end:
+            base.append(end)
+        return base
     def _resolve_tile_root(self, tile_dir: str | None) -> Path | None:
         if tile_dir:
             root = Path(tile_dir).expanduser()
@@ -183,9 +252,18 @@ class Command(BaseCommand):
         lats = [float(p[0]) for p in pings]
         lngs = [float(p[1]) for p in pings]
         times = [p[2] for p in pings]
+        start_coord = self._coord_from_decimal(corrida.origem_lat, corrida.origem_lng)
+        end_coord = self._coord_from_decimal(corrida.destino_lat, corrida.destino_lng)
+        route_payload = None
+        route_points = []
+        if start_coord and end_coord:
+            route_payload = geo_views.calculate_route_payload(start_coord[0], start_coord[1], end_coord[0], end_coord[1])
+            route_points = self._choose_route_points(route_payload, start_coord, end_coord)
+        if len(route_points) < 2:
+            route_points = list(zip(lats, lngs))
 
         # Converte para pixels globais no esquema WebMercator para alinhar com tiles.
-        pixels = [self._latlng_to_pixel(lat, lng, tile_zoom) for lat, lng in zip(lats, lngs)]
+        pixels = [self._latlng_to_pixel(lat, lng, tile_zoom) for lat, lng in route_points]
         px_vals = [p[0] for p in pixels]
         py_vals = [p[1] for p in pixels]
         if not px_vals or not py_vals:
@@ -207,6 +285,7 @@ class Command(BaseCommand):
         for px, py in pixels:
             coords.append((px - offset_x, py - offset_y))
         path_data = " ".join(f"{x:.2f},{y:.2f}" for x, y in coords)
+        route_path = path_data
         inicio_txt = times[0].isoformat() if times else ""
         fim_txt = times[-1].isoformat() if times else ""
 
@@ -235,7 +314,27 @@ class Command(BaseCommand):
             '<rect width="100%" height="100%" fill="#f8fafc" />',
         ]
         svg.extend(images_svg)
-        svg.append(f'<polyline points="{path_data}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />')
+
+        _, roads, _ = geo_views._load_road_graph()
+        road_paths: list[str] = []
+        if isinstance(roads, list):
+            for road in roads:
+                points = road.get("points") or []
+                coords_pixels: list[tuple[float, float]] = []
+                for lat, lng in points:
+                    px, py = self._latlng_to_pixel(float(lat), float(lng), tile_zoom)
+                    coords_pixels.append((px - offset_x, py - offset_y))
+                if len(coords_pixels) < 2:
+                    continue
+                if not any(0 <= px <= width and 0 <= py <= height for px, py in coords_pixels):
+                    continue
+                path_data = " ".join(f"{x:.2f},{y:.2f}" for x, y in coords_pixels)
+                color = road.get("color") or "#94a3b8"
+                road_paths.append(
+                    f'<polyline points="{path_data}" fill="none" stroke="{color}" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" stroke-opacity="0.5" />'
+                )
+        svg.extend(road_paths)
+        svg.append(f'<polyline points="{route_path}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />')
         svg.append(f'<circle cx="{coords[0][0]:.2f}" cy="{coords[0][1]:.2f}" r="5" fill="#22c55e" stroke="#14532d" />')
         svg.append(f'<circle cx="{coords[-1][0]:.2f}" cy="{coords[-1][1]:.2f}" r="5" fill="#ef4444" stroke="#7f1d1d" />')
         svg.append(f'<text x="12" y="{height - 20}" font-size="12" fill="#334155" font-family="sans-serif">Início: {inicio_txt}</text>')
