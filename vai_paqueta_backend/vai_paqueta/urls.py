@@ -3,7 +3,14 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 from .auth_views import CookieTokenRefreshView, LoginView, LogoutView, MeView, RegisterView
-from .views import landing, privacy, tutorial, webapp
+from .views import (
+    landing,
+    privacy,
+    tutorial,
+    webapp,
+    webapp_manifest,
+    webapp_service_worker,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,6 +23,8 @@ urlpatterns = [
     path("api/geo/", include("geo.urls")),
     path("", landing, name="landing"),
     path("app/", webapp, name="webapp"),
+    path("app/manifest.json", webapp_manifest, name="webapp_manifest"),
+    path("app/sw.js", webapp_service_worker, name="webapp_sw"),
     path("privacidade/", privacy, name="privacy"),
     path("tutorial/", tutorial, name="tutorial"),
 ]
