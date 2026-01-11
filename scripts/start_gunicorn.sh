@@ -13,7 +13,7 @@ fi
 cd "$BACKEND_DIR"
 "$VENV_BIN/python" manage.py collectstatic --noinput
 
-exec "$VENV_BIN/gunicorn" vai_paqueta.wsgi:application \
+exec "$VENV_BIN/python" -m gunicorn vai_paqueta.wsgi:application \
   --bind "${GUNICORN_BIND:-127.0.0.1:8000}" \
   --workers "${GUNICORN_WORKERS:-3}" \
   --timeout "${GUNICORN_TIMEOUT:-120}"
