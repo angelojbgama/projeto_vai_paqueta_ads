@@ -11,6 +11,7 @@ if not exist "%PYTHON%" (
   exit /b 1
 )
 
+"%PYTHON%" manage.py collectstatic --noinput
 start "Django" /D "%BACKEND_DIR%" "%PYTHON%" manage.py runserver 127.0.0.1:8000
 start "Cloudflared" /D "%PROJECT_DIR%" cloudflared tunnel run vai-paqueta-backend
 
