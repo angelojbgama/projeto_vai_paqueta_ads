@@ -17,6 +17,8 @@ import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../widgets/message_banner.dart';
+import '../../widgets/coach_mark.dart';
+import '../../services/map_tile_cache_service.dart';
 import '../../services/geo_service.dart';
 import '../../services/route_service.dart';
 import '../rides/rides_service.dart';
@@ -31,6 +33,16 @@ class PassengerPage extends ConsumerStatefulWidget {
 
 class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver {
   static const _prefsCorridaKey = 'corrida_ativa_id';
+  static const _prefsGuiaPassageiroKey = 'passageiro_guia_visto';
+  final GlobalKey _guiaMapaKey = GlobalKey();
+  final GlobalKey _guiaOrigemKey = GlobalKey();
+  final GlobalKey _guiaGpsKey = GlobalKey();
+  final GlobalKey _guiaDestinoKey = GlobalKey();
+  final GlobalKey _guiaLugaresKey = GlobalKey();
+  final GlobalKey _guiaPedirKey = GlobalKey();
+  final GlobalKey _guiaConfigKey = GlobalKey();
+  final GlobalKey _guiaLogoutKey = GlobalKey();
+  final GlobalKey _guiaTrocarKey = GlobalKey();
   final _origemCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
   LatLng? _origemLatLng;
@@ -100,7 +112,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   TileProvider _buildTileProvider() {
-    return _tileUsingAssets ? AssetTileProvider() : NetworkTileProvider();
+    return _tileUsingAssets ? AssetTileProvider() : MapTileCacheService.networkTileProvider();
   }
 
   String _normalizarStatus(String? status) {
@@ -381,6 +393,93 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _paymentWarningOpen = false;
     }
   }
+
+  Future<void> _mostrarGuiaPassageiroSeNecessario() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jaViu = prefs.getBool(_prefsGuiaPassageiroKey) ?? false;
+    if (jaViu || !mounted) return;
+    if (_modalAberto || _paymentWarningOpen) return;
+    final verGuia = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Conheça o app'),
+          content: const Text('Quer ver um guia rápido do modo Passageiro?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Conhecer agora'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (verGuia == true) {
+      await _mostrarGuiaPassageiro();
+    }
+    await prefs.setBool(_prefsGuiaPassageiroKey, true);
+  }
+
+  Future<void> _mostrarGuiaPassageiro() async {
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    await showCoachMarks(context, [
+      CoachMarkStep(
+        targetKey: _guiaConfigKey,
+        title: 'Configurações',
+        description: 'Edite seus dados do perfil.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaTrocarKey,
+        title: 'Trocar perfil',
+        description: 'Mude para o modo Ecotaxista.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaLogoutKey,
+        title: 'Sair',
+        description: 'Encerre sua sessão no app.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaMapaKey,
+        title: 'Mapa',
+        description: 'Mostra origem, destino e o motorista quando a corrida é aceita.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaOrigemKey,
+        title: 'Origem',
+        description: 'Informe de onde você vai sair.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaGpsKey,
+        title: 'GPS',
+        description: 'Usa sua localização atual como origem.',
+        highlightPadding: const EdgeInsets.all(6),
+      ),
+      CoachMarkStep(
+        targetKey: _guiaDestinoKey,
+        title: 'Destino',
+        description: 'Informe para onde você vai.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaLugaresKey,
+        title: 'Lugares',
+        description: 'Escolha 1 ou 2 lugares para a corrida.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaPedirKey,
+        title: 'Pedir corrida',
+        description:
+            'Envia sua solicitação. Depois pode virar Cancelar ou Finalizar quando permitido.',
+      ),
+    ]);
+  }
+
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
     if (!mounted) return;
@@ -395,6 +494,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _carregarEnderecosOffline();
     _carregarCorridaAtiva();
     _carregarPosicao();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaPassageiroSeNecessario());
   }
 
   @override
@@ -1615,12 +1715,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         ),
         actions: [
           IconButton(
+            key: _guiaConfigKey,
             tooltip: 'Editar dados',
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
           if (loggedIn)
             IconButton(
+              key: _guiaLogoutKey,
               tooltip: 'Sair',
               icon: const Icon(Icons.logout),
               onPressed: _logout,
@@ -1636,6 +1738,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             )
           else
             IconButton(
+              key: _guiaTrocarKey,
               tooltip: 'Ir para EcoTaxista',
               icon: const Icon(Icons.swap_horiz),
               onPressed: _trocarParaEcotaxista,
@@ -1649,6 +1752,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
+                key: _guiaMapaKey,
                 height: 220,
                 child: Builder(
                   builder: (context) {
@@ -1768,12 +1872,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextField(
+                      key: _guiaOrigemKey,
                       controller: _origemCtrl,
                       onChanged: _onOrigemChanged,
                       decoration: InputDecoration(
                         labelText: 'Endereço atual (origem)',
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
+                          key: _guiaGpsKey,
                           icon: const Icon(Icons.gps_fixed),
                           onPressed: _loading ? null : _usarGPS,
                         ),
@@ -1809,6 +1915,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       ),
                     const SizedBox(height: 8),
                     TextField(
+                      key: _guiaDestinoKey,
                       controller: _destinoCtrl,
                       onChanged: _onDestinoChanged,
                       decoration: const InputDecoration(
@@ -1846,6 +1953,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
+                      key: _guiaLugaresKey,
                       value: _lugaresSolicitados,
                       decoration: const InputDecoration(
                         labelText: 'Quantos lugares você precisa para essa corrida?',
@@ -1884,6 +1992,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                     ],
                     const SizedBox(height: 12),
                     ElevatedButton.icon(
+                      key: _guiaPedirKey,
                       onPressed: _loading || (_corridaAtiva && !_podeCancelarCorrida) ? null : _pedirCorrida,
                       icon: Icon(
                         _corridaAtiva

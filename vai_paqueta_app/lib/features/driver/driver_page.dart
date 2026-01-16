@@ -9,15 +9,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../services/driver_background_service.dart';
+import '../../services/map_tile_cache_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/route_service.dart';
 import '../../widgets/message_banner.dart';
+import '../../widgets/coach_mark.dart';
 import '../auth/auth_provider.dart';
 import 'driver_service.dart';
 
@@ -29,6 +32,22 @@ class DriverPage extends ConsumerStatefulWidget {
 }
 
 class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObserver {
+  static const _prefsRecebendoCorridasKey = 'driver_recebendo_corridas';
+  static const _prefsLocalizacaoBgKey = 'driver_localizacao_bg';
+  static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
+  static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
+  final GlobalKey _guiaConfigKey = GlobalKey();
+  final GlobalKey _guiaLogoutKey = GlobalKey();
+  final GlobalKey _guiaTrocarKey = GlobalKey();
+  final GlobalKey _guiaRecebimentoKey = GlobalKey();
+  final GlobalKey _guiaLocalizacaoBgKey = GlobalKey();
+  final GlobalKey _guiaMapaKey = GlobalKey();
+  final GlobalKey _guiaModalStatusKey = GlobalKey();
+  final GlobalKey _guiaModalPassageiroKey = GlobalKey();
+  final GlobalKey _guiaModalWhatsKey = GlobalKey();
+  final GlobalKey _guiaModalRotaKey = GlobalKey();
+  final GlobalKey _guiaModalMapaKey = GlobalKey();
+  final GlobalKey _guiaModalAcoesKey = GlobalKey();
   AppMessage? _status;
   bool _enviando = false;
   LatLng? _posicao;
@@ -53,6 +72,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _appPausado = false;
   StateSetter? _modalSetState;
   bool _backgroundAtivo = false;
+  bool _recebendoCorridas = true;
+  bool _enviarLocalizacaoBg = false;
+  bool _consentimentoLocalizacaoBg = false;
+  bool _guiaAtivo = false;
   StreamSubscription<String?>? _notificationTapSub;
 
   void _clearStatus() {
@@ -63,8 +86,330 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     setState(() => _status = null);
   }
 
+  Future<void> _carregarPreferencias() async {
+    final prefs = await SharedPreferences.getInstance();
+    final recebendo = prefs.getBool(_prefsRecebendoCorridasKey) ?? true;
+    final consentimentoBg = prefs.getBool(_prefsConsentimentoBgKey) ?? false;
+    final localizacaoBgSalva = prefs.getBool(_prefsLocalizacaoBgKey);
+    var localizacaoBg = localizacaoBgSalva ?? false;
+    if (!consentimentoBg) {
+      localizacaoBg = false;
+      if (localizacaoBgSalva == true) {
+        await prefs.setBool(_prefsLocalizacaoBgKey, false);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _recebendoCorridas = recebendo;
+      _enviarLocalizacaoBg = localizacaoBg;
+      _consentimentoLocalizacaoBg = consentimentoBg;
+    });
+    if (_recebendoCorridas) {
+      _verificarCorrida();
+      _iniciarAutoPing();
+      _iniciarPollingCorrida();
+    }
+  }
+
+  Future<void> _salvarPreferencias({
+    bool? recebendoCorridas,
+    bool? localizacaoBg,
+    bool? consentimentoLocalizacaoBg,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (recebendoCorridas != null) {
+      await prefs.setBool(_prefsRecebendoCorridasKey, recebendoCorridas);
+    }
+    if (localizacaoBg != null) {
+      await prefs.setBool(_prefsLocalizacaoBgKey, localizacaoBg);
+    }
+    if (consentimentoLocalizacaoBg != null) {
+      await prefs.setBool(_prefsConsentimentoBgKey, consentimentoLocalizacaoBg);
+    }
+  }
+
+  Future<void> _mostrarGuiaMotoristaSeNecessario() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jaViu = prefs.getBool(_prefsGuiaMotoristaKey) ?? false;
+    if (jaViu || !mounted) return;
+    if (_modalAberto) return;
+    final verGuia = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Conheça o app'),
+          content: const Text('Quer ver um guia rápido do modo Ecotaxista?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Conhecer agora'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (verGuia == true) {
+      await _mostrarGuiaMotorista();
+    }
+    await prefs.setBool(_prefsGuiaMotoristaKey, true);
+  }
+
+  Future<void> _mostrarGuiaMotorista() async {
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    _pausarAtualizacoesParaGuia();
+    try {
+      final concluido = await showCoachMarks(context, [
+        CoachMarkStep(
+          targetKey: _guiaConfigKey,
+          title: 'Configurações',
+          description: 'Edite seus dados do perfil.',
+        ),
+        CoachMarkStep(
+          targetKey: _guiaTrocarKey,
+          title: 'Trocar perfil',
+          description: 'Mude para o modo Passageiro.',
+        ),
+        CoachMarkStep(
+          targetKey: _guiaLogoutKey,
+          title: 'Sair',
+          description: 'Encerre sua sessão no app.',
+        ),
+        CoachMarkStep(
+          targetKey: _guiaRecebimentoKey,
+          title: 'Receber corridas',
+          description: 'Ative para ficar disponível e receber solicitações.',
+        ),
+        CoachMarkStep(
+          targetKey: _guiaLocalizacaoBgKey,
+          title: 'Localização em segundo plano',
+          description: 'Mantém o envio de localização com o app fechado.',
+        ),
+        CoachMarkStep(
+          targetKey: _guiaMapaKey,
+          title: 'Mapa e corrida',
+          description:
+              'Mostra você, origem, destino e rotas. Quando aparecer corrida, você verá botões para aceitar, rejeitar, iniciar e finalizar, além do WhatsApp.',
+        ),
+      ]);
+      if (!concluido || !mounted) return;
+      await _mostrarGuiaModalCorrida();
+    } finally {
+      _retomarAtualizacoesAposGuia();
+    }
+  }
+
+  void _pausarAtualizacoesParaGuia() {
+    if (_guiaAtivo) return;
+    _guiaAtivo = true;
+    _pingTimer?.cancel();
+    _pollTimer?.cancel();
+    if (_backgroundAtivo) {
+      DriverBackgroundService.stop();
+      _backgroundAtivo = false;
+    }
+  }
+
+  void _retomarAtualizacoesAposGuia() {
+    if (!_guiaAtivo) return;
+    _guiaAtivo = false;
+    if (!mounted) return;
+    if (_recebendoCorridas) {
+      _verificarCorrida(force: true);
+      _iniciarAutoPing(showStatus: false);
+      _iniciarPollingCorrida();
+    }
+  }
+
+  List<CoachMarkStep> _buildGuiaCorridaSteps() {
+    return [
+      CoachMarkStep(
+        targetKey: _guiaModalStatusKey,
+        title: 'Status da corrida',
+        description: 'Mostra se esta aguardando, aceita, em andamento ou concluida.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalPassageiroKey,
+        title: 'Passageiro',
+        description: 'Veja o nome e o telefone do passageiro.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalWhatsKey,
+        title: 'WhatsApp',
+        description: 'Fale com o passageiro direto no WhatsApp.',
+        highlightPadding: const EdgeInsets.all(6),
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalRotaKey,
+        title: 'Rota',
+        description: 'Confirme origem, destino e quantidade de lugares.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalMapaKey,
+        title: 'Mapa da corrida',
+        description: 'Mostra voce, origem, destino e as rotas.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalAcoesKey,
+        title: 'Acoes',
+        description:
+            'Use Aceitar ou Rejeitar. Depois aparecem Iniciar e Finalizar conforme a corrida avanca.',
+      ),
+    ];
+  }
+
+  Map<String, dynamic> _buildCorridaGuia() {
+    final baseLat = _posicao?.latitude ?? MapTileConfig.defaultCenterLat;
+    final baseLng = _posicao?.longitude ?? MapTileConfig.defaultCenterLng;
+    return {
+      'id': 123,
+      'status': 'aguardando',
+      'origem_lat': baseLat + 0.0012,
+      'origem_lng': baseLng + 0.0012,
+      'destino_lat': baseLat - 0.0015,
+      'destino_lng': baseLng - 0.0010,
+      'origem_endereco': 'Praia Jose Bonifacio, Paqueta',
+      'destino_endereco': 'Cais da Barca, Paqueta',
+      'lugares': 1,
+      'motorista_lat': baseLat,
+      'motorista_lng': baseLng,
+      'cliente': {
+        'id': 42,
+        'nome': 'Passageiro Exemplo',
+        'telefone': '(21) 99999-0000',
+      },
+    };
+  }
+
+  Future<void> _mostrarGuiaModalCorrida() async {
+    if (!mounted) return;
+    if (_modalAberto || _corridaAtual != null) return;
+    await _mostrarModalCorrida(_buildCorridaGuia(), guia: true);
+  }
+
+  Future<bool> _mostrarConsentimentoLocalizacaoBg() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Localização em segundo plano'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Para manter você disponível para corridas mesmo com o app fechado, '
+                'o Vai Paqueta precisa acessar sua localização em segundo plano.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.near_me, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Conectar você a corridas próximas enquanto estiver disponível.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.location_on, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Enviar sua posição periodicamente, mesmo em segundo plano.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.toggle_off, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Você pode desativar a qualquer momento nas configurações do Ecotaxista.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text('Ao continuar, solicitaremos a permissão de localização em segundo plano.'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Aceitar e continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _garantirConsentimentoLocalizacaoBg() async {
+    if (_consentimentoLocalizacaoBg) return true;
+    final aceitou = await _mostrarConsentimentoLocalizacaoBg();
+    if (!aceitou) return false;
+    if (!mounted) return false;
+    setState(() => _consentimentoLocalizacaoBg = true);
+    await _salvarPreferencias(consentimentoLocalizacaoBg: true);
+    return true;
+  }
+
+  Future<bool> _garantirPermissaoLocalizacao() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(
+          () => _status = const AppMessage(
+            'Permissão de localização necessária para enviar em segundo plano.',
+            MessageTone.warning,
+          ),
+        );
+      }
+      return false;
+    }
+    if (permission == LocationPermission.whileInUse && mounted) {
+      setState(
+        () => _status = const AppMessage(
+          'Para enviar em segundo plano, permita localização o tempo todo nas permissões do app.',
+          MessageTone.info,
+        ),
+      );
+    }
+    return true;
+  }
+
   TileProvider _buildTileProvider() {
-    return _tileUsingAssets ? AssetTileProvider() : NetworkTileProvider();
+    return _tileUsingAssets ? AssetTileProvider() : MapTileCacheService.networkTileProvider();
   }
   Future<void> _logout() async {
     await DriverBackgroundService.stop();
@@ -381,9 +726,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
     _configurarFonteTiles();
     _atualizarPosicao();
-    _verificarCorrida();
-    _iniciarAutoPing();
-    _iniciarPollingCorrida();
+    _carregarPreferencias();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaMotoristaSeNecessario());
   }
 
   @override
@@ -407,7 +751,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       final user = ref.read(authProvider).valueOrNull;
       final perfilId = user?.perfilId ?? 0;
       final perfilTipo = user?.perfilTipo ?? '';
-      if (perfilId != 0 && perfilTipo == 'ecotaxista') {
+      if (perfilId != 0 &&
+          perfilTipo == 'ecotaxista' &&
+          _recebendoCorridas &&
+          _enviarLocalizacaoBg &&
+          _consentimentoLocalizacaoBg &&
+          !_guiaAtivo) {
         DriverBackgroundService.start(perfilId: perfilId, perfilTipo: perfilTipo);
         _backgroundAtivo = true;
       }
@@ -418,9 +767,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _backgroundAtivo = false;
       }
       _atualizarPosicao();
-      _verificarCorrida();
-      _iniciarAutoPing();
-      _iniciarPollingCorrida();
+      if (_recebendoCorridas) {
+        _verificarCorrida();
+        _iniciarAutoPing();
+        _iniciarPollingCorrida();
+      }
       if (_corridaAtual != null && !_modalAberto) {
         _mostrarModalCorrida(_corridaAtual!);
       }
@@ -507,20 +858,28 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
   }
 
-  void _iniciarAutoPing() {
+  void _iniciarAutoPing({bool showStatus = true}) {
+    if (_guiaAtivo) return;
+    if (!_recebendoCorridas) return;
     _pingTimer?.cancel();
     _enviarPing(silencioso: true);
     _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _enviarPing(silencioso: true));
-    setState(() => _status = const AppMessage('Auto ping a cada 10s ligado.', MessageTone.info));
+    if (showStatus) {
+      setState(() => _status = const AppMessage('Auto ping a cada 10s ligado.', MessageTone.info));
+    }
   }
 
   void _iniciarPollingCorrida() {
+    if (_guiaAtivo) return;
+    if (!_recebendoCorridas) return;
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _verificarCorrida());
   }
 
   Future<void> _verificarCorrida({bool force = false}) async {
     if (_appPausado && !force) return;
+    if (_guiaAtivo && !force) return;
+    if (!_recebendoCorridas && !force) return;
     final authState = ref.read(authProvider);
     var user = authState.valueOrNull;
     if (user == null && authState.isLoading) {
@@ -535,6 +894,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     try {
       final service = DriverService();
       final corrida = await service.corridaAtribuida(perfilId);
+      if (_guiaAtivo) return;
       if (corrida != null && corrida.isNotEmpty) {
         _corridaAtual = corrida;
         _atualizarRotas(corrida);
@@ -558,15 +918,18 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
   }
 
-  Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida) async {
+  Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida, {bool guia = false}) async {
     if (_modalAberto) return;
     _modalAberto = true;
+    final corridaAnterior = _corridaAtual;
     _corridaAtual = corrida;
     if (!mounted) {
       _modalAberto = false;
+      _corridaAtual = corridaAnterior;
       return;
     }
     await Future<void>.delayed(Duration.zero);
+    var guiaIniciado = false;
     try {
       await showGeneralDialog<void>(
         context: context,
@@ -584,6 +947,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   borderRadius: BorderRadius.circular(16),
                   child: StatefulBuilder(builder: (dialogContext, setModalState) {
                     _modalSetState = setModalState;
+                    if (guia && !guiaIniciado) {
+                      guiaIniciado = true;
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!mounted) return;
+                        await showCoachMarks(dialogContext, _buildGuiaCorridaSteps());
+                        if (mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
+                          Navigator.of(dialogContext, rootNavigator: true).pop();
+                        }
+                      });
+                    }
                     final corridaAtual = _corridaAtual ?? corrida;
                     final statusRaw = corridaAtual['status'] as String?;
                     final status = _normalizarStatus(statusRaw);
@@ -653,6 +1026,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                             ),
                             const SizedBox(height: 12),
                             Container(
+                              key: _guiaModalStatusKey,
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
                                 color: Colors.green.shade50,
@@ -686,47 +1060,54 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                             const SizedBox(height: 12),
                             LayoutBuilder(
                               builder: (context, constraints) {
-                                final passengerCard = _infoBox(
-                                  context,
-                                  'Passageiro',
-                                  [
-                                    Text(passageiroNome ?? 'Passageiro confirmado',
-                                        style: Theme.of(context).textTheme.bodyMedium),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      crossAxisAlignment: WrapCrossAlignment.center,
-                                      children: [
-                                        Text(
-                                          passageiroTelefone ?? 'Telefone não informado',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium
-                                              ?.copyWith(color: Colors.grey.shade700),
-                                        ),
-                                        if (passengerWhatsLink != null)
-                                          OutlinedButton.icon(
-                                            onPressed: () => _abrirWhatsApp(passageiroTelefone),
-                                            icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                                            label: const Text('WhatsApp'),
+                                final passengerCard = KeyedSubtree(
+                                  key: _guiaModalPassageiroKey,
+                                  child: _infoBox(
+                                    context,
+                                    'Passageiro',
+                                    [
+                                      Text(passageiroNome ?? 'Passageiro confirmado',
+                                          style: Theme.of(context).textTheme.bodyMedium),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 4,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          Text(
+                                            passageiroTelefone ?? 'Telefone não informado',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(color: Colors.grey.shade700),
                                           ),
-                                      ],
-                                    ),
-                                  ],
+                                          if (passengerWhatsLink != null)
+                                            OutlinedButton.icon(
+                                              key: _guiaModalWhatsKey,
+                                              onPressed: guia ? null : () => _abrirWhatsApp(passageiroTelefone),
+                                              icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                              label: const Text('WhatsApp'),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 );
                                 final lugares = _asInt(corridaAtual['lugares']) ?? 1;
                                 final lugaresLabel = _formatarLugares(lugares);
-                                final routeCard = _infoBox(
-                                  context,
-                                  'Rota',
-                                  [
-                                    Text('Origem: $origemTexto', style: Theme.of(context).textTheme.bodyMedium),
-                                    const SizedBox(height: 4),
-                                    Text('Destino: $destinoTexto', style: Theme.of(context).textTheme.bodyMedium),
-                                    const SizedBox(height: 4),
-                                    Text('Lugares: $lugaresLabel', style: Theme.of(context).textTheme.bodyMedium),
-                                  ],
+                                final routeCard = KeyedSubtree(
+                                  key: _guiaModalRotaKey,
+                                  child: _infoBox(
+                                    context,
+                                    'Rota',
+                                    [
+                                      Text('Origem: $origemTexto', style: Theme.of(context).textTheme.bodyMedium),
+                                      const SizedBox(height: 4),
+                                      Text('Destino: $destinoTexto', style: Theme.of(context).textTheme.bodyMedium),
+                                      const SizedBox(height: 4),
+                                      Text('Lugares: $lugaresLabel', style: Theme.of(context).textTheme.bodyMedium),
+                                    ],
+                                  ),
                                 );
                                 if (constraints.maxWidth >= 520) {
                                   return Row(
@@ -750,6 +1131,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                             const SizedBox(height: 12),
                             if (origem != null || destino != null || motoristaPos != null)
                               SizedBox(
+                                key: _guiaModalMapaKey,
                                 height: 220,
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
@@ -855,6 +1237,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                               ),
                             const SizedBox(height: 16),
                             Wrap(
+                              key: _guiaModalAcoesKey,
                               spacing: 8,
                               runSpacing: 8,
                               children: [
@@ -862,26 +1245,26 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.check),
                                     label: const Text('Aceitar'),
-                                    onPressed: () => _acaoCorrida('aceitar'),
+                                    onPressed: guia ? null : () => _acaoCorrida('aceitar'),
                                   ),
                                 if (status == 'aguardando' || status == 'aceita')
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.close),
                                     label: const Text('Rejeitar'),
                                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade400),
-                                    onPressed: () => _acaoCorrida('rejeitar'),
+                                    onPressed: guia ? null : () => _acaoCorrida('rejeitar'),
                                   ),
                                 if (status == 'aceita')
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.play_arrow),
                                     label: const Text('Iniciar'),
-                                    onPressed: () => _acaoCorrida('iniciar'),
+                                    onPressed: guia ? null : () => _acaoCorrida('iniciar'),
                                   ),
                                 if (status == 'em_andamento')
                                   ElevatedButton.icon(
                                     icon: const Icon(Icons.flag),
                                     label: const Text('Finalizar'),
-                                    onPressed: () => _acaoCorrida('finalizar'),
+                                    onPressed: guia ? null : () => _acaoCorrida('finalizar'),
                                   ),
                               ],
                             ),
@@ -908,6 +1291,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     } finally {
       _modalAberto = false;
       _modalSetState = null;
+      if (guia) {
+        _corridaAtual = corridaAnterior;
+      }
     }
   }
 
@@ -973,7 +1359,85 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   void _onNotificationTap(String? payload) {
+    if (_guiaAtivo) return;
     _verificarCorrida(force: true);
+  }
+
+  void _setRecebimentoCorridas(bool ativo) {
+    if (_recebendoCorridas == ativo) return;
+    setState(() {
+      _recebendoCorridas = ativo;
+      _status = AppMessage(
+        ativo ? 'Recebimento de corridas ligado.' : 'Recebimento de corridas desligado.',
+        MessageTone.info,
+      );
+    });
+    _salvarPreferencias(recebendoCorridas: ativo);
+    if (ativo) {
+      _verificarCorrida(force: true);
+      _iniciarAutoPing(showStatus: false);
+      _iniciarPollingCorrida();
+      return;
+    }
+    _pingTimer?.cancel();
+    _pollTimer?.cancel();
+    if (_backgroundAtivo) {
+      DriverBackgroundService.stop();
+      _backgroundAtivo = false;
+    }
+  }
+
+  void _onToggleLocalizacaoSegundoPlano(bool ativo) {
+    if (!ativo) {
+      _setLocalizacaoSegundoPlano(false);
+      return;
+    }
+    unawaited(_habilitarLocalizacaoSegundoPlano());
+  }
+
+  Future<void> _habilitarLocalizacaoSegundoPlano() async {
+    final consentimentoOk = await _garantirConsentimentoLocalizacaoBg();
+    if (!consentimentoOk) {
+      _setLocalizacaoSegundoPlano(false, showStatus: false, forceRebuild: true);
+      return;
+    }
+    final permissaoOk = await _garantirPermissaoLocalizacao();
+    if (!permissaoOk) {
+      _setLocalizacaoSegundoPlano(false, showStatus: false, forceRebuild: true);
+      return;
+    }
+    _setLocalizacaoSegundoPlano(true);
+  }
+
+  void _setLocalizacaoSegundoPlano(
+    bool ativo, {
+    bool showStatus = true,
+    bool salvarPreferencias = true,
+    bool forceRebuild = false,
+  }) {
+    final mudou = _enviarLocalizacaoBg != ativo;
+    if (mounted && (mudou || showStatus || forceRebuild)) {
+      setState(() {
+        if (mudou) {
+          _enviarLocalizacaoBg = ativo;
+        }
+        if (showStatus) {
+          _status = AppMessage(
+            ativo
+                ? 'Envio de localização em segundo plano ligado.'
+                : 'Envio de localização em segundo plano desligado.',
+            MessageTone.info,
+          );
+        }
+      });
+    }
+    if (salvarPreferencias) {
+      _salvarPreferencias(localizacaoBg: ativo);
+    }
+    if (!ativo && _backgroundAtivo) {
+      DriverBackgroundService.stop();
+      _backgroundAtivo = false;
+    }
   }
 
   Future<void> _trocarParaPassageiro() async {
@@ -1025,12 +1489,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         ),
         actions: [
           IconButton(
+            key: _guiaConfigKey,
             tooltip: 'Editar dados',
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
           if (loggedIn)
             IconButton(
+              key: _guiaLogoutKey,
               tooltip: 'Sair',
               icon: const Icon(Icons.logout),
               onPressed: _logout,
@@ -1046,6 +1512,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             )
           else
             IconButton(
+              key: _guiaTrocarKey,
               tooltip: 'Ir para Passageiro',
               icon: const Icon(Icons.swap_horiz),
               onPressed: _trocarParaPassageiro,
@@ -1057,7 +1524,39 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Card(
+              elevation: 0,
+              color: Colors.grey.shade50,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  SwitchListTile.adaptive(
+                    key: _guiaRecebimentoKey,
+                    value: _recebendoCorridas,
+                    onChanged: _setRecebimentoCorridas,
+                    title: const Text('Ativar recebimento de corridas'),
+                    subtitle: const Text('Fique disponível para receber novas corridas.'),
+                  ),
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  SwitchListTile.adaptive(
+                    key: _guiaLocalizacaoBgKey,
+                    value: _enviarLocalizacaoBg,
+                    onChanged: _onToggleLocalizacaoSegundoPlano,
+                    title: const Text('Enviar localização em segundo plano'),
+                    subtitle: const Text(
+                      'Permite que o app continue enviando sua localização mesmo em segundo plano, '
+                      'para te conectar às corridas mais próximas.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
+              key: _guiaMapaKey,
               height: 220,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -1152,8 +1651,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'O app envia sua localização automaticamente a cada 10s e verifica corridas atribuídas.',
+            Text(
+              _recebendoCorridas
+                  ? 'O app envia sua localização automaticamente a cada 10s e verifica corridas atribuídas.'
+                  : 'Recebimento de corridas pausado. Ative para enviar sua localização e verificar corridas atribuídas.',
             ),
             if (_status != null) ...[
               const SizedBox(height: 12),
