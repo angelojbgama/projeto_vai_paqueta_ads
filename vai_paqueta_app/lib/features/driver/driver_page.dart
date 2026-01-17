@@ -725,6 +725,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _onNotificationTap(pendingTap);
     }
     _configurarFonteTiles();
+    if (!MapTileConfig.useAssets) {
+      MapTileCacheService.prefetchDefault();
+    }
     _atualizarPosicao();
     _carregarPreferencias();
     WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaMotoristaSeNecessario());

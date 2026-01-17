@@ -491,6 +491,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _configurarFonteTiles();
+    if (!MapTileConfig.useAssets) {
+      MapTileCacheService.prefetchDefault();
+    }
     _carregarEnderecosOffline();
     _carregarCorridaAtiva();
     _carregarPosicao();
