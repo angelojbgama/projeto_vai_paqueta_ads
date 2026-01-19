@@ -19,7 +19,6 @@ import '../../services/driver_background_service.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/route_service.dart';
-import '../../widgets/message_banner.dart';
 import '../../widgets/coach_mark.dart';
 import '../auth/auth_provider.dart';
 import 'driver_service.dart';
@@ -35,6 +34,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   static const _prefsRecebendoCorridasKey = 'driver_recebendo_corridas';
   static const _prefsLocalizacaoBgKey = 'driver_localizacao_bg';
   static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
+  static const _prefsConsentimentoNotificacaoKey = 'driver_notificacao_consentimento';
   static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
   final GlobalKey _guiaConfigKey = GlobalKey();
   final GlobalKey _guiaLogoutKey = GlobalKey();
@@ -48,7 +48,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   final GlobalKey _guiaModalRotaKey = GlobalKey();
   final GlobalKey _guiaModalMapaKey = GlobalKey();
   final GlobalKey _guiaModalAcoesKey = GlobalKey();
-  AppMessage? _status;
   bool _enviando = false;
   LatLng? _posicao;
   bool _tileUsingAssets = MapTileConfig.useAssets;
@@ -58,7 +57,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   int? _assetsMinNativeZoom;
   int? _assetsMaxNativeZoom;
   bool _usandoFallbackRede = false;
-  bool _alertaTiles = false;
   Timer? _pingTimer;
   Timer? _pollTimer;
   final RouteService _routeService = RouteService();
@@ -72,23 +70,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _appPausado = false;
   StateSetter? _modalSetState;
   bool _backgroundAtivo = false;
-  bool _recebendoCorridas = true;
+  bool _recebendoCorridas = false;
   bool _enviarLocalizacaoBg = false;
   bool _consentimentoLocalizacaoBg = false;
   bool _guiaAtivo = false;
   StreamSubscription<String?>? _notificationTapSub;
 
-  void _clearStatus() {
-    if (!mounted) {
-      _status = null;
-      return;
-    }
-    setState(() => _status = null);
-  }
-
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
-    final recebendo = prefs.getBool(_prefsRecebendoCorridasKey) ?? true;
+    final recebendo = prefs.getBool(_prefsRecebendoCorridasKey) ?? false;
     final consentimentoBg = prefs.getBool(_prefsConsentimentoBgKey) ?? false;
     final localizacaoBgSalva = prefs.getBool(_prefsLocalizacaoBgKey);
     var localizacaoBg = localizacaoBgSalva ?? false;
@@ -222,7 +212,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (!mounted) return;
     if (_recebendoCorridas) {
       _verificarCorrida(force: true);
-      _iniciarAutoPing(showStatus: false);
+      _iniciarAutoPing();
       _iniciarPollingCorrida();
     }
   }
@@ -352,6 +342,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                 ],
               ),
               const SizedBox(height: 12),
+              const Text(
+                'Se você negar, o app continua funcionando, mas você só receberá corridas com o app aberto.',
+              ),
+              const SizedBox(height: 12),
               const Text('Ao continuar, solicitaremos a permissão de localização em segundo plano.'),
             ],
           ),
@@ -362,13 +356,146 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Aceitar e continuar'),
+              child: const Text('Concordo e continuar'),
             ),
           ],
         );
       },
     );
     return result ?? false;
+  }
+
+  Future<bool> _mostrarConsentimentoLocalizacaoForeground() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Permitir localização'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Para receber corridas e mostrar sua posição no mapa, o Vai Paquetá precisa acessar '
+                'sua localização enquanto o app estiver aberto.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.map_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mostra você no mapa e calcula rotas.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.directions_car_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Usa sua posição para receber corridas quando você estiver disponível.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Concordo e continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _mostrarConsentimentoNotificacao() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Permitir notificações'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Ative as notificações para receber avisos de corridas e atualizações importantes.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notifications_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Alertas quando houver corrida disponível.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Você pode ajustar isso nas configurações do Android.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Concordo e continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _solicitarPermissaoNotificacao() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ?? false;
+    if (jaPediu) return;
+    final aceitou = await _mostrarConsentimentoNotificacao();
+    await prefs.setBool(_prefsConsentimentoNotificacaoKey, true);
+    if (!aceitou) return;
+    await NotificationService.requestPermissions();
   }
 
   Future<bool> _garantirConsentimentoLocalizacaoBg() async {
@@ -387,23 +514,20 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      if (mounted) {
-        setState(
-          () => _status = const AppMessage(
-            'Permissão de localização necessária para enviar em segundo plano.',
-            MessageTone.warning,
-          ),
-        );
-      }
       return false;
     }
-    if (permission == LocationPermission.whileInUse && mounted) {
-      setState(
-        () => _status = const AppMessage(
-          'Para enviar em segundo plano, permita localização o tempo todo nas permissões do app.',
-          MessageTone.info,
-        ),
-      );
+    return true;
+  }
+
+  Future<bool> _garantirPermissaoLocalizacaoForeground() async {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      final aceitou = await _mostrarConsentimentoLocalizacaoForeground();
+      if (!aceitou) return false;
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return false;
     }
     return true;
   }
@@ -419,19 +543,19 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     context.go('/auth');
   }
 
-  Future<Position?> _posicaoAtual() async {
+  Future<Position?> _posicaoAtual({
+    bool solicitarPermissao = false,
+  }) async {
     try {
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied && solicitarPermissao) {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
-        setState(() => _status = const AppMessage('Permissão de localização negada.', MessageTone.error));
         return null;
       }
       return await Geolocator.getCurrentPosition();
     } catch (e) {
-      setState(() => _status = AppMessage('Erro ao obter localização: ${friendlyError(e)}', MessageTone.error));
       return null;
     }
   }
@@ -626,7 +750,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           _usandoFallbackRede = false;
         });
       }
-      _alertaTiles = false;
       return;
     }
     if (MapTileConfig.allowNetworkFallback) {
@@ -636,18 +759,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _tileMinNativeZoom = null;
         _tileMaxNativeZoom = null;
         _usandoFallbackRede = true;
-        _status = const AppMessage('Mapa offline indisponível aqui. Usando mapa online.', MessageTone.info);
       });
       return;
-    }
-    if (!_alertaTiles) {
-      setState(() {
-        _status = const AppMessage(
-          'Área fora do mapa offline. Ajuste o GPS ou baixe mais tiles.',
-          MessageTone.warning,
-        );
-      });
-      _alertaTiles = true;
     }
   }
 
@@ -667,10 +780,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final link = _buildWhatsAppLink(telefone);
     if (link == null) return;
     final uri = Uri.parse(link);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      setState(() => _status = const AppMessage('Não foi possível abrir o WhatsApp.', MessageTone.error));
-    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Widget _infoBox(BuildContext context, String title, List<Widget> children) {
@@ -697,15 +807,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<void> _atualizarPosicao() async {
     if (!mounted) return;
-    setState(() {
-      _status = null;
-    });
     final pos = await _posicaoAtual();
     if (pos != null) {
       if (!mounted) return;
       setState(() {
         _posicao = LatLng(pos.latitude, pos.longitude);
-        _status = const AppMessage('Posição atualizada.', MessageTone.success);
       });
       await _avaliarTilesPara(_posicao);
       if (_corridaAtual != null) {
@@ -718,7 +824,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    NotificationService.requestPermissions();
     _notificationTapSub = NotificationService.onNotificationTap.listen(_onNotificationTap);
     final pendingTap = NotificationService.consumePendingPayload();
     if (pendingTap != null) {
@@ -730,7 +835,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
     _atualizarPosicao();
     _carregarPreferencias();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaMotoristaSeNecessario());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _solicitarPermissaoNotificacao();
+      if (!mounted) return;
+      await _mostrarGuiaMotoristaSeNecessario();
+    });
   }
 
   @override
@@ -813,25 +922,18 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final perfilId = user?.perfilId ?? 0;
     final perfilTipo = user?.perfilTipo;
     if (perfilId == 0 || perfilTipo != 'ecotaxista') {
-      if (mounted) {
-        setState(
-          () => _status = const AppMessage(
-            'Use um perfil de ecotaxista para enviar pings.',
-            MessageTone.warning,
-          ),
-        );
-      }
       return;
     }
 
     if (mounted) {
       setState(() {
         _enviando = true;
-        if (!silencioso) _status = null;
       });
     }
 
-    final pos = await _posicaoAtual();
+    final pos = await _posicaoAtual(
+      solicitarPermissao: !silencioso,
+    );
     if (pos == null) {
       if (mounted) setState(() => _enviando = false);
       return;
@@ -845,31 +947,19 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         longitude: _round6(pos.longitude),
         precisao: pos.accuracy,
       );
-      if (!silencioso && mounted) {
-        setState(() => _status = const AppMessage('Ping enviado!', MessageTone.success));
-      } else if (silencioso && mounted) {
-        if (_status?.tone == MessageTone.error) {
-          setState(() => _status = null);
-        }
-      }
     } catch (e) {
-      if (mounted) {
-        setState(() => _status = AppMessage('Erro ao enviar ping: ${friendlyError(e)}', MessageTone.error));
-      }
+      debugPrint('Erro ao enviar ping: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _enviando = false);
     }
   }
 
-  void _iniciarAutoPing({bool showStatus = true}) {
+  void _iniciarAutoPing() {
     if (_guiaAtivo) return;
     if (!_recebendoCorridas) return;
     _pingTimer?.cancel();
     _enviarPing(silencioso: true);
     _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _enviarPing(silencioso: true));
-    if (showStatus) {
-      setState(() => _status = const AppMessage('Auto ping a cada 10s ligado.', MessageTone.info));
-    }
   }
 
   void _iniciarPollingCorrida() {
@@ -1326,9 +1416,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             Navigator.of(context, rootNavigator: true).pop();
             _modalAberto = false;
           }
-          if (mounted) {
-            setState(() => _status = const AppMessage('Corrida enviada para outro motorista.', MessageTone.info));
-          }
           _verificarCorrida();
           return;
         default:
@@ -1340,7 +1427,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
       _modalSetState?.call(() {});
       if (!mounted) return;
-      setState(() => _status = const AppMessage('Status da corrida atualizado.', MessageTone.info));
       if (acao == 'finalizar' || (nova != null && nova['status'] == 'concluida')) {
         _limparRotas();
         if (_modalAberto) {
@@ -1356,8 +1442,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _modalAberto = false;
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _status = AppMessage('Erro ao atualizar corrida: ${friendlyError(e)}', MessageTone.error));
+      debugPrint('Erro ao atualizar corrida: ${friendlyError(e)}');
     }
   }
 
@@ -1366,19 +1451,42 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _verificarCorrida(force: true);
   }
 
-  void _setRecebimentoCorridas(bool ativo) {
-    if (_recebendoCorridas == ativo) return;
-    setState(() {
-      _recebendoCorridas = ativo;
-      _status = AppMessage(
-        ativo ? 'Recebimento de corridas ligado.' : 'Recebimento de corridas desligado.',
-        MessageTone.info,
-      );
-    });
-    _salvarPreferencias(recebendoCorridas: ativo);
+  void _onToggleRecebimentoCorridas(bool ativo) {
+    if (!ativo) {
+      _setRecebimentoCorridas(false);
+      return;
+    }
+    unawaited(_habilitarRecebimentoCorridas());
+  }
+
+  Future<void> _habilitarRecebimentoCorridas() async {
+    final permissaoOk = await _garantirPermissaoLocalizacaoForeground();
+    if (!permissaoOk) {
+      _setRecebimentoCorridas(false, forceRebuild: true);
+      return;
+    }
+    _setRecebimentoCorridas(true);
+  }
+
+  void _setRecebimentoCorridas(
+    bool ativo, {
+    bool salvarPreferencias = true,
+    bool forceRebuild = false,
+  }) {
+    final mudou = _recebendoCorridas != ativo;
+    if (mounted && (mudou || forceRebuild)) {
+      setState(() {
+        if (mudou) {
+          _recebendoCorridas = ativo;
+        }
+      });
+    }
+    if (salvarPreferencias) {
+      _salvarPreferencias(recebendoCorridas: ativo);
+    }
     if (ativo) {
       _verificarCorrida(force: true);
-      _iniciarAutoPing(showStatus: false);
+      _iniciarAutoPing();
       _iniciarPollingCorrida();
       return;
     }
@@ -1401,12 +1509,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   Future<void> _habilitarLocalizacaoSegundoPlano() async {
     final consentimentoOk = await _garantirConsentimentoLocalizacaoBg();
     if (!consentimentoOk) {
-      _setLocalizacaoSegundoPlano(false, showStatus: false, forceRebuild: true);
+      _setLocalizacaoSegundoPlano(false, forceRebuild: true);
       return;
     }
     final permissaoOk = await _garantirPermissaoLocalizacao();
     if (!permissaoOk) {
-      _setLocalizacaoSegundoPlano(false, showStatus: false, forceRebuild: true);
+      _setLocalizacaoSegundoPlano(false, forceRebuild: true);
       return;
     }
     _setLocalizacaoSegundoPlano(true);
@@ -1414,23 +1522,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   void _setLocalizacaoSegundoPlano(
     bool ativo, {
-    bool showStatus = true,
     bool salvarPreferencias = true,
     bool forceRebuild = false,
   }) {
     final mudou = _enviarLocalizacaoBg != ativo;
-    if (mounted && (mudou || showStatus || forceRebuild)) {
+    if (mounted && (mudou || forceRebuild)) {
       setState(() {
         if (mudou) {
           _enviarLocalizacaoBg = ativo;
-        }
-        if (showStatus) {
-          _status = AppMessage(
-            ativo
-                ? 'Envio de localização em segundo plano ligado.'
-                : 'Envio de localização em segundo plano desligado.',
-            MessageTone.info,
-          );
         }
       });
     }
@@ -1446,7 +1545,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   Future<void> _trocarParaPassageiro() async {
     setState(() {
       _trocandoPerfil = true;
-      _status = null;
     });
     try {
       await DriverBackgroundService.stop();
@@ -1455,9 +1553,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       if (!mounted) return;
       context.go('/passageiro');
     } catch (e) {
-      if (mounted) {
-        setState(() => _status = AppMessage('Erro ao trocar para Passageiro: ${friendlyError(e)}', MessageTone.error));
-      }
+      debugPrint('Erro ao trocar para Passageiro: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _trocandoPerfil = false);
     }
@@ -1522,153 +1618,149 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Card(
-              elevation: 0,
-              color: Colors.grey.shade50,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile.adaptive(
-                    key: _guiaRecebimentoKey,
-                    value: _recebendoCorridas,
-                    onChanged: _setRecebimentoCorridas,
-                    title: const Text('Ativar recebimento de corridas'),
-                    subtitle: const Text('Fique disponível para receber novas corridas.'),
-                  ),
-                  Divider(height: 1, color: Colors.grey.shade200),
-                  SwitchListTile.adaptive(
-                    key: _guiaLocalizacaoBgKey,
-                    value: _enviarLocalizacaoBg,
-                    onChanged: _onToggleLocalizacaoSegundoPlano,
-                    title: const Text('Enviar localização em segundo plano'),
-                    subtitle: const Text(
-                      'Permite que o app continue enviando sua localização mesmo em segundo plano, '
-                      'para te conectar às corridas mais próximas.',
+      body: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Card(
+                elevation: 0,
+                color: Colors.grey.shade50,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: _guiaRecebimentoKey,
+                      value: _recebendoCorridas,
+                      onChanged: _onToggleRecebimentoCorridas,
+                      title: const Text('Ativar recebimento de corridas'),
+                      subtitle: const Text('Fique disponível para receber novas corridas.'),
                     ),
-                  ),
-                ],
+                    Divider(height: 1, color: Colors.grey.shade200),
+                    SwitchListTile.adaptive(
+                      key: _guiaLocalizacaoBgKey,
+                      value: _enviarLocalizacaoBg,
+                      onChanged: _onToggleLocalizacaoSegundoPlano,
+                      title: const Text('Enviar localização em segundo plano'),
+                      subtitle: const Text(
+                        'Permite que o app continue enviando sua localização mesmo em segundo plano, '
+                        'para te conectar às corridas mais próximas.',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              key: _guiaMapaKey,
-              height: 220,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: _posicao == null
-                    ? Container(
-                        color: Colors.grey.shade100,
-                        child: const Center(child: Text('Localização não disponível')),
-                      )
-                    : Builder(
-                        builder: (context) {
-                          final bounds = MapTileConfig.tilesBounds;
-                          final rawPins = MapViewport.collectPins([_posicao]);
-                          final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
-                          final center = MapViewport.clampCenter(
-                            MapViewport.centerForPins(pins),
-                            bounds,
-                          );
-                          final zoom = MapViewport.zoomForPins(
-                            pins,
-                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                            fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
-                          );
-                          final fitBounds = MapViewport.boundsForPins(pins);
-                          final fit = fitBounds == null
-                              ? null
-                              : CameraFit.bounds(
-                                  bounds: fitBounds,
-                                  padding: const EdgeInsets.all(24),
-                                  minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                  maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                );
-                          final key = ValueKey(
-                            'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                          );
-                          return FlutterMap(
-                            key: key,
-                            options: MapOptions(
-                              initialCenter: center,
-                              initialZoom: zoom,
-                              initialCameraFit: fit,
-                              interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                              cameraConstraint: CameraConstraint.contain(bounds: bounds),
+              const SizedBox(height: 12),
+              SizedBox(
+                key: _guiaMapaKey,
+                height: 220,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _posicao == null
+                      ? Container(
+                          color: Colors.grey.shade100,
+                          child: const Center(child: Text('Localização não disponível')),
+                        )
+                      : Builder(
+                          builder: (context) {
+                            final bounds = MapTileConfig.tilesBounds;
+                            final rawPins = MapViewport.collectPins([_posicao]);
+                            final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                            final center = MapViewport.clampCenter(
+                              MapViewport.centerForPins(pins),
+                              bounds,
+                            );
+                            final zoom = MapViewport.zoomForPins(
+                              pins,
                               minZoom: MapTileConfig.displayMinZoom.toDouble(),
                               maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                            ),
-                            children: [
-                              TileLayer(
-                                urlTemplate: _tileUrl,
-                                tileProvider: _buildTileProvider(),
-                                userAgentPackageName: 'com.example.vai_paqueta_app',
+                              fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                            );
+                            final fitBounds = MapViewport.boundsForPins(pins);
+                            final fit = fitBounds == null
+                                ? null
+                                : CameraFit.bounds(
+                                    bounds: fitBounds,
+                                    padding: const EdgeInsets.all(24),
+                                    minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                    maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                  );
+                            final key = ValueKey(
+                              'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                            );
+                            return FlutterMap(
+                              key: key,
+                              options: MapOptions(
+                                initialCenter: center,
+                                initialZoom: zoom,
+                                initialCameraFit: fit,
+                                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                cameraConstraint: CameraConstraint.contain(bounds: bounds),
                                 minZoom: MapTileConfig.displayMinZoom.toDouble(),
                                 maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
-                                maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
-                                tileBounds: bounds,
                               ),
-                              if (_rotaMotorista.length >= 2)
-                                PolylineLayer(
-                                  polylines: [
-                                    Polyline(
-                                      points: _rotaMotorista,
-                                      strokeWidth: 3,
-                                      color: Colors.orangeAccent,
-                                    ),
-                                  ],
+                              children: [
+                                TileLayer(
+                                  urlTemplate: _tileUrl,
+                                  tileProvider: _buildTileProvider(),
+                                  userAgentPackageName: 'com.example.vai_paqueta_app',
+                                  minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                  maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                  minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                  maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                  tileBounds: bounds,
                                 ),
-                              if (_rotaCorrida.length >= 2)
-                                PolylineLayer(
-                                  polylines: [
-                                    Polyline(
-                                      points: _rotaCorrida,
-                                      strokeWidth: 3,
-                                      color: Colors.blueAccent,
-                                    ),
-                                  ],
-                                ),
-                              MarkerLayer(
-                                markers: [
-                                  Marker(
-                                    point: _posicao!,
-                                    width: 40,
-                                    height: 40,
-                                    child: const Icon(Icons.location_pin, color: Colors.red, size: 36),
+                                if (_rotaMotorista.length >= 2)
+                                  PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: _rotaMotorista,
+                                        strokeWidth: 3,
+                                        color: Colors.orangeAccent,
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                                if (_rotaCorrida.length >= 2)
+                                  PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: _rotaCorrida,
+                                        strokeWidth: 3,
+                                        color: Colors.blueAccent,
+                                      ),
+                                    ],
+                                  ),
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: _posicao!,
+                                      width: 40,
+                                      height: 40,
+                                      child: const Icon(Icons.location_pin, color: Colors.red, size: 36),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                ),
               ),
-            ),
             const SizedBox(height: 16),
             Text(
               _recebendoCorridas
                   ? 'O app envia sua localização automaticamente a cada 10s e verifica corridas atribuídas.'
                   : 'Recebimento de corridas pausado. Ative para enviar sua localização e verificar corridas atribuídas.',
             ),
-            if (_status != null) ...[
-              const SizedBox(height: 12),
-              MessageBanner(
-                message: _status!,
-                onClose: _clearStatus,
-              ),
-            ],
           ],
         ),
       ),
+    ),
     );
   }
 }

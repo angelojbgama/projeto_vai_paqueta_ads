@@ -52,27 +52,29 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_erro == null) const CircularProgressIndicator(),
-            if (_erro != null) const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 12),
-            Text(_erro ?? 'Carregando Vai Paqueta...'),
-            const SizedBox(height: 8),
-            Text(
-              'API: ${ApiConfig.baseUrl}',
-              style: const TextStyle(fontSize: 12),
-            ),
-            if (_erro != null && _detalhe != null) ...[
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_erro == null) const CircularProgressIndicator(),
+              if (_erro != null) const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 12),
+              Text(_erro ?? 'Carregando Vai Paqueta...'),
               const SizedBox(height: 8),
               Text(
-                _detalhe!,
+                'API: ${ApiConfig.baseUrl}',
                 style: const TextStyle(fontSize: 12),
               ),
+              if (_erro != null && _detalhe != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _detalhe!,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

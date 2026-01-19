@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -84,7 +86,34 @@ O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.
     }
   }
 
+  Future<void> _showMessageDialog(String title, String text) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(text),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _setMessage(String text, MessageTone tone) {
+    if (!mounted) return;
+    if (tone == MessageTone.error) {
+      if (_mensagem != null) {
+        setState(() => _mensagem = null);
+      }
+      unawaited(_showMessageDialog('Atencao', text));
+      return;
+    }
     setState(() => _mensagem = AppMessage(text, tone));
   }
 

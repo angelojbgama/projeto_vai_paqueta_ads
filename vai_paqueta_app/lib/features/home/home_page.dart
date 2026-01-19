@@ -98,49 +98,52 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              auth.when(
-                data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Não autenticado'),
-                loading: () => const Text('Verificando conta...'),
-                error: (e, _) => Text('Erro de conta: ${friendlyError(e)}'),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _loading ? null : () => _escolherPerfil('passageiro'),
-                  icon: const Icon(Icons.person),
-                  label: Text(_loading ? 'Aguarde...' : 'Entrar como Passageiro'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+      body: SafeArea(
+        top: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                auth.when(
+                  data: (user) => Text(user != null ? 'Conta: ${user.email}' : 'Não autenticado'),
+                  loading: () => const Text('Verificando conta...'),
+                  error: (e, _) => Text('Erro de conta: ${friendlyError(e)}'),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading ? null : () => _escolherPerfil('passageiro'),
+                    icon: const Icon(Icons.person),
+                    label: Text(_loading ? 'Aguarde...' : 'Entrar como Passageiro'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _loading ? null : () => _escolherPerfil('ecotaxista'),
-                  icon: const Icon(Icons.local_taxi),
-                  label: Text(_loading ? 'Aguarde...' : 'Entrar como EcoTaxista'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _loading ? null : () => _escolherPerfil('ecotaxista'),
+                    icon: const Icon(Icons.local_taxi),
+                    label: Text(_loading ? 'Aguarde...' : 'Entrar como EcoTaxista'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                   ),
                 ),
-              ),
-              if (_mensagem != null) ...[
-                const SizedBox(height: 16),
-                MessageBanner(
-                  message: _mensagem!,
-                  onClose: () => setState(() => _mensagem = null),
-                ),
+                if (_mensagem != null) ...[
+                  const SizedBox(height: 16),
+                  MessageBanner(
+                    message: _mensagem!,
+                    onClose: () => setState(() => _mensagem = null),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

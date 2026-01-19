@@ -59,27 +59,30 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       appBar: AppBar(
         title: const Text('Histórico'),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _erro != null
-              ? Center(
-                  child: MessageBanner(
-                    message: _erro!,
-                    onClose: () => setState(() => _erro = null),
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _erro != null
+                ? Center(
+                    child: MessageBanner(
+                      message: _erro!,
+                      onClose: () => setState(() => _erro = null),
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: _corridas.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final c = _corridas[index];
+                      return ListTile(
+                        title: Text('Corrida ${c.id}'),
+                        subtitle: Text('Status: ${c.status}'),
+                        trailing: const Icon(Icons.chevron_right),
+                      );
+                    },
                   ),
-                )
-              : ListView.separated(
-                  itemCount: _corridas.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final c = _corridas[index];
-                    return ListTile(
-                      title: Text('Corrida ${c.id}'),
-                      subtitle: Text('Status: ${c.status}'),
-                      trailing: const Icon(Icons.chevron_right),
-                    );
-                  },
-                ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _carregar,
         child: const Icon(Icons.refresh),

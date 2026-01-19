@@ -16,7 +16,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
-import '../../widgets/message_banner.dart';
 import '../../widgets/coach_mark.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/geo_service.dart';
@@ -45,6 +44,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   final GlobalKey _guiaTrocarKey = GlobalKey();
   final _origemCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
+  String _origemTextoConfirmado = '';
+  String _destinoTextoConfirmado = '';
   LatLng? _origemLatLng;
   LatLng? _destinoLatLng;
   LatLng? _motoristaLatLng;
@@ -55,7 +56,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   List<LatLng> _rota = [];
   List<LatLng> _rotaMotorista = [];
   bool _loading = false;
-  AppMessage? _mensagem;
   bool _corridaAtiva = false;
   int? _corridaIdAtual;
   String? _statusCorrida;
@@ -73,7 +73,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   _TileSource? _assetTileSource;
   _TileSource? _networkTileSource;
   bool _usandoFallbackRede = false;
-  bool _alertaTiles = false;
   bool _posCarregada = false;
   int _lugaresSolicitados = 1;
   final GeoService _geo = GeoService();
@@ -258,30 +257,163 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return '${pos.latitude.toStringAsFixed(6)}, ${pos.longitude.toStringAsFixed(6)}';
   }
 
-  void _setMessage(String text, MessageTone tone) {
+  Future<bool> _mostrarConsentimentoLocalizacao() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Permitir localização'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Para definir sua origem automaticamente e mostrar sua posição no mapa, '
+                'o Vai Paquetá precisa acessar sua localização enquanto o app estiver aberto.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.gps_fixed, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Preenche o endereço de origem com o GPS.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.edit_location_alt_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Se preferir, você pode digitar o endereço manualmente.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Concordo e continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  void _limparRotaCorrida() {
+    if (_rota.isEmpty && _rotaKey == null) return;
     if (!mounted) {
-      _mensagem = AppMessage(text, tone);
+      _rota = [];
+      _rotaKey = null;
       return;
     }
-    setState(() => _mensagem = AppMessage(text, tone));
+    setState(() {
+      _rota = [];
+      _rotaKey = null;
+    });
   }
 
-  void _setMessageRaw(String text, MessageTone tone) {
-    _mensagem = AppMessage(text, tone);
-  }
-
-  void _clearMessage() {
-    if (!mounted) {
-      _mensagem = null;
+  Future<void> _atualizarRotaSePossivel() async {
+    if (_corridaAtiva) return;
+    final origem = _origemLatLng;
+    final destino = _destinoLatLng;
+    if (origem == null || destino == null) {
+      _limparRotaCorrida();
       return;
     }
-    setState(() => _mensagem = null);
+    await _carregarRotaCorrida(origem, destino);
   }
 
-  void _clearInputMessage() {
-    if (_mensagem == null) return;
-    if (_mensagem!.tone == MessageTone.error || _mensagem!.tone == MessageTone.warning) {
-      _clearMessage();
+  Future<void> _confirmarOrigemDigitada() async {
+    if (_corridaAtiva) return;
+    final texto = _origemCtrl.text.trim();
+    if (texto.isEmpty) {
+      if (!mounted) {
+        _origemLatLng = null;
+        _origemTextoConfirmado = '';
+        _limparRotaCorrida();
+        return;
+      }
+      setState(() {
+        _origemLatLng = null;
+        _origemTextoConfirmado = '';
+      });
+      _limparRotaCorrida();
+      return;
+    }
+    if (_origemLatLng != null && texto == _origemTextoConfirmado) {
+      await _atualizarRotaSePossivel();
+      return;
+    }
+    try {
+      final res = await _geo.forward(texto);
+      if (!mounted) return;
+      setState(() {
+        _origemLatLng = LatLng(res.lat, res.lng);
+        _origemCtrl.text = res.endereco;
+        _sugestoesOrigem = [];
+      });
+      _origemTextoConfirmado = _origemCtrl.text.trim();
+      await _avaliarTilesPara(_origemLatLng);
+      await _atualizarRotaSePossivel();
+    } catch (e) {
+      debugPrint('Erro ao localizar origem: ${friendlyError(e)}');
+    }
+  }
+
+  Future<void> _confirmarDestinoDigitado() async {
+    if (_corridaAtiva) return;
+    final texto = _destinoCtrl.text.trim();
+    if (texto.isEmpty) {
+      if (!mounted) {
+        _destinoLatLng = null;
+        _destinoTextoConfirmado = '';
+        _limparRotaCorrida();
+        return;
+      }
+      setState(() {
+        _destinoLatLng = null;
+        _destinoTextoConfirmado = '';
+      });
+      _limparRotaCorrida();
+      return;
+    }
+    if (_destinoLatLng != null && texto == _destinoTextoConfirmado) {
+      await _atualizarRotaSePossivel();
+      return;
+    }
+    try {
+      final res = await _geo.forward(texto);
+      if (!mounted) return;
+      setState(() {
+        _destinoLatLng = LatLng(res.lat, res.lng);
+        _destinoCtrl.text = res.endereco;
+        _sugestoesDestino = [];
+      });
+      _destinoTextoConfirmado = _destinoCtrl.text.trim();
+      await _avaliarTilesPara(_destinoLatLng);
+      await _atualizarRotaSePossivel();
+    } catch (e) {
+      debugPrint('Erro ao localizar destino: ${friendlyError(e)}');
     }
   }
 
@@ -302,8 +434,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (link == null) return;
     final uri = Uri.parse(link);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
-      setState(() => _mensagem = const AppMessage('Não foi possível abrir o WhatsApp.', MessageTone.error));
+    if (!ok) {
+      debugPrint('Não foi possível abrir o WhatsApp.');
     }
   }
 
@@ -327,6 +459,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (limparEnderecos) {
       _origemCtrl.clear();
       _destinoCtrl.clear();
+      _origemTextoConfirmado = '';
+      _destinoTextoConfirmado = '';
       _origemLatLng = null;
       _destinoLatLng = null;
       _sugestoesOrigem = [];
@@ -648,17 +782,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       if (_usandoFallbackRede && _assetTileSource != null) {
         _applyTileSource(_assetTileSource!, usandoFallback: false);
       }
-      _alertaTiles = false;
       return;
     }
     if (MapTileConfig.allowNetworkFallback && _networkTileSource != null) {
       _applyTileSource(_networkTileSource!, usandoFallback: true);
-      _setMessage('Mapa offline indisponível aqui. Usando mapa online.', MessageTone.info);
       return;
-    }
-    if (!_alertaTiles) {
-      _setMessage('Área fora do mapa offline. Ajuste o GPS ou baixe mais tiles.', MessageTone.warning);
-      _alertaTiles = true;
     }
   }
 
@@ -757,6 +885,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Future<void> _carregarPosicao() async {
     if (_posCarregada) return;
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return;
+    }
     await _usarGPS(silencioso: true);
   }
 
@@ -804,12 +936,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           if (_origemCtrl.text.trim().isEmpty && current.origemEndereco != null && current.origemEndereco!.isNotEmpty) {
             _origemCtrl.text = current.origemEndereco!;
           }
-          if (_destinoCtrl.text.trim().isEmpty && current.destinoEndereco != null && current.destinoEndereco!.isNotEmpty) {
-            _destinoCtrl.text = current.destinoEndereco!;
-          }
-          _lugaresSolicitados = current.lugares;
-        });
-        _sincronizarModalCorrida();
+        if (_destinoCtrl.text.trim().isEmpty && current.destinoEndereco != null && current.destinoEndereco!.isNotEmpty) {
+          _destinoCtrl.text = current.destinoEndereco!;
+        }
+        _lugaresSolicitados = current.lugares;
+      });
+      _origemTextoConfirmado = _origemCtrl.text.trim();
+      _destinoTextoConfirmado = _destinoCtrl.text.trim();
+      _sincronizarModalCorrida();
         if (_origemLatLng != null && _destinoLatLng != null) {
           _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
         }
@@ -859,8 +993,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (!mounted) return false;
         setState(() {
           _encerrarCorrida();
-          _mensagem = const AppMessage('Corrida não encontrada.', MessageTone.info);
         });
+        debugPrint('Corrida não encontrada.');
         return false;
       }
       if (!mounted) return false;
@@ -902,6 +1036,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         _lugaresSolicitados = corrida.lugares;
       });
+      _origemTextoConfirmado = _origemCtrl.text.trim();
+      _destinoTextoConfirmado = _destinoCtrl.text.trim();
       _sincronizarModalCorrida();
       if (_origemLatLng != null && _destinoLatLng != null) {
         _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
@@ -1337,21 +1473,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Future<void> _trocarParaEcotaxista() async {
     setState(() {
       _trocandoPerfil = true;
-      _mensagem = null;
     });
     try {
       await ref.read(authProvider.notifier).atualizarPerfil(tipo: 'ecotaxista');
       if (!mounted) return;
       context.go('/motorista');
     } catch (e) {
-      if (mounted) {
-        setState(
-          () => _mensagem = AppMessage(
-            'Erro ao trocar para EcoTaxista: ${friendlyError(e)}',
-            MessageTone.error,
-          ),
-        );
-      }
+      debugPrint('Erro ao trocar para EcoTaxista: ${friendlyError(e)}');
     } finally {
       if (mounted) {
         setState(() => _trocandoPerfil = false);
@@ -1361,17 +1489,23 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Future<void> _usarGPS({bool silencioso = false}) async {
     setState(() {
-      if (!silencioso) _mensagem = null;
       _loading = true;
     });
     try {
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        final aceitou = await _mostrarConsentimentoLocalizacao();
+        if (!aceitou) {
+          if (mounted) setState(() => _loading = false);
+          return;
+        }
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
         if (!mounted) return;
-        setState(() => _mensagem = const AppMessage('Permissão de localização negada.', MessageTone.error));
+        if (!silencioso) {
+          debugPrint('Permissão de localização negada.');
+        }
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
@@ -1386,34 +1520,19 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (!mounted) return;
         setState(() {
           _origemCtrl.text = res.endereco.isNotEmpty ? res.endereco : _origemCtrl.text;
-          if (!silencioso) {
-            _mensagem = AppMessage(
-              res.endereco.isNotEmpty ? res.endereco : 'Origem definida pelo GPS.',
-              MessageTone.info,
-            );
-          }
         });
       } catch (_) {
         if (!silencioso) {
-          if (!mounted) return;
-          setState(
-            () => _mensagem = const AppMessage(
-              'Origem definida pelo GPS (falha no endereço, use o texto digitado).',
-              MessageTone.info,
-            ),
-          );
+          debugPrint('Origem definida pelo GPS (falha no endereço).');
         }
       }
+      _origemTextoConfirmado = _origemCtrl.text.trim();
+      await _atualizarRotaSePossivel();
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        if (!silencioso) {
-          _mensagem = AppMessage(
-            'Erro ao obter localização: ${friendlyError(e)}',
-            MessageTone.error,
-          );
-        }
-      });
+      if (!silencioso) {
+        debugPrint('Erro ao obter localização: ${friendlyError(e)}');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1438,13 +1557,37 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   void _onOrigemChanged(String texto) {
-    _clearInputMessage();
+    final trimmed = texto.trim();
+    if (_origemLatLng != null && trimmed != _origemTextoConfirmado) {
+      if (mounted) {
+        setState(() {
+          _origemLatLng = null;
+          _origemTextoConfirmado = '';
+        });
+      } else {
+        _origemLatLng = null;
+        _origemTextoConfirmado = '';
+      }
+      _limparRotaCorrida();
+    }
     _debounceOrigem?.cancel();
     _debounceOrigem = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesOrigem(texto));
   }
 
   void _onDestinoChanged(String texto) {
-    _clearInputMessage();
+    final trimmed = texto.trim();
+    if (_destinoLatLng != null && trimmed != _destinoTextoConfirmado) {
+      if (mounted) {
+        setState(() {
+          _destinoLatLng = null;
+          _destinoTextoConfirmado = '';
+        });
+      } else {
+        _destinoLatLng = null;
+        _destinoTextoConfirmado = '';
+      }
+      _limparRotaCorrida();
+    }
     _debounceDestino?.cancel();
     _debounceDestino = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesDestino(texto));
   }
@@ -1453,7 +1596,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (!_corridaAtiva || _corridaIdAtual == null) return;
     setState(() {
       _loading = true;
-      _mensagem = null;
     });
     final refreshed = await _atualizarCorridaAtiva();
     if (!mounted) return;
@@ -1466,12 +1608,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final msg = remaining != null && remaining > Duration.zero
           ? 'Aguarde ${_formatTempoRestante(remaining)} para finalizar.'
           : 'Corrida ainda nao pode ser finalizada.';
-      setState(
-        () => _mensagem = AppMessage(
-          msg,
-          MessageTone.warning,
-        ),
-      );
+      debugPrint(msg);
       setState(() => _loading = false);
       return;
     }
@@ -1480,12 +1617,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       await rides.finalizarCorrida(_corridaIdAtual!);
       setState(() {
         _encerrarCorrida(limparEnderecos: true);
-        _mensagem = const AppMessage('Corrida finalizada.', MessageTone.success);
       });
     } catch (e) {
-      setState(
-        () => _mensagem = AppMessage('Erro ao finalizar: ${friendlyError(e)}', MessageTone.error),
-      );
+      debugPrint('Erro ao finalizar: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1495,7 +1629,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (_corridaAtiva && _corridaIdAtual != null) {
       setState(() {
         _loading = true;
-        _mensagem = null;
       });
       final refreshed = await _atualizarCorridaAtiva();
       if (!mounted) return;
@@ -1509,12 +1642,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         final msg = remaining != null && remaining > Duration.zero && status == 'aceita'
             ? 'Aguarde ${_formatTempoRestante(remaining)} para cancelar.'
             : 'Corrida já aceita. Não é possível cancelar agora.';
-        setState(
-          () => _mensagem = AppMessage(
-            msg,
-            MessageTone.warning,
-          ),
-        );
+        debugPrint(msg);
         setState(() => _loading = false);
         return;
       }
@@ -1525,9 +1653,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _encerrarCorrida();
         });
       } catch (e) {
-        setState(
-          () => _mensagem = AppMessage('Erro ao cancelar: ${friendlyError(e)}', MessageTone.error),
-        );
+        debugPrint('Erro ao cancelar: ${friendlyError(e)}');
       } finally {
         setState(() => _loading = false);
       }
@@ -1536,19 +1662,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
     setState(() {
       _loading = true;
-      _mensagem = null;
     });
     try {
       final user = ref.read(authProvider).valueOrNull;
       final perfilId = user?.perfilId ?? 0;
       if (perfilId == 0) {
-        setState(
-          () => _mensagem = const AppMessage('Perfil do usuário não encontrado.', MessageTone.error),
-        );
+        debugPrint('Perfil do usuário não encontrado.');
         return;
       }
       if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
-        setState(() => _mensagem = const AppMessage('Selecione 1 ou 2 lugares.', MessageTone.warning));
+        debugPrint('Selecione 1 ou 2 lugares.');
         return;
       }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
@@ -1556,6 +1679,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemLatLng = LatLng(res.lat, res.lng);
         _origemCtrl.text = res.endereco;
         _sugestoesOrigem = [];
+        _origemTextoConfirmado = _origemCtrl.text.trim();
         await _avaliarTilesPara(_origemLatLng);
       }
       if (_destinoLatLng == null && _destinoCtrl.text.isNotEmpty) {
@@ -1563,10 +1687,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _destinoLatLng = LatLng(res.lat, res.lng);
         _destinoCtrl.text = res.endereco;
         _sugestoesDestino = [];
+        _destinoTextoConfirmado = _destinoCtrl.text.trim();
         await _avaliarTilesPara(_destinoLatLng);
       }
       if (_origemLatLng == null || _destinoLatLng == null) {
-        setState(() => _mensagem = const AppMessage('Defina origem e destino.', MessageTone.warning));
+        debugPrint('Defina origem e destino.');
         return;
       }
 
@@ -1601,9 +1726,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _mostrarAvisoPagamento(rideId: corrida.id);
       });
     } catch (e) {
-      setState(
-        () => _mensagem = AppMessage('Erro ao pedir corrida: ${friendlyError(e)}', MessageTone.error),
-      );
+      debugPrint('Erro ao pedir corrida: ${friendlyError(e)}');
     } finally {
       setState(() => _loading = false);
     }
@@ -1878,6 +2001,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       key: _guiaOrigemKey,
                       controller: _origemCtrl,
                       onChanged: _onOrigemChanged,
+                      onEditingComplete: () async {
+                        await _confirmarOrigemDigitada();
+                      },
                       decoration: InputDecoration(
                         labelText: 'Endereço atual (origem)',
                         border: const OutlineInputBorder(),
@@ -1904,13 +2030,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                             return ListTile(
                               dense: true,
                               title: Text(s.endereco),
-                              onTap: () {
-                                _clearInputMessage();
+                              onTap: () async {
                                 setState(() {
                                   _origemCtrl.text = s.endereco;
                                   _origemLatLng = LatLng(s.lat, s.lng);
                                   _sugestoesOrigem = [];
                                 });
+                                _origemTextoConfirmado = _origemCtrl.text.trim();
+                                await _avaliarTilesPara(_origemLatLng);
+                                await _atualizarRotaSePossivel();
                               },
                             );
                           },
@@ -1921,6 +2049,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       key: _guiaDestinoKey,
                       controller: _destinoCtrl,
                       onChanged: _onDestinoChanged,
+                      onEditingComplete: () async {
+                        await _confirmarDestinoDigitado();
+                      },
                       decoration: const InputDecoration(
                         labelText: 'Endereço de ida (destino)',
                         border: OutlineInputBorder(),
@@ -1942,13 +2073,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                             return ListTile(
                               dense: true,
                               title: Text(s.endereco),
-                              onTap: () {
-                                _clearInputMessage();
+                              onTap: () async {
                                 setState(() {
                                   _destinoCtrl.text = s.endereco;
                                   _destinoLatLng = LatLng(s.lat, s.lng);
                                   _sugestoesDestino = [];
                                 });
+                                _destinoTextoConfirmado = _destinoCtrl.text.trim();
+                                await _avaliarTilesPara(_destinoLatLng);
+                                await _atualizarRotaSePossivel();
                               },
                             );
                           },
@@ -1970,7 +2103,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                           ? null
                           : (value) {
                               if (value == null) return;
-                              _clearInputMessage();
                               setState(() => _lugaresSolicitados = value);
                             },
                     ),
@@ -1980,11 +2112,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
                     ),
                     const SizedBox(height: 8),
-                    if (_mensagem != null)
-                      MessageBanner(
-                        message: _mensagem!,
-                        onClose: _clearMessage,
-                      ),
                     if (_cancelamentoBloqueado()) ...[
                       const SizedBox(height: 8),
                       _buildCancelCountdown(context, compact: true),
