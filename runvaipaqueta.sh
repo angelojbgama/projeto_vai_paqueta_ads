@@ -9,10 +9,11 @@ SERVICE_TUNNEL="cloudflared.service"
 
 usage() {
   cat <<USAGE
-Uso: $0 [start|restart|status]
+Uso: $0 [start|restart|status|log]
 
 start/restart: roda migrate, collectstatic e inicia/reinicia os serviços.
 status: exibe status dos serviços do backend e tunnel.
+log: exibe status e as últimas linhas de log do backend.
 USAGE
 }
 
@@ -44,6 +45,12 @@ case "${1:-}" in
     ;;
   status)
     systemctl status --no-pager "$SERVICE_BACKEND" "$SERVICE_TUNNEL"
+    exit 0
+    ;;
+  log)
+    systemctl status --no-pager "$SERVICE_BACKEND" "$SERVICE_TUNNEL" || true
+    echo "---- Últimos logs do backend ----"
+    journalctl -u "$SERVICE_BACKEND" -n 200 --no-pager
     exit 0
     ;;
   *)
