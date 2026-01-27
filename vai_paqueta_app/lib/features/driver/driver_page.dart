@@ -66,6 +66,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   String? _rotaCorridaKey;
   bool _modalAberto = false;
   Map<String, dynamic>? _corridaAtual;
+  int? _ultimaCorridaAlertada;
   bool _trocandoPerfil = false;
   bool _appPausado = false;
   StateSetter? _modalSetState;
@@ -990,6 +991,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       if (_guiaAtivo) return;
       if (corrida != null && corrida.isNotEmpty) {
         _corridaAtual = corrida;
+        _alertarNovaCorridaSeNecessario(corrida);
         _atualizarRotas(corrida);
         if (_modalAberto) {
           _modalSetState?.call(() {});
@@ -998,6 +1000,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         }
       } else {
         _corridaAtual = null;
+        _ultimaCorridaAlertada = null;
         _limparRotas();
         if (_modalAberto && mounted) {
           Navigator.of(context, rootNavigator: true).pop();
@@ -1009,6 +1012,23 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       // silencioso para polling
       debugPrint('Erro ao verificar corrida: ${friendlyError(e)}');
     }
+  }
+
+  Future<void> _alertarNovaCorridaSeNecessario(Map<String, dynamic> corrida) async {
+    final status = _normalizarStatus(corrida['status']?.toString());
+    final corridaId = corrida['id'] is int ? corrida['id'] as int : null;
+    if (status != 'aguardando' || corridaId == null) return;
+    if (_ultimaCorridaAlertada == corridaId) return;
+    _ultimaCorridaAlertada = corridaId;
+    try {
+      await NotificationService.showRideAvailable(
+        id: corridaId,
+        title: 'Nova corrida disponível',
+        body: 'Confirme para aceitar a corrida.',
+        payload: 'ride:$corridaId',
+      );
+    } catch (_) {}
+    await SystemSound.play(SystemSoundType.alert);
   }
 
   Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida, {bool guia = false}) async {
