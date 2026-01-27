@@ -79,11 +79,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   final RouteService _routeService = RouteService();
   List<GeoResult> _sugestoesOrigem = [];
   List<GeoResult> _sugestoesDestino = [];
-  final Distance _distance = const Distance();
   String? _rotaKey;
   String? _rotaMotoristaKey;
-  List<_EnderecoOffline> _enderecosOffline = [];
-  bool _enderecosCarregados = false;
   Timer? _debounceOrigem;
   Timer? _debounceDestino;
   bool _trocandoPerfil = false;
@@ -813,74 +810,42 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return zooms;
   }
 
-  Future<void> _carregarEnderecosOffline() async {
-    if (_enderecosCarregados) return;
+  Future<void> _buscarSugestoesOrigem(String texto) async {
+    _sugestoesOrigem = [];
+    setState(() {});
+    final q = texto.trim();
+    if (q.isEmpty) return;
+    final referencia = _origemLatLng ?? _destinoLatLng ?? const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     try {
-      final jsonStr = await rootBundle.loadString('assets/addresses.json');
-      final data = json.decode(jsonStr) as List<dynamic>;
-      _enderecosOffline = data
-          .map(
-            (e) => _EnderecoOffline(
-              displayName: _buildDisplayName(e),
-              lat: (e['lat'] as num).toDouble(),
-              lng: (e['lng'] as num).toDouble(),
-              searchText: _normalizeTexto("${e['street'] ?? ''} ${e['housenumber'] ?? ''}"),
-            ),
-          )
-          .where((e) => e.displayName.isNotEmpty)
-          .toList();
-      _enderecosCarregados = true;
-    } catch (_) {
-      _enderecosOffline = [];
-      _enderecosCarregados = true;
+      final resultados = await _geo.searchNearby(
+        query: q,
+        lat: referencia.latitude,
+        lng: referencia.longitude,
+        limit: 8,
+      );
+      setState(() => _sugestoesOrigem = resultados);
+    } catch (e) {
+      debugPrint('Erro ao buscar sugestoes de origem: ${friendlyError(e)}');
     }
   }
 
-  Future<void> _garantirEnderecos() async {
-    if (_enderecosCarregados) return;
-    await _carregarEnderecosOffline();
-  }
-
-  List<GeoResult> _filtrarEnderecos(String texto, {LatLng? referencia}) {
-    if (_enderecosOffline.isEmpty) return const [];
-    final q = _normalizeTexto(texto);
-    if (q.isEmpty) return const [];
-
-    final list = <(_EnderecoOffline, double?)>[];
-    for (final e in _enderecosOffline) {
-      if (!e.searchText.contains(q)) continue;
-      double? dist;
-      if (referencia != null) {
-        dist = _distance(LatLng(e.lat, e.lng), referencia) / 1000.0;
-      }
-      list.add((e, dist));
+  Future<void> _buscarSugestoesDestino(String texto) async {
+    _sugestoesDestino = [];
+    setState(() {});
+    final q = texto.trim();
+    if (q.isEmpty) return;
+    final referencia = _destinoLatLng ?? _origemLatLng ?? const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
+    try {
+      final resultados = await _geo.searchNearby(
+        query: q,
+        lat: referencia.latitude,
+        lng: referencia.longitude,
+        limit: 8,
+      );
+      setState(() => _sugestoesDestino = resultados);
+    } catch (e) {
+      debugPrint('Erro ao buscar sugestoes de destino: ${friendlyError(e)}');
     }
-
-    list.sort((a, b) {
-      if (a.$2 != null && b.$2 != null) {
-        final cmp = a.$2!.compareTo(b.$2!);
-        if (cmp != 0) return cmp;
-      }
-      return a.$1.displayName.compareTo(b.$1.displayName);
-    });
-
-    return list.take(8).map((item) {
-      final e = item.$1;
-      return GeoResult(lat: e.lat, lng: e.lng, endereco: e.displayName);
-    }).toList();
-  }
-
-  String _normalizeTexto(String value) {
-    final lower = value.toLowerCase();
-    return lower.replaceAll(RegExp('[^a-z0-9\\u00C0-\\u017F\\s]+'), ' ').replaceAll(RegExp('\\s+'), ' ').trim();
-  }
-
-  String _buildDisplayName(Map<String, dynamic> e) {
-    final street = (e['street'] ?? '').toString().trim();
-    final number = e['housenumber']?.toString().trim() ?? '';
-    if (street.isEmpty) return '';
-    if (number.isNotEmpty) return '$street, $number';
-    return street;
   }
 
   Future<void> _carregarPosicao() async {
@@ -1538,24 +1503,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
   }
 
-  Future<void> _buscarSugestoesOrigem(String texto) async {
-    await _garantirEnderecos();
-    _sugestoesOrigem = [];
-    setState(() {});
-    if (texto.trim().length < 1) return;
-    final resultados = _filtrarEnderecos(texto, referencia: _origemLatLng ?? _destinoLatLng);
-    setState(() => _sugestoesOrigem = resultados);
-  }
-
-  Future<void> _buscarSugestoesDestino(String texto) async {
-    await _garantirEnderecos();
-    _sugestoesDestino = [];
-    setState(() {});
-    if (texto.trim().length < 1) return;
-    final resultados = _filtrarEnderecos(texto, referencia: _origemLatLng ?? _destinoLatLng);
-    setState(() => _sugestoesDestino = resultados);
-  }
-
   void _onOrigemChanged(String texto) {
     final trimmed = texto.trim();
     if (_origemLatLng != null && trimmed != _origemTextoConfirmado) {
@@ -2165,20 +2112,6 @@ class _TileSource {
     this.maxZoom,
     this.minNativeZoom,
     this.maxNativeZoom,
-  });
-}
-
-class _EnderecoOffline {
-  final String displayName;
-  final double lat;
-  final double lng;
-  final String searchText;
-
-  const _EnderecoOffline({
-    required this.displayName,
-    required this.lat,
-    required this.lng,
-    required this.searchText,
   });
 }
 

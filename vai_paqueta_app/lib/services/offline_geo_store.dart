@@ -1,7 +1,6 @@
-import 'dart:convert';
-
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:latlong2/latlong.dart';
+
+import 'api_client.dart';
 
 class OfflineGeoResult {
   final double lat;
@@ -15,11 +14,11 @@ class OfflineGeoResult {
   });
 }
 
-/// Carrega e consulta endereços locais vindos de assets/addresses.json.
+/// Carrega e consulta endereços offline vindos do backend (api/geo/addresses/).
 class OfflineGeoStore {
-  OfflineGeoStore({this.assetPath = 'assets/addresses.json'});
+  OfflineGeoStore({this.endpoint = 'geo/addresses/'});
 
-  final String assetPath;
+  final String endpoint;
 
   List<_OfflineAddress>? _cache;
   final Distance _distance = const Distance();
@@ -27,8 +26,11 @@ class OfflineGeoStore {
   Future<List<_OfflineAddress>> _loadAddresses() async {
     if (_cache != null) return _cache!;
     try {
-      final content = await rootBundle.loadString(assetPath);
-      final data = json.decode(content) as List<dynamic>;
+      final resp = await ApiClient.client.get(endpoint);
+      if (resp.statusCode != 200 || resp.data is! List) {
+        return _cache ?? <_OfflineAddress>[];
+      }
+      final data = resp.data as List<dynamic>;
       _cache = data
           .map(
             (e) => _OfflineAddress(
@@ -41,9 +43,9 @@ class OfflineGeoStore {
           .where((a) => a.street.isNotEmpty)
           .toList();
     } catch (_) {
-      _cache = <_OfflineAddress>[];
+      // Mantém cache nulo para tentar novamente em próximas chamadas.
     }
-    return _cache!;
+    return _cache ?? <_OfflineAddress>[];
   }
 
   Future<OfflineGeoResult?> reverse(

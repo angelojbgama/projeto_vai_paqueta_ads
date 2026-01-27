@@ -1,6 +1,3 @@
-import 'package:dio/dio.dart';
-
-import 'api_client.dart';
 import 'offline_geo_store.dart';
 
 class GeoResult {
@@ -16,7 +13,6 @@ class GeoResult {
 }
 
 class GeoService {
-  final Dio _dio = ApiClient.client;
   final OfflineGeoStore _offline = OfflineGeoStore();
 
   Future<GeoResult> forward(String query) async {
@@ -24,17 +20,7 @@ class GeoService {
     if (offline != null) {
       return GeoResult(lat: offline.lat, lng: offline.lng, endereco: offline.endereco);
     }
-
-    final resp = await _dio.get(
-      '/geo/forward/',
-      queryParameters: {'q': query},
-    );
-    final data = resp.data as Map<String, dynamic>;
-    return GeoResult(
-      lat: (data['latitude'] as num).toDouble(),
-      lng: (data['longitude'] as num).toDouble(),
-      endereco: data['endereco'] as String? ?? query,
-    );
+    throw Exception('Endereco nao encontrado nos enderecos disponiveis.');
   }
 
   Future<GeoResult> reverse(double lat, double lng) async {
@@ -42,17 +28,7 @@ class GeoService {
     if (offline != null) {
       return GeoResult(lat: offline.lat, lng: offline.lng, endereco: offline.endereco);
     }
-
-    final resp = await _dio.get(
-      '/geo/reverse/',
-      queryParameters: {'lat': lat, 'lng': lng},
-    );
-    final data = resp.data as Map<String, dynamic>;
-    return GeoResult(
-      lat: lat,
-      lng: lng,
-      endereco: data['endereco'] as String? ?? '',
-    );
+    throw Exception('Endereco nao encontrado nos enderecos disponiveis.');
   }
 
   Future<List<GeoResult>> searchNearby({
@@ -69,64 +45,14 @@ class GeoService {
       radiusKm: radiusKm,
       limit: limit,
     );
-    if (offlineResults.length >= limit) {
-      return offlineResults
-          .map(
-            (e) => GeoResult(
-              lat: e.lat,
-              lng: e.lng,
-              endereco: e.endereco,
-            ),
-          )
-          .toList();
-    }
-
-    try {
-      final remaining = limit - offlineResults.length;
-      final resp = await _dio.get(
-        '/geo/search/',
-        queryParameters: {
-          'q': query,
-          'lat': lat,
-          'lng': lng,
-          'radius_km': radiusKm,
-          'limit': remaining,
-        },
-        options: Options(validateStatus: (_) => true),
-      );
-      final extra = <GeoResult>[];
-      if (resp.statusCode == 200) {
-        final data = resp.data as List<dynamic>;
-        extra.addAll(
-          data.map(
-            (e) => GeoResult(
-              lat: (e['latitude'] as num).toDouble(),
-              lng: (e['longitude'] as num).toDouble(),
-              endereco: e['endereco'] as String? ?? '',
-            ),
+    return offlineResults
+        .map(
+          (e) => GeoResult(
+            lat: e.lat,
+            lng: e.lng,
+            endereco: e.endereco,
           ),
-        );
-      }
-      final offlineConverted = offlineResults
-          .map(
-            (e) => GeoResult(
-              lat: e.lat,
-              lng: e.lng,
-              endereco: e.endereco,
-            ),
-          )
-          .toList();
-      return [...offlineConverted, ...extra].take(limit).toList();
-    } catch (_) {
-      return offlineResults
-          .map(
-            (e) => GeoResult(
-              lat: e.lat,
-              lng: e.lng,
-              endereco: e.endereco,
-            ),
-          )
-          .toList();
-    }
+        )
+        .toList();
   }
 }
