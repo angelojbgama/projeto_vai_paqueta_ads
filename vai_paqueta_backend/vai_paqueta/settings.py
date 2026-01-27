@@ -139,3 +139,10 @@ ROADS_CONNECT_RADIUS = float(os.environ.get("ROADS_CONNECT_RADIUS", "12.0"))
 ROADS_TRACE_DISTANCE = float(os.environ.get("ROADS_TRACE_DISTANCE", "25.0"))
 # Distância máxima entre vértices antes de gerar pontos extras na malha manual.
 ROADS_DENSIFY_MAX_SEGMENT_M = float(os.environ.get("ROADS_DENSIFY_MAX_SEGMENT_M", "15.0"))
+
+# Caminho para o catálogo offline de endereços (usado no backend de geocodificação).
+ADDRESSES_JSON_PATH = os.environ.get(
+    "ADDRESSES_JSON_PATH",
+    str(BASE_DIR / "static" / "landing" / "data" / "addresses.json"),
+)
+ADDRESSES_REVERSE_MAX_DISTANCE_M = float(os.environ.get("ADDRESSES_REVERSE_MAX_DISTANCE_M", "250.0"))

@@ -1,6 +1,7 @@
 import heapq
 import json
 import math
+import re
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,8 +15,7 @@ _EARTH_RADIUS_M = 6371000.0
 
 class ReverseGeocodeView(APIView):
     """
-    Geocodificação reversa simples (lat/lng -> endereço).
-    Usa geopy.Nominatim; em produção use chave própria (ex: Google Geocoding).
+    Geocodificação reversa simples (lat/lng -> endereço) usando apenas o catálogo offline.
     """
 
     def get(self, request):
@@ -25,95 +25,29 @@ class ReverseGeocodeView(APIView):
         except (TypeError, ValueError):
             return Response({"detail": "lat e lng são obrigatórios."}, status=400)
 
-        try:
-            from geopy.geocoders import Nominatim
-
-            geolocator = Nominatim(user_agent="vai-paqueta")
-            location = geolocator.reverse(f"{lat}, {lng}", language="pt")
-            if not location:
-                return Response({"detail": "Endereço não encontrado."}, status=404)
-            raw = getattr(location, "raw", {}) or {}
-            address = raw.get("address") or {}
-            street = (
-                address.get("road")
-                or address.get("pedestrian")
-                or address.get("street")
-                or address.get("residential")
-                or address.get("path")
-                or address.get("footway")
-                or address.get("neighbourhood")
-            )
-            number = address.get("house_number")
-            if street and number:
-                short_address = f"{street}, {number}"
-            elif street:
-                short_address = street
-            else:
-                short_address = location.address
-            return Response({"endereco": short_address, "endereco_completo": location.address})
-        except Exception as exc:  # noqa: BLE001
-            return Response({"detail": f"Falha no geocoding: {exc}"}, status=500)
+        max_distance = float(getattr(settings, "ADDRESSES_REVERSE_MAX_DISTANCE_M", 250.0))
+        address, distance, error = _reverse_offline(lat, lng, max_distance)
+        if error is not None:
+            status = 500 if _is_config_error(error) else 404
+            payload = {"detail": error}
+            if distance is not None:
+                payload["distancia_m"] = round(distance, 2)
+            return Response(payload, status=status)
+        assert address is not None  # Para tipagem estática.
+        return Response(
+            {
+                "endereco": _address_display(address),
+                "endereco_completo": _address_display(address),
+                "latitude": address.lat,
+                "longitude": address.lng,
+                "distancia_m": None if distance is None else round(distance, 2),
+            }
+        )
 
 
 class NearbySearchView(APIView):
     """
-    Busca endereços próximos ao ponto informado (lat/lng) contendo o texto.
-    Usa Nominatim com viewbox para limitar o raio aproximado.
-    """
-
-    def get(self, request):
-        query = request.query_params.get("q")
-        try:
-            lat = float(request.query_params.get("lat"))
-            lng = float(request.query_params.get("lng"))
-        except (TypeError, ValueError):
-            return Response({"detail": "Parâmetros q, lat e lng são obrigatórios."}, status=400)
-
-        radius_km = float(request.query_params.get("radius_km", 5))
-        limit = int(request.query_params.get("limit", 5))
-
-        # Aproximação simples de bbox
-        lat_deg = radius_km / 111.0
-        lng_deg = radius_km / (111.0 * max(abs(math.cos(math.radians(lat))), 0.01))
-        viewbox = [
-            lng - lng_deg,
-            lat - lat_deg,
-            lng + lng_deg,
-            lat + lat_deg,
-        ]
-
-        try:
-            from geopy.geocoders import Nominatim
-
-            geolocator = Nominatim(user_agent="vai-paqueta")
-            results = geolocator.geocode(
-                query,
-                exactly_one=False,
-                limit=limit,
-                viewbox=viewbox,
-                bounded=True,
-                language="pt",
-            )
-            if not results:
-                return Response([], status=200)
-            resposta = []
-            for r in results:
-                resposta.append(
-                    {
-                        "latitude": r.latitude,
-                        "longitude": r.longitude,
-                        "endereco": r.address,
-                        "nome": r.raw.get("display_name", r.address),
-                    }
-                )
-            return Response(resposta)
-        except Exception as exc:  # noqa: BLE001
-            return Response({"detail": f"Falha na busca: {exc}"}, status=500)
-
-
-class ForwardGeocodeView(APIView):
-    """
-    Geocodificação direta (endereço -> lat/lng).
+    Busca endereços próximos ao ponto informado (lat/lng) contendo o texto no catálogo offline.
     """
 
     def get(self, request):
@@ -121,21 +55,87 @@ class ForwardGeocodeView(APIView):
         if not query:
             return Response({"detail": "Parâmetro q é obrigatório."}, status=400)
         try:
-            from geopy.geocoders import Nominatim
+            lat = float(request.query_params.get("lat"))
+            lng = float(request.query_params.get("lng"))
+        except (TypeError, ValueError):
+            return Response({"detail": "Parâmetros q, lat e lng são obrigatórios."}, status=400)
 
-            geolocator = Nominatim(user_agent="vai-paqueta")
-            location = geolocator.geocode(query, language="pt")
-            if not location:
-                return Response({"detail": "Endereço não encontrado."}, status=404)
-            return Response(
+        try:
+            radius_km = max(0.0, float(request.query_params.get("radius_km", 5)))
+        except (TypeError, ValueError):
+            return Response({"detail": "radius_km inválido."}, status=400)
+        try:
+            limit = int(request.query_params.get("limit", 5))
+        except (TypeError, ValueError):
+            return Response({"detail": "limit inválido."}, status=400)
+
+        matches, error = _search_offline(query, lat, lng, radius_km, max(limit, 0))
+        if error is not None:
+            status = 500 if _is_config_error(error) else 404
+            return Response({"detail": error}, status=status)
+        resposta = []
+        for addr, dist_km in matches or []:
+            resposta.append(
                 {
-                    "latitude": location.latitude,
-                    "longitude": location.longitude,
-                    "endereco": location.address,
+                    "latitude": addr.lat,
+                    "longitude": addr.lng,
+                    "endereco": _address_display(addr),
+                    "nome": _address_display(addr),
+                    "distancia_km": round(dist_km, 3),
                 }
             )
-        except Exception as exc:  # noqa: BLE001
-            return Response({"detail": f"Falha no geocoding: {exc}"}, status=500)
+        return Response(resposta)
+
+
+class AddressesView(APIView):
+    """
+    Retorna o catálogo offline de endereços para consumo do app.
+    """
+
+    permission_classes = []
+    authentication_classes = []
+
+    def get(self, request):
+        addresses, error = _load_addresses_cached()
+        if error is not None:
+            status = 500 if _is_config_error(error) else 404
+            return Response({"detail": error}, status=status)
+        assert addresses is not None
+        return Response(
+            [
+                {
+                    "street": addr.street,
+                    "housenumber": addr.housenumber,
+                    "lat": addr.lat,
+                    "lng": addr.lng,
+                    "display_name": _address_display(addr),
+                }
+                for addr in addresses
+            ]
+        )
+
+
+class ForwardGeocodeView(APIView):
+    """
+    Geocodificação direta (endereço -> lat/lng) usando apenas o catálogo offline.
+    """
+
+    def get(self, request):
+        query = request.query_params.get("q")
+        if not query:
+            return Response({"detail": "Parâmetro q é obrigatório."}, status=400)
+        address, error = _forward_offline(query)
+        if error is not None:
+            status = 500 if _is_config_error(error) else 404
+            return Response({"detail": error}, status=status)
+        assert address is not None
+        return Response(
+            {
+                "latitude": address.lat,
+                "longitude": address.lng,
+                "endereco": _address_display(address),
+            }
+        )
 
 
 class CountryListView(APIView):
@@ -201,6 +201,184 @@ def _float_from_params(params, *keys: str) -> float | None:
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{key} inválido: {raw}") from exc
     return None
+
+
+def _normalize_text(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9\u00c0-\u017f\s]+", " ", value.lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _addresses_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    configured = getattr(settings, "ADDRESSES_JSON_PATH", None)
+    if configured:
+        candidates.append(_normalize_path(configured))
+    candidates.extend(
+        [
+            _normalize_path(settings.BASE_DIR / "static" / "landing" / "data" / "addresses.json"),
+            _normalize_path("geo/addresses.json"),
+            _normalize_path("scripts/addresses.json"),
+            _normalize_path("../vai_paqueta_app/assets/addresses.json"),
+        ]
+    )
+    uniq: list[Path] = []
+    seen: set[Path] = set()
+    for cand in candidates:
+        if cand in seen:
+            continue
+        uniq.append(cand)
+        seen.add(cand)
+    return uniq
+
+
+@dataclass
+class _Address:
+    street: str
+    housenumber: str | None
+    lat: float
+    lng: float
+    search_text: str
+
+
+def _address_display(address: _Address) -> str:
+    if address.housenumber:
+        return f"{address.street}, {address.housenumber}"
+    return address.street
+
+
+_ADDRESS_LOCK = threading.Lock()
+_ADDRESS_CACHE: dict[str, object] = {"path": None, "mtime": None, "addresses": None}
+
+
+def _is_config_error(msg: str) -> bool:
+    tokens = (
+        "Arquivo de enderecos",
+        "Erro ao ler",
+        "Formato de enderecos",
+        "Falha ao ler",
+    )
+    return any(token in msg for token in tokens)
+
+
+def _parse_addresses(data: list[object]) -> list[_Address]:
+    addresses: list[_Address] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        street = str(entry.get("street") or "").strip()
+        if not street:
+            continue
+        housenumber_raw = entry.get("housenumber")
+        housenumber = str(housenumber_raw).strip() if housenumber_raw not in (None, "") else None
+        lat = _parse_float(entry.get("lat"))
+        lng = _parse_float(entry.get("lng"))
+        if lat is None or lng is None:
+            continue
+        search_text = _normalize_text(f"{street} {housenumber or ''}")
+        addresses.append(
+            _Address(
+                street=street,
+                housenumber=housenumber,
+                lat=lat,
+                lng=lng,
+                search_text=search_text,
+            )
+        )
+    return addresses
+
+
+def _load_addresses_cached() -> tuple[list[_Address] | None, str | None]:
+    candidates = _addresses_candidates()
+    path, data, error = _load_json_from_candidates(candidates)
+    if error is not None:
+        return None, f"Erro ao ler {path}: {error}"
+    if data is None or path is None:
+        return None, "Arquivo de enderecos nao encontrado."
+    try:
+        mtime = path.stat().st_mtime
+    except OSError:
+        return None, "Falha ao ler arquivo de enderecos."
+
+    with _ADDRESS_LOCK:
+        if _ADDRESS_CACHE["path"] == path and _ADDRESS_CACHE["mtime"] == mtime:
+            cached = _ADDRESS_CACHE.get("addresses")
+            if isinstance(cached, list) and cached:
+                return cached, None
+
+    if not isinstance(data, list):
+        return None, "Formato de enderecos invalido."
+
+    addresses = _parse_addresses(data)
+    if not addresses:
+        return None, "Nenhum endereco valido encontrado."
+
+    with _ADDRESS_LOCK:
+        _ADDRESS_CACHE["path"] = path
+        _ADDRESS_CACHE["mtime"] = mtime
+        _ADDRESS_CACHE["addresses"] = addresses
+    return addresses, None
+
+
+def _forward_offline(query: str) -> tuple[_Address | None, str | None]:
+    addresses, error = _load_addresses_cached()
+    if error is not None:
+        return None, error
+    normalized = _normalize_text(query)
+    if not normalized:
+        return None, "Parâmetro q é obrigatório."
+    for addr in addresses:
+        if normalized in addr.search_text:
+            return addr, None
+    return None, "Endereço não encontrado."
+
+
+def _reverse_offline(
+    lat: float,
+    lng: float,
+    max_distance_m: float,
+) -> tuple[_Address | None, float | None, str | None]:
+    addresses, error = _load_addresses_cached()
+    if error is not None:
+        return None, None, error
+    best: _Address | None = None
+    best_dist: float | None = None
+    for addr in addresses:
+        dist = _haversine_m(lat, lng, addr.lat, addr.lng)
+        if best_dist is None or dist < best_dist:
+            best = addr
+            best_dist = dist
+    if best is None:
+        return None, None, "Nenhum endereco valido encontrado."
+    if max_distance_m > 0 and best_dist is not None and best_dist > max_distance_m:
+        return None, best_dist, "Fora da area atendida."
+    return best, best_dist, None
+
+
+def _search_offline(
+    query: str,
+    lat: float,
+    lng: float,
+    radius_km: float,
+    limit: int,
+) -> tuple[list[tuple[_Address, float]] | None, str | None]:
+    addresses, error = _load_addresses_cached()
+    if error is not None:
+        return None, error
+    normalized = _normalize_text(query)
+    if not normalized:
+        return [], None
+    results: list[tuple[_Address, float]] = []
+    for addr in addresses:
+        if normalized not in addr.search_text:
+            continue
+        dist_km = _haversine_m(lat, lng, addr.lat, addr.lng) / 1000.0
+        if radius_km > 0 and dist_km > radius_km:
+            continue
+        results.append((addr, dist_km))
+    results.sort(key=lambda item: (item[1], _address_display(item[0])))
+    if limit > 0:
+        results = results[:limit]
+    return results, None
 
 
 def _round6(value: float) -> float:
