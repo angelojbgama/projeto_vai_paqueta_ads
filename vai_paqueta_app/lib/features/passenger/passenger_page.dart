@@ -625,7 +625,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (!MapTileConfig.useAssets) {
       MapTileCacheService.prefetchDefault();
     }
-    _carregarEnderecosOffline();
     _carregarCorridaAtiva();
     _carregarPosicao();
     WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaPassageiroSeNecessario());
