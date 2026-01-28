@@ -4878,5 +4878,173 @@
     "lng": -43.1077602,
     "osm_type": "relation",
     "osm_id": 13704949
+  },
+  {
+    "street": "Arvore Maria Gorda",
+    "housenumber": "",
+    "lat": -22.7584046,
+    "lng": -43.1084613,
+    "osm_type": "custom",
+    "osm_id": -1
+  },
+  {
+    "street": "Ponte da Saudade",
+    "housenumber": "",
+    "lat": -22.7608376,
+    "lng": -43.1114761,
+    "osm_type": "custom",
+    "osm_id": -2
+  },
+  {
+    "street": "Farol Mesbla",
+    "housenumber": "",
+    "lat": -22.7659825,
+    "lng": -43.1029998,
+    "osm_type": "custom",
+    "osm_id": -3
+  },
+  {
+    "street": "Parque Darke de Mattos",
+    "housenumber": "",
+    "lat": -22.7678095,
+    "lng": -43.1130698,
+    "osm_type": "custom",
+    "osm_id": -4
+  },
+  {
+    "street": "Pedra dos Namorados",
+    "housenumber": "",
+    "lat": -22.7610863,
+    "lng": -43.1111358,
+    "osm_type": "custom",
+    "osm_id": -5
+  },
+  {
+    "street": "Caramanchão dos Tamoios",
+    "housenumber": "",
+    "lat": -22.7609018,
+    "lng": -43.1074796,
+    "osm_type": "custom",
+    "osm_id": -6
+  },
+  {
+    "street": "Praça de São Roque",
+    "housenumber": "",
+    "lat": -22.7532937,
+    "lng": -43.1106269,
+    "osm_type": "custom",
+    "osm_id": -7
+  },
+  {
+    "street": "Mercado Careca e Frescos",
+    "housenumber": "",
+    "lat": -22.762218,
+    "lng": -43.107673,
+    "osm_type": "custom",
+    "osm_id": -8
+  },
+  {
+    "street": "Restaurante Zeca's Paquetá",
+    "housenumber": "",
+    "lat": -22.761175,
+    "lng": -43.107681,
+    "osm_type": "custom",
+    "osm_id": -9
+  },
+  {
+    "street": "Hospital Municipal UISMAV",
+    "housenumber": "",
+    "lat": -22.76128107212424,
+    "lng": -43.10831042337829,
+    "osm_type": "custom",
+    "osm_id": -10
+  },
+  {
+    "street": "Pousada Acordes ao Luar",
+    "housenumber": "",
+    "lat": -22.761557466638358,
+    "lng": -43.1079255263807,
+    "osm_type": "custom",
+    "osm_id": -11
+  },
+  {
+    "street": "Paquefarma",
+    "housenumber": "",
+    "lat": -22.76185921213574,
+    "lng": -43.108282930735925,
+    "osm_type": "custom",
+    "osm_id": -12
+  },
+  {
+    "street": "BIBI LUNCH'S",
+    "housenumber": "",
+    "lat": -22.76217085022892,
+    "lng": -43.10823599207777,
+    "osm_type": "custom",
+    "osm_id": -13
+  },
+  {
+    "street": "Praia da Imbuquinha",
+    "housenumber": "",
+    "lat": -22.767095668852708,
+    "lng": -43.10528159466742,
+    "osm_type": "custom",
+    "osm_id": -14
+  },
+  {
+    "street": "Praia da Imbuca",
+    "housenumber": "",
+    "lat": -22.7676042645385,
+    "lng": -43.106322358646906,
+    "osm_type": "custom",
+    "osm_id": -15
+  },
+  {
+    "street": "Casa Vó",
+    "housenumber": "",
+    "lat": -22.763417940317797,
+    "lng": -43.104603617841406,
+    "osm_type": "custom",
+    "osm_id": -16
+  },
+  {
+    "street": "Casinha Amarela",
+    "housenumber": "",
+    "lat": -22.753313884978457,
+    "lng": -43.111018518026235,
+    "osm_type": "custom",
+    "osm_id": -17
+  },
+  {
+    "street": "Casa de Artes Paquetá",
+    "housenumber": "",
+    "lat": -22.753261524140278,
+    "lng": -43.111262411740086,
+    "osm_type": "custom",
+    "osm_id": -18
+  },
+  {
+    "street": "Lab Mate Tamoio",
+    "housenumber": "",
+    "lat": -22.765842574616407,
+    "lng": -43.10923589318486,
+    "osm_type": "custom",
+    "osm_id": -19
+  },
+  {
+    "street": "Praia Jose Bonifacio",
+    "housenumber": "",
+    "lat": -22.76292887349592,
+    "lng": -43.11010766853155,
+    "osm_type": "custom",
+    "osm_id": -20
+  },
+  {
+    "street": "Tia Leleta - Bar e Restaurante",
+    "housenumber": "",
+    "lat": -22.760770727534062,
+    "lng": -43.10828473278757,
+    "osm_type": "custom",
+    "osm_id": -21
   }
 ]
