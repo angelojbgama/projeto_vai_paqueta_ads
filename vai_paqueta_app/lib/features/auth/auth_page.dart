@@ -378,6 +378,11 @@ O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.
                       );
                     },
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Prefira informar um número com WhatsApp para facilitar o contato entre motorista e passageiro.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                  ),
                   const SizedBox(height: 12),
                 ],
                 TextField(
