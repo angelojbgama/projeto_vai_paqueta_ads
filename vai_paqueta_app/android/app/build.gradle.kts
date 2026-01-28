@@ -13,6 +13,7 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
 
 android {
     namespace = "br.com.vaipaqueta.app"
@@ -59,8 +60,8 @@ android {
         release {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
-            } else {
-                throw org.gradle.api.GradleException("Arquivo key.properties nao encontrado para assinatura de release.")
+            } else if (isReleaseTask) {
+                logger.lifecycle("key.properties not found; release will be unsigned.")
             }
         }
     }

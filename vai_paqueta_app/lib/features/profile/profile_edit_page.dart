@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/error_messages.dart';
 import '../../core/phone_countries.dart';
+import '../../services/driver_background_service.dart';
 import '../../widgets/message_banner.dart';
 import '../auth/auth_provider.dart';
 import '../auth/auth_service.dart';
@@ -27,6 +28,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
   late final Future<List<PhoneCountry>> _countriesFuture;
   bool _saving = false;
   bool _deleting = false;
+  bool _loggingOut = false;
   AppMessage? _mensagem;
   int? _lastUserId;
 
@@ -196,6 +198,32 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
       setState(() => _mensagem = AppMessage('Erro ao atualizar: ${friendlyError(e)}', MessageTone.error));
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    final user = ref.read(authProvider).valueOrNull;
+    if (user == null) {
+      if (!mounted) return;
+      context.go('/auth');
+      return;
+    }
+    setState(() {
+      _loggingOut = true;
+      _mensagem = null;
+    });
+    try {
+      if (user.perfilTipo == 'ecotaxista') {
+        await DriverBackgroundService.stop();
+      }
+      await ref.read(authProvider.notifier).logout();
+      if (!mounted) return;
+      context.go('/auth');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _mensagem = AppMessage('Erro ao sair: ${friendlyError(e)}', MessageTone.error));
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
     }
   }
 
@@ -437,6 +465,11 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   );
                 },
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Prefira informar um número com WhatsApp para facilitar o contato entre motorista e passageiro.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -467,6 +500,12 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                   style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                   icon: const Icon(Icons.delete_forever),
                   label: Text(_deleting ? 'Excluindo...' : 'Excluir conta'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _loggingOut ? null : _logout,
+                  icon: const Icon(Icons.logout),
+                  label: Text(_loggingOut ? 'Saindo...' : 'Sair'),
                 ),
               ],
               const SizedBox(height: 8),

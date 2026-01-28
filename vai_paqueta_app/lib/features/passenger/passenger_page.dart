@@ -20,6 +20,7 @@ import '../../widgets/coach_mark.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/geo_service.dart';
 import '../../services/route_service.dart';
+import '../../services/realtime_service.dart';
 import '../rides/rides_service.dart';
 import '../auth/auth_provider.dart';
 
@@ -40,7 +41,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   final GlobalKey _guiaLugaresKey = GlobalKey();
   final GlobalKey _guiaPedirKey = GlobalKey();
   final GlobalKey _guiaConfigKey = GlobalKey();
-  final GlobalKey _guiaLogoutKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
   final _origemCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
@@ -90,6 +90,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Timer? _finalUnlockTimer;
   bool _appPausado = false;
   Duration _corridaPollInterval = const Duration(seconds: 4);
+  RealtimeService? _realtime;
+  bool _wsConnected = false;
+  int? _wsPerfilId;
+  ProviderSubscription<AsyncValue<dynamic>>? _authSub;
   static const Duration _tempoMinimoCancelamentoAposAceite = Duration(minutes: 2);
   static const Duration _tempoMinimoFinalizarAposInicio = Duration(minutes: 3);
   Duration _serverTimeOffset = Duration.zero;
@@ -152,7 +156,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   String _formatarLugares(int lugares) {
-    return lugares == 1 ? '1 lugar' : '$lugares lugares';
+    return lugares == 1 ? '1 assento' : '$lugares assentos';
   }
 
   DateTime _nowServer() {
@@ -481,6 +485,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   void _sincronizarModalCorrida() {
     if (!_corridaAtiva || _corridaIdAtual == null) return;
+    if (_motoristaLatLng != null) {
+      _atualizarRotaMotorista(_statusCorrida);
+    }
     if (_modalAberto) {
       _modalSetState?.call(() {});
       return;
@@ -564,17 +571,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       CoachMarkStep(
         targetKey: _guiaConfigKey,
         title: 'Configurações',
-        description: 'Edite seus dados do perfil.',
+        description: 'Edite seus dados do perfil e encontre o botão Sair.',
       ),
       CoachMarkStep(
         targetKey: _guiaTrocarKey,
         title: 'Trocar perfil',
         description: 'Mude para o modo Ecotaxista.',
-      ),
-      CoachMarkStep(
-        targetKey: _guiaLogoutKey,
-        title: 'Sair',
-        description: 'Encerre sua sessão no app.',
       ),
       CoachMarkStep(
         targetKey: _guiaMapaKey,
@@ -599,8 +601,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       ),
       CoachMarkStep(
         targetKey: _guiaLugaresKey,
-        title: 'Lugares',
-        description: 'Escolha 1 ou 2 lugares para a corrida.',
+        title: 'Assentos',
+        description: 'Escolha 1 ou 2 assentos para a corrida.',
       ),
       CoachMarkStep(
         targetKey: _guiaPedirKey,
@@ -609,12 +611,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             'Envia sua solicitação. Depois pode virar Cancelar ou Finalizar quando permitido.',
       ),
     ]);
-  }
-
-  Future<void> _logout() async {
-    await ref.read(authProvider.notifier).logout();
-    if (!mounted) return;
-    context.go('/auth');
   }
 
   @override
@@ -627,6 +623,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
     _carregarCorridaAtiva();
     _carregarPosicao();
+    _configurarRealtime();
+    _authSub = ref.listenManual(authProvider, (_, __) {
+      if (!mounted) return;
+      _configurarRealtime();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaPassageiroSeNecessario());
   }
 
@@ -640,6 +641,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaTimer?.cancel();
     _cancelUnlockTimer?.cancel();
     _finalUnlockTimer?.cancel();
+    _authSub?.close();
+    _stopRealtime();
     super.dispose();
   }
 
@@ -654,8 +657,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     } else if (state == AppLifecycleState.resumed && _appPausado) {
       _appPausado = false;
       if (_corridaIdAtual != null) {
-        _atualizarCorridaAtiva();
-        _iniciarPollingCorrida();
+        if (_wsConnected) {
+          _realtime?.sendSync();
+        } else {
+          _atualizarCorridaAtiva();
+          _iniciarPollingCorrida();
+        }
       }
       _gerenciarTimerCancelamento();
     }
@@ -872,6 +879,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final current = corrida;
       if (current != null) {
         final nextStatus = _normalizarStatus(current.status);
+        if (nextStatus == 'concluida' || nextStatus == 'cancelada' || nextStatus == 'rejeitada') {
+          _encerrarCorrida(limparEnderecos: nextStatus == 'concluida');
+          return;
+        }
         setState(() {
           _atualizarServerOffset(current.serverTime);
           _corridaAtiva = true;
@@ -916,7 +927,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         _avaliarTilesPara(_origemLatLng ?? _destinoLatLng);
         _salvarCorridaLocal(current.id);
-        _iniciarPollingCorrida();
+        if (!_wsConnected) {
+          _iniciarPollingCorrida();
+        }
         _gerenciarTimerCancelamento();
         _gerenciarTimerFinalizacao();
       } else {
@@ -930,6 +943,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   void _iniciarPollingCorrida() {
     _corridaTimer?.cancel();
     if (_corridaIdAtual == null) return;
+    if (_wsConnected) return;
     _corridaPollInterval = const Duration(seconds: 4);
     _agendarPoll();
   }
@@ -948,6 +962,136 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     });
   }
 
+  void _configurarRealtime() {
+    final user = ref.read(authProvider).valueOrNull;
+    final perfilId = user?.perfilId ?? 0;
+    final tipo = user?.perfilTipo ?? '';
+    final isPassenger = tipo == 'passageiro' || tipo == 'cliente';
+    if (!isPassenger || perfilId == 0) {
+      _stopRealtime();
+      return;
+    }
+    if (_realtime != null && _wsPerfilId == perfilId) return;
+    _stopRealtime();
+    _wsPerfilId = perfilId;
+    _realtime = RealtimeService(
+      role: RealtimeRole.passenger,
+      onConnected: _onRealtimeConnected,
+      onDisconnected: _onRealtimeDisconnected,
+      onEvent: _handleRealtimeEvent,
+    );
+    unawaited(_realtime!.connect());
+  }
+
+  void _stopRealtime() {
+    _realtime?.disconnect(reconnect: false);
+    _realtime = null;
+    _wsConnected = false;
+    _wsPerfilId = null;
+  }
+
+  void _onRealtimeConnected() {
+    if (!mounted) return;
+    setState(() => _wsConnected = true);
+    _corridaTimer?.cancel();
+    _realtime?.sendSync();
+  }
+
+  void _onRealtimeDisconnected() {
+    if (!mounted) return;
+    setState(() => _wsConnected = false);
+    if (_corridaIdAtual != null) {
+      _iniciarPollingCorrida();
+    }
+  }
+
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    final type = event['type']?.toString();
+    if (type == null) return;
+    if (type == 'ride_update' || type == 'ride_assigned' || type == 'ride_created') {
+      final raw = event['corrida'];
+      if (raw is Map) {
+        final corrida = CorridaResumo.fromJson(Map<String, dynamic>.from(raw as Map));
+        _aplicarCorridaResumo(corrida);
+      } else if (raw == null) {
+        _encerrarCorrida();
+      }
+      return;
+    }
+    if (type == 'driver_location') {
+      final corridaId = event['corrida_id'];
+      if (_corridaIdAtual == null) return;
+      if (corridaId is int && _corridaIdAtual != null && corridaId != _corridaIdAtual) {
+        return;
+      }
+      final lat = event['latitude'];
+      final lng = event['longitude'];
+      if (lat is num && lng is num) {
+        setState(() {
+          _motoristaLatLng = LatLng(lat.toDouble(), lng.toDouble());
+        });
+        _atualizarRotaMotorista(_statusCorrida);
+      }
+    }
+  }
+
+  void _aplicarCorridaResumo(CorridaResumo corrida) {
+    if (!mounted) return;
+    final nextStatus = _normalizarStatus(corrida.status);
+    if (nextStatus == 'concluida' || nextStatus == 'cancelada' || nextStatus == 'rejeitada') {
+      _encerrarCorrida(limparEnderecos: nextStatus == 'concluida');
+      return;
+    }
+    setState(() {
+      _atualizarServerOffset(corrida.serverTime);
+      _corridaAtiva = true;
+      _corridaIdAtual = corrida.id;
+      _statusCorrida = corrida.status;
+      _corridaLugares = corrida.lugares;
+      _corridaAceitaEm = nextStatus == 'aceita'
+          ? (_corridaAceitaEm ?? corrida.atualizadoEm ?? _nowServer())
+          : null;
+      _corridaIniciadaEm = nextStatus == 'em_andamento'
+          ? (_corridaIniciadaEm ?? corrida.atualizadoEm ?? _nowServer())
+          : null;
+      _motoristaNome = corrida.motoristaNome;
+      _motoristaTelefone = corrida.motoristaTelefone;
+      _origemEnderecoCorrida = corrida.origemEndereco;
+      _destinoEnderecoCorrida = corrida.destinoEndereco;
+      if (corrida.origemLat != null && corrida.origemLng != null) {
+        _origemLatLng = LatLng(corrida.origemLat!, corrida.origemLng!);
+      }
+      if (corrida.destinoLat != null && corrida.destinoLng != null) {
+        _destinoLatLng = LatLng(corrida.destinoLat!, corrida.destinoLng!);
+      }
+      if (corrida.motoristaLat != null && corrida.motoristaLng != null) {
+        _motoristaLatLng = LatLng(corrida.motoristaLat!, corrida.motoristaLng!);
+      } else {
+        _motoristaLatLng = null;
+        _rotaMotorista = [];
+      }
+      if (_origemCtrl.text.trim().isEmpty && corrida.origemEndereco != null && corrida.origemEndereco!.isNotEmpty) {
+        _origemCtrl.text = corrida.origemEndereco!;
+      }
+      if (_destinoCtrl.text.trim().isEmpty && corrida.destinoEndereco != null && corrida.destinoEndereco!.isNotEmpty) {
+        _destinoCtrl.text = corrida.destinoEndereco!;
+      }
+      _lugaresSolicitados = corrida.lugares;
+    });
+    _origemTextoConfirmado = _origemCtrl.text.trim();
+    _destinoTextoConfirmado = _destinoCtrl.text.trim();
+    _sincronizarModalCorrida();
+    if (_origemLatLng != null && _destinoLatLng != null) {
+      _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
+    }
+    if (_motoristaLatLng != null) {
+      _atualizarRotaMotorista(corrida.status);
+    }
+    _gerenciarTimerCancelamento();
+    _gerenciarTimerFinalizacao();
+    _salvarCorridaLocal(corrida.id);
+  }
+
   Future<bool> _atualizarCorridaAtiva() async {
     if (_corridaIdAtual == null) return false;
     try {
@@ -961,56 +1105,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         debugPrint('Corrida não encontrada.');
         return false;
       }
-      if (!mounted) return false;
-      final nextStatus = _normalizarStatus(corrida.status);
-      setState(() {
-        _atualizarServerOffset(corrida.serverTime);
-        _statusCorrida = corrida.status;
-        _corridaLugares = corrida.lugares;
-        _corridaAceitaEm = nextStatus == 'aceita'
-            ? (_corridaAceitaEm ?? corrida.atualizadoEm ?? _nowServer())
-            : null;
-        _corridaIniciadaEm = nextStatus == 'em_andamento'
-            ? (_corridaIniciadaEm ?? corrida.atualizadoEm ?? _nowServer())
-            : null;
-        _motoristaNome = corrida.motoristaNome;
-        _motoristaTelefone = corrida.motoristaTelefone;
-        _origemEnderecoCorrida = corrida.origemEndereco;
-        _destinoEnderecoCorrida = corrida.destinoEndereco;
-        if (corrida.origemLat != null && corrida.origemLng != null) {
-          _origemLatLng = LatLng(corrida.origemLat!, corrida.origemLng!);
-        }
-        if (corrida.destinoLat != null && corrida.destinoLng != null) {
-          _destinoLatLng = LatLng(corrida.destinoLat!, corrida.destinoLng!);
-        }
-        if (corrida.motoristaLat != null && corrida.motoristaLng != null) {
-          _motoristaLatLng = LatLng(corrida.motoristaLat!, corrida.motoristaLng!);
-        } else {
-          _motoristaLatLng = null;
-          _rotaMotorista = [];
-        }
-        if (corrida.status == 'concluida' || corrida.status == 'cancelada' || corrida.status == 'rejeitada') {
-          _encerrarCorrida(limparEnderecos: corrida.status == 'concluida');
-        }
-        if (_origemCtrl.text.trim().isEmpty && corrida.origemEndereco != null && corrida.origemEndereco!.isNotEmpty) {
-          _origemCtrl.text = corrida.origemEndereco!;
-        }
-        if (_destinoCtrl.text.trim().isEmpty && corrida.destinoEndereco != null && corrida.destinoEndereco!.isNotEmpty) {
-          _destinoCtrl.text = corrida.destinoEndereco!;
-        }
-        _lugaresSolicitados = corrida.lugares;
-      });
-      _origemTextoConfirmado = _origemCtrl.text.trim();
-      _destinoTextoConfirmado = _destinoCtrl.text.trim();
-      _sincronizarModalCorrida();
-      if (_origemLatLng != null && _destinoLatLng != null) {
-        _carregarRotaCorrida(_origemLatLng!, _destinoLatLng!);
-      }
-      if (_motoristaLatLng != null) {
-        _atualizarRotaMotorista(corrida.status);
-      }
-      _gerenciarTimerCancelamento();
-      _gerenciarTimerFinalizacao();
+      _aplicarCorridaResumo(corrida);
       return true;
     } catch (_) {
       return false;
@@ -1060,7 +1155,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         ),
         const SizedBox(height: 6),
         Text(
-          'Cancelamento liberado em ${_formatTempoRestante(remaining)}',
+          'Você pode cancelar a corrida em ${_formatTempoRestante(remaining)}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.green.shade800),
         ),
       ],
@@ -1194,7 +1289,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
               const SizedBox(height: 4),
               Text(
-                'Quantos lugares você precisa para essa corrida? ${_formatarLugares(_corridaLugares)}',
+                'Quantos assentos você precisa para essa corrida? ${_formatarLugares(_corridaLugares)}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
@@ -1616,10 +1711,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         debugPrint('Perfil do usuário não encontrado.');
         return;
       }
-      if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
-        debugPrint('Selecione 1 ou 2 lugares.');
-        return;
-      }
+    if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
+      debugPrint('Selecione 1 ou 2 assentos.');
+      return;
+    }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
         final res = await _geo.forward(_origemCtrl.text);
         _origemLatLng = LatLng(res.lat, res.lng);
@@ -1761,7 +1856,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final loggedIn = auth.valueOrNull != null;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -1792,13 +1886,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
-          if (loggedIn)
-            IconButton(
-              key: _guiaLogoutKey,
-              tooltip: 'Sair',
-              icon: const Icon(Icons.logout),
-              onPressed: _logout,
-            ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -2038,12 +2125,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       key: _guiaLugaresKey,
                       value: _lugaresSolicitados,
                       decoration: const InputDecoration(
-                        labelText: 'Quantos lugares você precisa para essa corrida?',
+                        labelText: 'Quantos assentos você precisa para essa corrida?',
                         border: OutlineInputBorder(),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 1, child: Text('1 lugar')),
-                        DropdownMenuItem(value: 2, child: Text('2 lugares')),
+                        DropdownMenuItem(value: 1, child: Text('1 assento')),
+                        DropdownMenuItem(value: 2, child: Text('2 assentos')),
                       ],
                       onChanged: _corridaAtiva || _loading
                           ? null
@@ -2054,7 +2141,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Máximo de 2 lugares por corrida.',
+                      'Máximo de 2 assentos por corrida.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
                     ),
                     const SizedBox(height: 8),

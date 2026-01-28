@@ -19,6 +19,7 @@ import '../../services/driver_background_service.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/route_service.dart';
+import '../../services/realtime_service.dart';
 import '../../widgets/coach_mark.dart';
 import '../auth/auth_provider.dart';
 import 'driver_service.dart';
@@ -37,7 +38,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   static const _prefsConsentimentoNotificacaoKey = 'driver_notificacao_consentimento';
   static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
   final GlobalKey _guiaConfigKey = GlobalKey();
-  final GlobalKey _guiaLogoutKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
   final GlobalKey _guiaRecebimentoKey = GlobalKey();
   final GlobalKey _guiaLocalizacaoBgKey = GlobalKey();
@@ -76,6 +76,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _consentimentoLocalizacaoBg = false;
   bool _guiaAtivo = false;
   StreamSubscription<String?>? _notificationTapSub;
+  RealtimeService? _realtime;
+  bool _wsConnected = false;
+  int? _wsPerfilId;
+  ProviderSubscription<AsyncValue<dynamic>>? _authSub;
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
@@ -95,6 +99,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _enviarLocalizacaoBg = localizacaoBg;
       _consentimentoLocalizacaoBg = consentimentoBg;
     });
+    _configurarRealtime();
     if (_recebendoCorridas) {
       _verificarCorrida();
       _iniciarAutoPing();
@@ -160,17 +165,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         CoachMarkStep(
           targetKey: _guiaConfigKey,
           title: 'Configurações',
-          description: 'Edite seus dados do perfil.',
+          description: 'Edite seus dados do perfil e encontre o botão Sair.',
         ),
         CoachMarkStep(
           targetKey: _guiaTrocarKey,
           title: 'Trocar perfil',
           description: 'Mude para o modo Passageiro.',
-        ),
-        CoachMarkStep(
-          targetKey: _guiaLogoutKey,
-          title: 'Sair',
-          description: 'Encerre sua sessão no app.',
         ),
         CoachMarkStep(
           targetKey: _guiaRecebimentoKey,
@@ -236,11 +236,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         description: 'Fale com o passageiro direto no WhatsApp.',
         highlightPadding: const EdgeInsets.all(6),
       ),
-      CoachMarkStep(
-        targetKey: _guiaModalRotaKey,
-        title: 'Rota',
-        description: 'Confirme origem, destino e quantidade de lugares.',
-      ),
+        CoachMarkStep(
+          targetKey: _guiaModalRotaKey,
+          title: 'Rota',
+          description: 'Confirme origem, destino e quantidade de assentos.',
+        ),
       CoachMarkStep(
         targetKey: _guiaModalMapaKey,
         title: 'Mapa da corrida',
@@ -536,13 +536,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   TileProvider _buildTileProvider() {
     return _tileUsingAssets ? AssetTileProvider() : MapTileCacheService.networkTileProvider();
   }
-  Future<void> _logout() async {
-    await DriverBackgroundService.stop();
-    _backgroundAtivo = false;
-    await ref.read(authProvider.notifier).logout();
-    if (!mounted) return;
-    context.go('/auth');
-  }
 
   Future<Position?> _posicaoAtual({
     bool solicitarPermissao = false,
@@ -836,6 +829,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
     _atualizarPosicao();
     _carregarPreferencias();
+    _configurarRealtime();
+    _authSub = ref.listenManual(authProvider, (_, __) {
+      if (!mounted) return;
+      _configurarRealtime();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _solicitarPermissaoNotificacao();
       if (!mounted) return;
@@ -851,6 +849,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     DriverBackgroundService.stop();
     _backgroundAtivo = false;
     _notificationTapSub?.cancel();
+    _authSub?.close();
+    _stopRealtime();
     super.dispose();
   }
 
@@ -881,7 +881,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
       _atualizarPosicao();
       if (_recebendoCorridas) {
-        _verificarCorrida();
+        if (_wsConnected) {
+          _realtime?.sendSync();
+        } else {
+          _verificarCorrida();
+        }
         _iniciarAutoPing();
         _iniciarPollingCorrida();
       }
@@ -914,7 +918,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   String _formatarLugares(int lugares) {
-    return lugares == 1 ? '1 lugar' : '$lugares lugares';
+    return lugares == 1 ? '1 assento' : '$lugares assentos';
   }
 
   Future<void> _enviarPing({bool silencioso = false}) async {
@@ -941,13 +945,25 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
 
     try {
-      final service = DriverService();
-      await service.enviarPing(
-        perfilId: perfilId,
-        latitude: _round6(pos.latitude),
-        longitude: _round6(pos.longitude),
-        precisao: pos.accuracy,
-      );
+      final lat = _round6(pos.latitude);
+      final lng = _round6(pos.longitude);
+      if (_wsConnected && _realtime != null) {
+        final corridaId = _corridaAtual?['id'];
+        _realtime!.sendPing(
+          latitude: lat,
+          longitude: lng,
+          precisaoM: pos.accuracy,
+          corridaId: corridaId is int ? corridaId : null,
+        );
+      } else {
+        final service = DriverService();
+        await service.enviarPing(
+          perfilId: perfilId,
+          latitude: lat,
+          longitude: lng,
+          precisao: pos.accuracy,
+        );
+      }
     } catch (e) {
       debugPrint('Erro ao enviar ping: ${friendlyError(e)}');
     } finally {
@@ -958,22 +974,117 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   void _iniciarAutoPing() {
     if (_guiaAtivo) return;
     if (!_recebendoCorridas) return;
+    final intervalo = _wsConnected ? const Duration(seconds: 5) : const Duration(seconds: 10);
     _pingTimer?.cancel();
     _enviarPing(silencioso: true);
-    _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _enviarPing(silencioso: true));
+    _pingTimer = Timer.periodic(intervalo, (_) => _enviarPing(silencioso: true));
   }
 
   void _iniciarPollingCorrida() {
     if (_guiaAtivo) return;
     if (!_recebendoCorridas) return;
+    if (_wsConnected) return;
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _verificarCorrida());
+  }
+
+  void _configurarRealtime() {
+    final user = ref.read(authProvider).valueOrNull;
+    final perfilId = user?.perfilId ?? 0;
+    final isDriver = user?.perfilTipo == 'ecotaxista';
+    if (!isDriver || perfilId == 0 || !_recebendoCorridas) {
+      _stopRealtime();
+      return;
+    }
+    if (_realtime != null && _wsPerfilId == perfilId) return;
+    _stopRealtime();
+    _wsPerfilId = perfilId;
+    _realtime = RealtimeService(
+      role: RealtimeRole.driver,
+      onConnected: _onRealtimeConnected,
+      onDisconnected: _onRealtimeDisconnected,
+      onEvent: _handleRealtimeEvent,
+    );
+    unawaited(_realtime!.connect());
+  }
+
+  void _stopRealtime() {
+    _realtime?.disconnect(reconnect: false);
+    _realtime = null;
+    _wsConnected = false;
+    _wsPerfilId = null;
+  }
+
+  void _onRealtimeConnected() {
+    if (!mounted) return;
+    setState(() => _wsConnected = true);
+    _pollTimer?.cancel();
+    _realtime?.sendSync();
+    _iniciarAutoPing();
+  }
+
+  void _onRealtimeDisconnected() {
+    if (!mounted) return;
+    setState(() => _wsConnected = false);
+    _iniciarAutoPing();
+    if (_recebendoCorridas) {
+      _iniciarPollingCorrida();
+    }
+  }
+
+  void _handleRealtimeEvent(Map<String, dynamic> event) {
+    final type = event['type']?.toString();
+    if (type == null) return;
+    if (type == 'ride_update' || type == 'ride_assigned' || type == 'ride_created') {
+      final raw = event['corrida'];
+      if (raw is Map) {
+        final corrida = Map<String, dynamic>.from(raw as Map);
+        _aplicarCorridaAtual(corrida);
+      } else if (raw == null) {
+        _aplicarCorridaAtual(null);
+      }
+    }
+  }
+
+  void _aplicarCorridaAtual(Map<String, dynamic>? corrida) {
+    if (corrida == null || corrida.isEmpty) {
+      _corridaAtual = null;
+      _ultimaCorridaAlertada = null;
+      _limparRotas();
+      if (_modalAberto && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _modalAberto = false;
+        _modalSetState = null;
+      }
+      return;
+    }
+    final status = _normalizarStatus(corrida['status']?.toString());
+    if (!['aguardando', 'aceita', 'em_andamento'].contains(status)) {
+      _corridaAtual = null;
+      _ultimaCorridaAlertada = null;
+      _limparRotas();
+      if (_modalAberto && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _modalAberto = false;
+        _modalSetState = null;
+      }
+      return;
+    }
+    _corridaAtual = corrida;
+    _alertarNovaCorridaSeNecessario(corrida);
+    _atualizarRotas(corrida);
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+    } else {
+      _mostrarModalCorrida(corrida);
+    }
   }
 
   Future<void> _verificarCorrida({bool force = false}) async {
     if (_appPausado && !force) return;
     if (_guiaAtivo && !force) return;
     if (!_recebendoCorridas && !force) return;
+    if (_wsConnected && !force) return;
     final authState = ref.read(authProvider);
     var user = authState.valueOrNull;
     if (user == null && authState.isLoading) {
@@ -989,25 +1100,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       final service = DriverService();
       final corrida = await service.corridaAtribuida(perfilId);
       if (_guiaAtivo) return;
-      if (corrida != null && corrida.isNotEmpty) {
-        _corridaAtual = corrida;
-        _alertarNovaCorridaSeNecessario(corrida);
-        _atualizarRotas(corrida);
-        if (_modalAberto) {
-          _modalSetState?.call(() {});
-        } else {
-          _mostrarModalCorrida(corrida);
-        }
-      } else {
-        _corridaAtual = null;
-        _ultimaCorridaAlertada = null;
-        _limparRotas();
-        if (_modalAberto && mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
-          _modalAberto = false;
-          _modalSetState = null;
-        }
-      }
+      _aplicarCorridaAtual(corrida);
     } catch (e) {
       // silencioso para polling
       debugPrint('Erro ao verificar corrida: ${friendlyError(e)}');
@@ -1163,10 +1256,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                   ),
                                   const SizedBox(height: 4),
                                   Text(statusHint, style: Theme.of(context).textTheme.bodySmall),
-                                  if (corridaAtual['id'] != null) ...[
-                                    const SizedBox(height: 6),
-                                    Text('Corrida #${corridaAtual['id']}', style: Theme.of(context).textTheme.bodySmall),
-                                  ],
                                 ],
                               ),
                             ),
@@ -1207,7 +1296,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                   ),
                                 );
                                 final lugares = _asInt(corridaAtual['lugares']) ?? 1;
-                                final lugaresLabel = _formatarLugares(lugares);
                                 final routeCard = KeyedSubtree(
                                   key: _guiaModalRotaKey,
                                   child: _infoBox(
@@ -1218,7 +1306,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                       const SizedBox(height: 4),
                                       Text('Destino: $destinoTexto', style: Theme.of(context).textTheme.bodyMedium),
                                       const SizedBox(height: 4),
-                                      Text('Lugares: $lugaresLabel', style: Theme.of(context).textTheme.bodyMedium),
+                                      Text('Assentos: $lugares', style: Theme.of(context).textTheme.bodyMedium),
                                     ],
                                   ),
                                 );
@@ -1505,11 +1593,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _salvarPreferencias(recebendoCorridas: ativo);
     }
     if (ativo) {
+      _configurarRealtime();
       _verificarCorrida(force: true);
       _iniciarAutoPing();
       _iniciarPollingCorrida();
       return;
     }
+    _configurarRealtime();
     _pingTimer?.cancel();
     _pollTimer?.cancel();
     if (_backgroundAtivo) {
@@ -1582,7 +1672,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final loggedIn = auth.valueOrNull != null;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -1613,13 +1702,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
-          if (loggedIn)
-            IconButton(
-              key: _guiaLogoutKey,
-              tooltip: 'Sair',
-              icon: const Icon(Icons.logout),
-              onPressed: _logout,
-            ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),

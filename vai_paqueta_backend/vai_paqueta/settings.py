@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
@@ -69,6 +70,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "vai_paqueta.wsgi.application"
 ASGI_APPLICATION = "vai_paqueta.asgi.application"
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0")
+USE_REDIS = os.environ.get("DJANGO_USE_REDIS", "0" if DEBUG else "1").lower() in ("1", "true", "yes")
+if USE_REDIS:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
 
 DB_PATH = os.environ.get("DJANGO_DB_PATH")
 DATABASES = {

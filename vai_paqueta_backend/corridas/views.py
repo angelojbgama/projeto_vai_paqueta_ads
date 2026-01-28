@@ -20,6 +20,7 @@ from .serializers import (
     LocalizacaoPingSerializer,
     PerfilSerializer,
 )
+from .realtime import notify_corrida, notify_driver_location
 
 ACTIVE_STATUSES = ["aguardando", "aceita", "em_andamento"]
 PING_MAX_AGE_MINUTES = 5
@@ -89,6 +90,7 @@ def _auto_atribuir_por_ping(perfil: Perfil, lat: float, lng: float) -> Corrida |
         tentativa_lista.add(perfil.id)
         corrida.motoristas_tentados = _limitar_motoristas_tentados(list(tentativa_lista))
         corrida.save(update_fields=["motorista", "status", "atualizado_em", "motoristas_tentados"])
+        notify_corrida(corrida, event_type="ride_assigned")
         return corrida
 
 
@@ -316,6 +318,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
                 "concluida_em",
             ]
         )
+        notify_corrida(corrida, event_type="ride_assigned")
         return novo_motorista
 
     def _dist_motorista_origem_km(self, corrida: Corrida) -> float | None:
@@ -368,6 +371,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             destino_endereco=data.get("destino_endereco", ""),
         )
         self._atribuir_motorista_proximo(corrida)
+        notify_corrida(corrida, event_type="ride_created")
         return Response(CorridaSerializer(corrida).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="aceitar")
@@ -398,6 +402,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             corrida.save(
                 update_fields=["status", "motorista", "atualizado_em", "aceita_em", "iniciada_em", "concluida_em"]
             )
+            notify_corrida(corrida, event_type="ride_update")
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="iniciar")
@@ -422,6 +427,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             corrida.aceita_em = corrida.aceita_em or agora
             corrida.iniciada_em = corrida.iniciada_em or agora
             corrida.save(update_fields=["status", "atualizado_em", "aceita_em", "iniciada_em"])
+            notify_corrida(corrida, event_type="ride_update")
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="finalizar")
@@ -475,6 +481,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
                     "concluida_em",
                 ]
             )
+            notify_corrida(corrida, event_type="ride_update")
             return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="cancelar")
@@ -512,6 +519,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
         corrida.status = "cancelada"
         corrida.motoristas_tentados = []
         corrida.save(update_fields=["status", "atualizado_em", "motoristas_tentados"])
+        notify_corrida(corrida, event_type="ride_update")
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="reatribuir")
@@ -552,6 +560,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             excluir_motorista_id=int(excluir_id) if excluir_id else None,
             allow_reset=False,
         )
+        notify_corrida(corrida, event_type="ride_update")
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="rejeitar")
@@ -587,6 +596,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
             ]
         )
         self._atribuir_motorista_proximo(corrida, excluir_motorista_id=motorista.id, allow_reset=False)
+        notify_corrida(corrida, event_type="ride_update")
         return Response(CorridaSerializer(corrida).data)
 
     @action(detail=True, methods=["post"], url_path="status")
@@ -637,6 +647,7 @@ class CorridaViewSet(viewsets.ModelViewSet):
                 "concluida_em",
             ]
         )
+        notify_corrida(corrida, event_type="ride_update")
         return Response(CorridaSerializer(corrida).data)
 
     @action(
@@ -755,6 +766,13 @@ class LocalizacaoPingViewSet(viewsets.ModelViewSet):
         except Exception:
             # Evita derrubar o ping por falha de auto-atribuição.
             pass
+        notify_driver_location(
+            perfil_id=perfil.id,
+            latitude=float(ping.latitude),
+            longitude=float(ping.longitude),
+            precisao_m=ping.precisao_m,
+            ping_em=ping.criado_em,
+        )
 
 
 class MotoristasProximosView(APIView):
