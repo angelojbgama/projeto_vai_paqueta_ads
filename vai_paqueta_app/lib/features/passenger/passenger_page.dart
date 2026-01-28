@@ -13,6 +13,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/driver_settings.dart';
 import '../../core/error_messages.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
@@ -89,13 +90,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Timer? _cancelUnlockTimer;
   Timer? _finalUnlockTimer;
   bool _appPausado = false;
-  Duration _corridaPollInterval = const Duration(seconds: 4);
+  Duration _corridaPollInterval = PassengerSettings.corridaPollIntervalBase;
   RealtimeService? _realtime;
   bool _wsConnected = false;
   int? _wsPerfilId;
   ProviderSubscription<AsyncValue<dynamic>>? _authSub;
-  static const Duration _tempoMinimoCancelamentoAposAceite = Duration(minutes: 2);
-  static const Duration _tempoMinimoFinalizarAposInicio = Duration(minutes: 3);
   Duration _serverTimeOffset = Duration.zero;
   bool get _podeCancelarCorrida {
     if (!_corridaAtiva || _corridaIdAtual == null) return false;
@@ -170,18 +169,18 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Duration? _tempoRestanteCancelamento() {
     if (_normalizarStatus(_statusCorrida) != 'aceita') return null;
-    if (_corridaAceitaEm == null) return _tempoMinimoCancelamentoAposAceite;
+    if (_corridaAceitaEm == null) return PassengerSettings.tempoMinimoCancelamentoAposAceite;
     final elapsed = _nowServer().difference(_corridaAceitaEm!);
-    final remaining = _tempoMinimoCancelamentoAposAceite - elapsed;
+    final remaining = PassengerSettings.tempoMinimoCancelamentoAposAceite - elapsed;
     if (remaining <= Duration.zero) return Duration.zero;
     return remaining;
   }
 
   Duration? _tempoRestanteFinalizacao() {
     if (_normalizarStatus(_statusCorrida) != 'em_andamento') return null;
-    if (_corridaIniciadaEm == null) return _tempoMinimoFinalizarAposInicio;
+    if (_corridaIniciadaEm == null) return PassengerSettings.tempoMinimoFinalizarAposInicio;
     final elapsed = _nowServer().difference(_corridaIniciadaEm!);
-    final remaining = _tempoMinimoFinalizarAposInicio - elapsed;
+    final remaining = PassengerSettings.tempoMinimoFinalizarAposInicio - elapsed;
     if (remaining <= Duration.zero) return Duration.zero;
     return remaining;
   }
@@ -197,14 +196,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   double _cancelamentoProgresso(Duration remaining) {
-    final totalSeconds = _tempoMinimoCancelamentoAposAceite.inSeconds;
+    final totalSeconds = PassengerSettings.tempoMinimoCancelamentoAposAceite.inSeconds;
     if (totalSeconds <= 0) return 1;
     final elapsed = (totalSeconds - remaining.inSeconds).clamp(0, totalSeconds);
     return elapsed / totalSeconds;
   }
 
   double _finalizacaoProgresso(Duration remaining) {
-    final totalSeconds = _tempoMinimoFinalizarAposInicio.inSeconds;
+    final totalSeconds = PassengerSettings.tempoMinimoFinalizarAposInicio.inSeconds;
     if (totalSeconds <= 0) return 1;
     final elapsed = (totalSeconds - remaining.inSeconds).clamp(0, totalSeconds);
     return elapsed / totalSeconds;
@@ -221,7 +220,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _cancelUnlockTimer?.cancel();
     final remaining = _tempoRestanteCancelamento();
     if (remaining == null || remaining <= Duration.zero) return;
-    _cancelUnlockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _cancelUnlockTimer = Timer.periodic(PassengerSettings.countdownTick, (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -239,7 +238,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _finalUnlockTimer?.cancel();
     final remaining = _tempoRestanteFinalizacao();
     if (remaining == null || remaining <= Duration.zero) return;
-    _finalUnlockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _finalUnlockTimer = Timer.periodic(PassengerSettings.countdownTick, (timer) {
       if (!mounted) {
         timer.cancel();
         return;
@@ -944,7 +943,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaTimer?.cancel();
     if (_corridaIdAtual == null) return;
     if (_wsConnected) return;
-    _corridaPollInterval = const Duration(seconds: 4);
+    _corridaPollInterval = PassengerSettings.corridaPollIntervalBase;
     _agendarPoll();
   }
 
@@ -953,10 +952,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaTimer = Timer(_corridaPollInterval, () async {
       final sucesso = await _atualizarCorridaAtiva();
       if (sucesso) {
-        _corridaPollInterval = const Duration(seconds: 4);
+        _corridaPollInterval = PassengerSettings.corridaPollIntervalBase;
       } else {
         final next = _corridaPollInterval.inSeconds * 2;
-        _corridaPollInterval = Duration(seconds: next.clamp(4, 20));
+        _corridaPollInterval = Duration(
+          seconds: next.clamp(
+            PassengerSettings.corridaPollIntervalMin.inSeconds,
+            PassengerSettings.corridaPollIntervalMax.inSeconds,
+          ),
+        );
       }
       _agendarPoll();
     });
@@ -1309,7 +1313,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         barrierDismissible: false,
         barrierLabel: 'Corrida',
         barrierColor: Colors.black54,
-        transitionDuration: const Duration(milliseconds: 200),
+        transitionDuration: UiTimings.modalTransition,
         pageBuilder: (ctx, anim, __) {
           return SafeArea(
             child: Center(
@@ -1612,7 +1616,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _limparRotaCorrida();
     }
     _debounceOrigem?.cancel();
-    _debounceOrigem = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesOrigem(texto));
+    _debounceOrigem = Timer(PassengerSettings.suggestionDebounce, () => _buscarSugestoesOrigem(texto));
   }
 
   void _onDestinoChanged(String texto) {
@@ -1630,7 +1634,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _limparRotaCorrida();
     }
     _debounceDestino?.cancel();
-    _debounceDestino = Timer(const Duration(milliseconds: 300), () => _buscarSugestoesDestino(texto));
+    _debounceDestino = Timer(PassengerSettings.suggestionDebounce, () => _buscarSugestoesDestino(texto));
   }
 
   Future<void> _finalizarCorrida() async {

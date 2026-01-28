@@ -7,6 +7,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../core/driver_settings.dart';
 import '../features/driver/driver_service.dart';
 import 'auth_storage.dart';
 import 'notification_service.dart';
@@ -102,7 +103,7 @@ void driverServiceOnStart(ServiceInstance service) async {
     );
   }
 
-  Timer.periodic(const Duration(seconds: 10), (timer) async {
+  Timer.periodic(DriverSettings.backgroundPingInterval, (timer) async {
     final token = await AuthStorage.getAccessToken();
     if (token == null || token.isEmpty) {
       timer.cancel();

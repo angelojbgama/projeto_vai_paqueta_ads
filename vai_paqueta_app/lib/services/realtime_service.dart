@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../core/api_config.dart';
+import '../core/driver_settings.dart';
 import 'auth_storage.dart';
 
 enum RealtimeRole { driver, passenger }
@@ -47,7 +48,7 @@ class RealtimeService {
       cancelOnError: true,
     );
     _handshakeTimer?.cancel();
-    _handshakeTimer = Timer(const Duration(seconds: 6), () {
+    _handshakeTimer = Timer(RealtimeSettings.handshakeTimeout, () {
       if (!_connected) {
         _handleDisconnect();
       }
@@ -150,7 +151,10 @@ class RealtimeService {
     }
     if (_shouldReconnect) {
       _attempt += 1;
-      final delaySeconds = min(30, 2 + _attempt * 2);
+      final delaySeconds = min(
+        RealtimeSettings.reconnectMaxSeconds,
+        RealtimeSettings.reconnectBaseSeconds + _attempt * RealtimeSettings.reconnectStepSeconds,
+      );
       _reconnectTimer?.cancel();
       _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
         if (_shouldReconnect) {

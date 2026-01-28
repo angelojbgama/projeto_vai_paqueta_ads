@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/error_messages.dart';
+import '../../core/driver_settings.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../services/driver_background_service.dart';
@@ -75,6 +76,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _enviarLocalizacaoBg = false;
   bool _consentimentoLocalizacaoBg = false;
   bool _guiaAtivo = false;
+  bool _avisoVelocidadeAberto = false;
+  DateTime? _ultimoAvisoVelocidadeEm;
+  LatLng? _ultimaAmostraVelocidade;
+  DateTime? _ultimaAmostraVelocidadeEm;
   StreamSubscription<String?>? _notificationTapSub;
   RealtimeService? _realtime;
   bool _wsConnected = false;
@@ -799,6 +804,59 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     );
   }
 
+  double? _extrairVelocidadeMps(Position pos) {
+    final now = pos.timestamp ?? DateTime.now();
+    double? speedMps;
+    if (pos.speed.isFinite && pos.speed > 0) {
+      speedMps = pos.speed;
+    } else if (_ultimaAmostraVelocidade != null && _ultimaAmostraVelocidadeEm != null) {
+      final segundos = now.difference(_ultimaAmostraVelocidadeEm!).inMilliseconds / 1000;
+      if (segundos >= 1) {
+        final distancia = Geolocator.distanceBetween(
+          _ultimaAmostraVelocidade!.latitude,
+          _ultimaAmostraVelocidade!.longitude,
+          pos.latitude,
+          pos.longitude,
+        );
+        speedMps = distancia / segundos;
+      }
+    }
+    _ultimaAmostraVelocidade = LatLng(pos.latitude, pos.longitude);
+    _ultimaAmostraVelocidadeEm = now;
+    return speedMps;
+  }
+
+  Future<void> _avaliarVelocidade(Position pos) async {
+    if (!mounted) return;
+    if (_appPausado || _guiaAtivo) return;
+    if (_avisoVelocidadeAberto) return;
+    final speedMps = _extrairVelocidadeMps(pos);
+    if (speedMps == null || !speedMps.isFinite) return;
+    final speedKmh = speedMps * 3.6;
+    if (speedKmh < DriverSettings.speedWarningThresholdKmh) return;
+    final agora = DateTime.now();
+    if (_ultimoAvisoVelocidadeEm != null &&
+        agora.difference(_ultimoAvisoVelocidadeEm!) < DriverSettings.speedWarningCooldown) {
+      return;
+    }
+    await _mostrarAvisoVelocidade(speedKmh);
+  }
+
+  Future<void> _mostrarAvisoVelocidade(double velocidadeKmh) async {
+    if (!mounted || _avisoVelocidadeAberto) return;
+    _avisoVelocidadeAberto = true;
+    _ultimoAvisoVelocidadeEm = DateTime.now();
+    try {
+      await NotificationService.showSpeedWarning(
+        speedKmh: velocidadeKmh,
+        limitKmh: DriverSettings.speedWarningThresholdKmh,
+        timeoutAfterMs: DriverSettings.speedWarningAutoClose.inMilliseconds,
+      );
+    } finally {
+      _avisoVelocidadeAberto = false;
+    }
+  }
+
   Future<void> _atualizarPosicao() async {
     if (!mounted) return;
     final pos = await _posicaoAtual();
@@ -807,6 +865,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       setState(() {
         _posicao = LatLng(pos.latitude, pos.longitude);
       });
+      _modalSetState?.call(() {});
+      unawaited(_avaliarVelocidade(pos));
       await _avaliarTilesPara(_posicao);
       if (_corridaAtual != null) {
         _atualizarRotas(_corridaAtual!);
@@ -944,6 +1004,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       return;
     }
 
+    if (mounted) {
+      setState(() {
+        _posicao = LatLng(pos.latitude, pos.longitude);
+      });
+    }
+    _modalSetState?.call(() {});
+    unawaited(_avaliarTilesPara(_posicao));
+    unawaited(_avaliarVelocidade(pos));
+
     try {
       final lat = _round6(pos.latitude);
       final lng = _round6(pos.longitude);
@@ -974,7 +1043,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   void _iniciarAutoPing() {
     if (_guiaAtivo) return;
     if (!_recebendoCorridas) return;
-    final intervalo = _wsConnected ? const Duration(seconds: 5) : const Duration(seconds: 10);
+    final intervalo = _wsConnected ? DriverSettings.pingIntervalWs : DriverSettings.pingIntervalHttp;
     _pingTimer?.cancel();
     _enviarPing(silencioso: true);
     _pingTimer = Timer.periodic(intervalo, (_) => _enviarPing(silencioso: true));
@@ -985,7 +1054,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (!_recebendoCorridas) return;
     if (_wsConnected) return;
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _verificarCorrida());
+    _pollTimer = Timer.periodic(DriverSettings.corridaPollingInterval, (_) => _verificarCorrida());
   }
 
   void _configurarRealtime() {
@@ -1142,7 +1211,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         barrierDismissible: false,
         barrierLabel: 'Corrida',
         barrierColor: Colors.black54,
-        transitionDuration: const Duration(milliseconds: 200),
+        transitionDuration: UiTimings.modalTransition,
         pageBuilder: (ctx, anim, __) {
           return SafeArea(
             child: Center(

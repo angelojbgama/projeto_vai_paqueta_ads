@@ -5,19 +5,20 @@ import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/api_config.dart';
+import '../core/driver_settings.dart';
 import 'auth_storage.dart';
 
 class ApiClient {
   ApiClient._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: ApiConfig.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
+      connectTimeout: NetworkSettings.connectTimeout,
+      receiveTimeout: NetworkSettings.receiveTimeout,
     ));
     _refreshDio = Dio(BaseOptions(
       baseUrl: ApiConfig.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 15),
+      connectTimeout: NetworkSettings.connectTimeout,
+      receiveTimeout: NetworkSettings.receiveTimeout,
     ));
 
     if (kDebugMode) {

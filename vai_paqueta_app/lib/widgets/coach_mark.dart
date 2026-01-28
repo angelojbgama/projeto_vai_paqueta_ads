@@ -3,6 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../core/driver_settings.dart';
+
 class CoachMarkStep {
   final GlobalKey targetKey;
   final String title;
@@ -50,7 +52,7 @@ Future<bool> showCoachMarks(BuildContext context, List<CoachMarkStep> steps) asy
       skipped = true;
       break;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await Future<void>.delayed(UiTimings.coachMarkStepDelay);
   }
   return !skipped;
 }
@@ -62,13 +64,13 @@ Future<void> _ensureVisible(GlobalKey key) async {
     await Scrollable.ensureVisible(
       targetContext,
       alignment: 0.5,
-      duration: const Duration(milliseconds: 250),
+      duration: UiTimings.coachMarkScrollDuration,
       curve: Curves.easeOut,
     );
   } catch (_) {
     // Ignore if no scrollable ancestor.
   }
-  await Future<void>.delayed(const Duration(milliseconds: 50));
+  await Future<void>.delayed(UiTimings.coachMarkStepDelay);
 }
 
 enum _CoachMarkAction { next, skip }

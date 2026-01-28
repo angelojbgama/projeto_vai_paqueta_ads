@@ -6,7 +6,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 class NotificationService {
   static const String trackingChannelId = 'vaipaqueta_tracking';
   static const String ridesChannelId = 'vaipaqueta_corridas';
+  static const String speedChannelId = 'vaipaqueta_velocidade';
   static const int trackingNotificationId = 4101;
+  static const int speedNotificationId = 4102;
 
   static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
@@ -54,6 +56,14 @@ class NotificationService {
         importance: Importance.high,
       ),
     );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        speedChannelId,
+        'Aviso de velocidade',
+        description: 'Alertas quando o ecotaxista ultrapassa a velocidade configurada.',
+        importance: Importance.high,
+      ),
+    );
   }
 
   static Future<void> requestPermissions() async {
@@ -86,6 +96,32 @@ class NotificationService {
       body,
       NotificationDetails(android: android, iOS: ios),
       payload: payload,
+    );
+  }
+
+  static Future<void> showSpeedWarning({
+    required double speedKmh,
+    required double limitKmh,
+    int? timeoutAfterMs,
+  }) async {
+    await initialize();
+    final android = AndroidNotificationDetails(
+      speedChannelId,
+      'Aviso de velocidade',
+      channelDescription: 'Alertas quando o ecotaxista ultrapassa a velocidade configurada.',
+      importance: Importance.high,
+      priority: Priority.high,
+      ticker: 'aviso_velocidade',
+      timeoutAfter: timeoutAfterMs,
+    );
+    const ios = DarwinNotificationDetails();
+    final body =
+        'Você está acima de ${limitKmh.toStringAsFixed(0)} km/h (~${speedKmh.toStringAsFixed(0)} km/h). Reduza a velocidade.';
+    await _plugin.show(
+      speedNotificationId,
+      'Atenção à velocidade',
+      body,
+      NotificationDetails(android: android, iOS: ios),
     );
   }
 
