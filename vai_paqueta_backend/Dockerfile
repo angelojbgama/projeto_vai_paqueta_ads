@@ -17,4 +17,4 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["gunicorn", "vai_paqueta.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "vai_paqueta.asgi:application"]
