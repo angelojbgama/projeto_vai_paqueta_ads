@@ -80,10 +80,12 @@ class CorridaSerializer(serializers.ModelSerializer):
         ping = self._ultimo_ping(obj)
         if not ping:
             return None
-        return ping["criado_em"]
+        # Converte para string ISO para evitar datetime no payload do WebSocket
+        return ping["criado_em"].isoformat()
 
     def get_server_time(self, obj):
-        return timezone.now()
+        # String ISO para evitar datetime no payload do WebSocket
+        return timezone.now().isoformat()
 
 
 class CorridaCreateSerializer(serializers.Serializer):
