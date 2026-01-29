@@ -62,9 +62,9 @@ class _SplashPageState extends ConsumerState<SplashPage> {
               const SizedBox(height: 12),
               Text(_erro ?? 'Carregando Vai Paqueta...'),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'API: ${ApiConfig.baseUrl}',
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(fontSize: 12),
               ),
               if (_erro != null && _detalhe != null) ...[
                 const SizedBox(height: 8),

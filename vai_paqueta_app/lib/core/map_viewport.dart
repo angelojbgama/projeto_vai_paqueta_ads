@@ -7,7 +7,7 @@ import 'map_config.dart';
 
 class MapViewport {
   static LatLng defaultCenter() {
-    return LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
+    return const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
   }
 
   static List<LatLng> collectPins(Iterable<LatLng?> pins) {

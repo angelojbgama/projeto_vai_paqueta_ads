@@ -756,7 +756,13 @@ class LocalizacaoPingViewSet(viewsets.ModelViewSet):
         perfil = _perfil_usuario(user)
         if perfil_informado and perfil_informado.id != perfil.id:
             raise PermissionDenied("Perfil não pertence ao usuário autenticado.")
-        ping = serializer.save(perfil=perfil)
+        
+        bearing = serializer.validated_data.get("bearing")
+        print(f"DEBUG: LocalizacaoPingViewSet.perform_create - Received bearing: {bearing}") # ADD THIS LINE
+
+        ping = serializer.save(perfil=perfil, bearing=bearing)
+        print(f"DEBUG: LocalizacaoPingViewSet.perform_create - Saved ping.bearing: {ping.bearing}") # ADD THIS LINE
+
         try:
             _auto_atribuir_por_ping(
                 perfil,
@@ -771,6 +777,7 @@ class LocalizacaoPingViewSet(viewsets.ModelViewSet):
             latitude=float(ping.latitude),
             longitude=float(ping.longitude),
             precisao_m=ping.precisao_m,
+            bearing=ping.bearing, # Pass bearing
             ping_em=ping.criado_em,
         )
 

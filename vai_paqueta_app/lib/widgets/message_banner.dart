@@ -49,7 +49,6 @@ class MessageBanner extends StatelessWidget {
         icon = Icons.error_outline;
         break;
       case MessageTone.info:
-      default:
         bg = Colors.blueGrey.shade50;
         fg = Colors.blueGrey.shade800;
         border = Colors.blueGrey.shade200;

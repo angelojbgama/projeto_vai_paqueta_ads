@@ -35,7 +35,7 @@ class OfflineGeoStore {
           .map(
             (e) => _OfflineAddress(
               street: (e['street']?.toString().trim()) ?? '',
-              housenumber: e['housenumber'] != null ? e['housenumber'].toString().trim() : null,
+              housenumber: e['housenumber']?.toString().trim(),
               lat: (e['lat'] as num).toDouble(),
               lng: (e['lng'] as num).toDouble(),
             ),

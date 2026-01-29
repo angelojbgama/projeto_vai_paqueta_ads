@@ -23,7 +23,9 @@ dependencies:
   flutter_background_service: ^5.0.5
   flutter_local_notifications: ^17.1.2
   web_socket_channel: ^2.4.0
+  flutter_compass: ^0.8.0
 
+  collection: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -34,3 +36,4 @@ flutter:
   assets:
     - assets/tiles/
     - assets/logo/
+    - assets/icons/

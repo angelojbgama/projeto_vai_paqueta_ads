@@ -29,6 +29,9 @@ if "%DJANGO_USE_REDIS%"=="" set "DJANGO_USE_REDIS=0"
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+python manage.py makemigrations
+python manage.py migrate
+
 
 if exist ".venv\Scripts\daphne.exe" (
   daphne -b 0.0.0.0 -p %PORT% vai_paqueta.asgi:application

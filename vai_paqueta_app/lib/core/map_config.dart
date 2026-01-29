@@ -25,7 +25,7 @@ class MapTileConfig {
 
   /// Caminho padrão para tiles locais.
   static const assetsPrefix = 'assets/tiles/';
-  static const assetsTemplate = '${assetsPrefix}{z}/{x}/{y}.png';
+  static const assetsTemplate = '$assetsPrefix{z}/{x}/{y}.png';
   static const assetsMinZoom = int.fromEnvironment('MAP_TILE_MIN_ZOOM', defaultValue: 12);
   static const assetsMaxZoom = int.fromEnvironment('MAP_TILE_MAX_ZOOM', defaultValue: 19);
   static const _displayMinZoomEnv = int.fromEnvironment('MAP_TILE_DISPLAY_MIN_ZOOM', defaultValue: -1);
@@ -91,8 +91,8 @@ class MapTileConfig {
     final x = ((lng + 180.0) / 360.0 * n).floor();
     final latRad = lat * math.pi / 180.0;
     final y = ((1.0 - math.log(math.tan(latRad) + (1 / math.cos(latRad))) / math.pi) / 2.0 * n).floor();
-    final safeX = x.clamp(0, n - 1) as int;
-    final safeY = y.clamp(0, n - 1) as int;
+    final safeX = x.clamp(0, n - 1);
+    final safeY = y.clamp(0, n - 1);
     return '$assetsPrefix$zoom/$safeX/$safeY.png';
   }
 }

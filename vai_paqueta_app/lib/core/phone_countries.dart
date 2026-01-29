@@ -17,14 +17,14 @@ class PhoneCountry {
 
   String get label {
     final flagLabel = flag.isNotEmpty ? '$flag ' : '';
-    return '${flagLabel}+${ddi}';
+    return '$flagLabel+$ddi';
   }
 }
 
 String iso2ToFlag(String iso2) {
   if (iso2.length != 2) return '';
   final upper = iso2.toUpperCase();
-  final base = 127397;
+  const base = 127397;
   final chars = upper.codeUnits.map((code) => base + code).toList();
   return String.fromCharCodes(chars);
 }

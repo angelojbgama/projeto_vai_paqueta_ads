@@ -23,7 +23,6 @@ class CoachMarkStep {
 
 Future<bool> showCoachMarks(BuildContext context, List<CoachMarkStep> steps) async {
   final overlay = Overlay.of(context, rootOverlay: true);
-  if (overlay == null) return false;
   var skipped = false;
   for (var i = 0; i < steps.length; i++) {
     final step = steps[i];
@@ -157,7 +156,7 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay> {
               painter: _HolePainter(
                 holeRect: highlightRect,
                 radius: widget.step.borderRadius,
-                color: Colors.black.withOpacity(0.65),
+                color: Colors.black.withAlpha(166),
               ),
             ),
           ),
@@ -256,7 +255,7 @@ class _SpeechBubble extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withAlpha(51),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),

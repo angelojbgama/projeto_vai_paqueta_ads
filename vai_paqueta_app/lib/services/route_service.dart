@@ -27,8 +27,10 @@ class RouteService {
         final payload = resp.data as Map<String, dynamic>;
         final route = _parseRoute(payload);
         if (route.length >= 2) return route;
-        final fallback = _parseClosestRoad(payload['closest_road_start']) ??
-            _parseClosestRoad(payload['closest_road_end']);
+        var fallback = _parseClosestRoad(payload['closest_road_start']);
+        if (fallback.isEmpty) {
+          fallback = _parseClosestRoad(payload['closest_road_end']);
+        }
         if (fallback.length >= 2) return fallback;
       }
     } catch (_) {

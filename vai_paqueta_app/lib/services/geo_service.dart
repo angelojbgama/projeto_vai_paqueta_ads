@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+
+import 'api_client.dart';
 import 'offline_geo_store.dart';
 
 class GeoResult {
@@ -14,6 +17,21 @@ class GeoResult {
 
 class GeoService {
   final OfflineGeoStore _offline = OfflineGeoStore();
+
+  Future<bool> isInsideServiceArea(double lat, double lng) async {
+    try {
+      await ApiClient.client.get('geo/reverse/', queryParameters: {'lat': lat, 'lng': lng});
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        final data = e.response?.data;
+        if (data is Map && data['detail'] == 'Fora da area atendida.') {
+          return false;
+        }
+      }
+      return true; // Assume it's inside if there's another error
+    }
+  }
 
   Future<GeoResult> forward(String query) async {
     final offline = await _offline.forward(query);

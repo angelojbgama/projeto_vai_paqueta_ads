@@ -39,7 +39,7 @@ class CorridaAdmin(admin.ModelAdmin):
 
 @admin.register(LocalizacaoPing)
 class LocalizacaoPingAdmin(admin.ModelAdmin):
-    list_display = ("id", "perfil", "perfil_nome", "latitude", "longitude", "precisao_m", "criado_em")
+    list_display = ("id", "perfil", "perfil_nome", "latitude", "longitude", "precisao_m", "bearing", "criado_em")
     list_filter = ("criado_em", "perfil__tipo")
     search_fields = ("perfil__device_uuid", "perfil__nome")
     list_select_related = ("perfil",)

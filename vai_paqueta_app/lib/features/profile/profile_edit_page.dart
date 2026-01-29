@@ -422,7 +422,7 @@ class _ProfileEditPageState extends ConsumerState<ProfileEditPage> {
                       Expanded(
                         flex: 3,
                         child: DropdownButtonFormField<String>(
-                          value: selected,
+                          initialValue: selected,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'DDI',

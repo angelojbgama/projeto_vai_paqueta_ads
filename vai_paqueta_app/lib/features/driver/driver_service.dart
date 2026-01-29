@@ -10,12 +10,14 @@ class DriverService {
     required double latitude,
     required double longitude,
     double? precisao,
+    double? bearing,
   }) async {
     await _dio.post('/pings/', data: {
       'perfil': perfilId,
       'latitude': latitude,
       'longitude': longitude,
       'precisao_m': precisao,
+      if (bearing != null) 'bearing': bearing,
     });
   }
 

@@ -27,6 +27,7 @@ class CorridaSerializer(serializers.ModelSerializer):
     motorista_lat = serializers.SerializerMethodField()
     motorista_lng = serializers.SerializerMethodField()
     motorista_ping_em = serializers.SerializerMethodField()
+    motorista_bearing = serializers.SerializerMethodField()
     server_time = serializers.SerializerMethodField()
 
     class Meta:
@@ -46,6 +47,7 @@ class CorridaSerializer(serializers.ModelSerializer):
             "motorista_lat",
             "motorista_lng",
             "motorista_ping_em",
+            "motorista_bearing",
             "criado_em",
             "atualizado_em",
             "server_time",
@@ -60,7 +62,7 @@ class CorridaSerializer(serializers.ModelSerializer):
         return (
             LocalizacaoPing.objects.filter(perfil=obj.motorista)
             .order_by("-criado_em")
-            .values("latitude", "longitude", "criado_em")
+            .values("latitude", "longitude", "bearing", "criado_em")
             .first()
         )
 
@@ -82,6 +84,12 @@ class CorridaSerializer(serializers.ModelSerializer):
             return None
         # Converte para string ISO para evitar datetime no payload do WebSocket
         return ping["criado_em"].isoformat()
+
+    def get_motorista_bearing(self, obj):
+        ping = self._ultimo_ping(obj)
+        if not ping:
+            return None
+        return ping["bearing"]
 
     def get_server_time(self, obj):
         # String ISO para evitar datetime no payload do WebSocket
@@ -107,5 +115,5 @@ class CorridaStatusSerializer(serializers.Serializer):
 class LocalizacaoPingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocalizacaoPing
-        fields = ["id", "perfil", "latitude", "longitude", "precisao_m", "criado_em"]
+        fields = ["id", "perfil", "latitude", "longitude", "precisao_m", "bearing", "criado_em"]
         read_only_fields = ["id", "criado_em"]

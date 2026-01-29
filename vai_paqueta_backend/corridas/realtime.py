@@ -49,6 +49,7 @@ def notify_driver_location(
     latitude: float,
     longitude: float,
     precisao_m: Optional[float] = None,
+    bearing: Optional[float] = None,
     ping_em=None,
     corrida_id: Optional[int] = None,
 ) -> None:
@@ -69,6 +70,7 @@ def notify_driver_location(
         "latitude": latitude,
         "longitude": longitude,
         "precisao_m": precisao_m,
+        "bearing": bearing, # Include bearing
         "ping_em": (ping_em or timezone.now()).isoformat(),
     }
     groups = [group_ride(corrida.id), group_passenger(corrida.cliente_id)]

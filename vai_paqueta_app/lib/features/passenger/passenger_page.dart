@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'dart:math' as math;
 
-import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
@@ -97,6 +96,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   int? _wsPerfilId;
   ProviderSubscription<AsyncValue<dynamic>>? _authSub;
   Duration _serverTimeOffset = Duration.zero;
+  double _motoristaBearing = 0.0;
   bool get _podeCancelarCorrida {
     if (!_corridaAtiva || _corridaIdAtual == null) return false;
     final status = _normalizarStatus(_statusCorrida);
@@ -368,16 +368,27 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     try {
       final res = await _geo.forward(texto);
       if (!mounted) return;
+
+      final isOriginOk = await _geo.isInsideServiceArea(res.lat, res.lng);
+      if (!isOriginOk) {
+        _showErrorSnackbar('O endereço de origem está fora da área de serviço.');
+        setState(() {
+          _origemLatLng = null;
+        });
+        return;
+      }
+
       setState(() {
         _origemLatLng = LatLng(res.lat, res.lng);
         _origemCtrl.text = res.endereco;
+        _origemCtrl.selection = TextSelection.collapsed(offset: _origemCtrl.text.length); // Add this line
         _sugestoesOrigem = [];
       });
       _origemTextoConfirmado = _origemCtrl.text.trim();
       await _avaliarTilesPara(_origemLatLng);
       await _atualizarRotaSePossivel();
     } catch (e) {
-      debugPrint('Erro ao localizar origem: ${friendlyError(e)}');
+      _showErrorSnackbar('Erro ao localizar origem: ${friendlyError(e)}');
     }
   }
 
@@ -405,16 +416,27 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     try {
       final res = await _geo.forward(texto);
       if (!mounted) return;
+
+      final isDestOk = await _geo.isInsideServiceArea(res.lat, res.lng);
+      if (!isDestOk) {
+        _showErrorSnackbar('O endereço de destino está fora da área de serviço.');
+        setState(() {
+          _destinoLatLng = null;
+        });
+        return;
+      }
+
       setState(() {
         _destinoLatLng = LatLng(res.lat, res.lng);
         _destinoCtrl.text = res.endereco;
+        _destinoCtrl.selection = TextSelection.collapsed(offset: _destinoCtrl.text.length); // Add this line
         _sugestoesDestino = [];
       });
       _destinoTextoConfirmado = _destinoCtrl.text.trim();
       await _avaliarTilesPara(_destinoLatLng);
       await _atualizarRotaSePossivel();
     } catch (e) {
-      debugPrint('Erro ao localizar destino: ${friendlyError(e)}');
+      _showErrorSnackbar('Erro ao localizar destino: ${friendlyError(e)}');
     }
   }
 
@@ -628,7 +650,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       if (!mounted) return;
       _configurarRealtime();
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _mostrarGuiaPassageiroSeNecessario());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _mostrarGuiaPassageiroSeNecessario();
+    });
   }
 
   @override
@@ -683,7 +708,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     }
     final referencia = _origemLatLng ??
         _destinoLatLng ??
-        LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
+        const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     await _avaliarTilesPara(referencia);
   }
 
@@ -745,8 +770,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (MapTileConfig.useAssets) {
       final manifest = await _carregarManifesto();
       final assetZooms = _extrairZooms(manifest);
-      final minZoom = assetZooms.isNotEmpty ? assetZooms.reduce(min) : MapTileConfig.assetsMinZoom;
-      final maxZoom = assetZooms.isNotEmpty ? assetZooms.reduce(max) : MapTileConfig.assetsMaxZoom;
+      final minZoom = assetZooms.isNotEmpty ? assetZooms.reduce(math.min) : MapTileConfig.assetsMinZoom;
+      final maxZoom = assetZooms.isNotEmpty ? assetZooms.reduce(math.max) : MapTileConfig.assetsMaxZoom;
       return _TileSource(
         template: MapTileConfig.assetsTemplate,
         usingAssets: true,
@@ -816,11 +841,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return zooms;
   }
 
-  Future<void> _buscarSugestoesOrigem(String texto) async {
-    _sugestoesOrigem = [];
-    setState(() {});
+  Future<Iterable<GeoResult>> _buscarSugestoesOrigem(String texto) async {
     final q = texto.trim();
-    if (q.isEmpty) return;
+    if (q.isEmpty) {
+      return const Iterable<GeoResult>.empty();
+    }
     final referencia = _origemLatLng ?? _destinoLatLng ?? const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     try {
       final resultados = await _geo.searchNearby(
@@ -829,17 +854,18 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         lng: referencia.longitude,
         limit: 8,
       );
-      setState(() => _sugestoesOrigem = resultados);
+      return resultados;
     } catch (e) {
       debugPrint('Erro ao buscar sugestoes de origem: ${friendlyError(e)}');
+      return const Iterable<GeoResult>.empty();
     }
   }
 
-  Future<void> _buscarSugestoesDestino(String texto) async {
-    _sugestoesDestino = [];
-    setState(() {});
+  Future<Iterable<GeoResult>> _buscarSugestoesDestino(String texto) async {
     final q = texto.trim();
-    if (q.isEmpty) return;
+    if (q.isEmpty) {
+      return const Iterable<GeoResult>.empty();
+    }
     final referencia = _destinoLatLng ?? _origemLatLng ?? const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     try {
       final resultados = await _geo.searchNearby(
@@ -848,9 +874,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         lng: referencia.longitude,
         limit: 8,
       );
-      setState(() => _sugestoesDestino = resultados);
+      return resultados;
     } catch (e) {
       debugPrint('Erro ao buscar sugestoes de destino: ${friendlyError(e)}');
+      return const Iterable<GeoResult>.empty();
     }
   }
 
@@ -1016,7 +1043,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (type == 'ride_update' || type == 'ride_assigned' || type == 'ride_created') {
       final raw = event['corrida'];
       if (raw is Map) {
-        final corrida = CorridaResumo.fromJson(Map<String, dynamic>.from(raw as Map));
+        final corrida = CorridaResumo.fromJson(Map<String, dynamic>.from(raw));
         _aplicarCorridaResumo(corrida);
       } else if (raw == null) {
         _encerrarCorrida();
@@ -1031,10 +1058,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       final lat = event['latitude'];
       final lng = event['longitude'];
+      final bearing = event['bearing'];
+      debugPrint('Passenger received driver_location: lat=$lat, lng=$lng, bearing=$bearing');
       if (lat is num && lng is num) {
         setState(() {
           _motoristaLatLng = LatLng(lat.toDouble(), lng.toDouble());
+          if (bearing is num) {
+            _motoristaBearing = bearing.toDouble();
+          }
         });
+        debugPrint('Passenger _motoristaBearing after WS update: $_motoristaBearing');
         _atualizarRotaMotorista(_statusCorrida);
       }
     }
@@ -1075,6 +1108,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _motoristaLatLng = null;
         _rotaMotorista = [];
       }
+      if (corrida.motoristaBearing != null) {
+        _motoristaBearing = corrida.motoristaBearing!;
+      } else {
+        _motoristaBearing = 0.0;
+      }
+      debugPrint('Passenger _motoristaBearing after initial load: $_motoristaBearing');
       if (_origemCtrl.text.trim().isEmpty && corrida.origemEndereco != null && corrida.origemEndereco!.isNotEmpty) {
         _origemCtrl.text = corrida.origemEndereco!;
       }
@@ -1223,7 +1262,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 18, offset: const Offset(0, 8)),
         ],
       ),
       child: Column(
@@ -1320,7 +1359,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Dialog(
-                  backgroundColor: Theme.of(context).dialogBackgroundColor,
+                  backgroundColor: Theme.of(context).dialogTheme.backgroundColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   child: StatefulBuilder(
@@ -1422,9 +1461,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                 if (motorista != null)
                                                   Marker(
                                                     point: motorista,
-                                                    width: 36,
+                                                    width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
                                                     height: 36,
-                                                    child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
+                                                    child: Transform.rotate(
+                                                      angle: (_motoristaBearing) * (math.pi / 180),
+                                                      child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                                    ),
                                                   ),
                                               ],
                                             ),
@@ -1559,12 +1601,24 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
         if (!mounted) return;
         if (!silencioso) {
-          debugPrint('Permissão de localização negada.');
+          _showErrorSnackbar('Permissão de localização negada.');
         }
         return;
       }
       final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
+
+      final isOriginOk = await _geo.isInsideServiceArea(pos.latitude, pos.longitude);
+      if (!isOriginOk) {
+        if (!silencioso) {
+          _showErrorSnackbar('Sua localização atual está fora da área de serviço.');
+        }
+        setState(() {
+          _origemLatLng = null;
+        });
+        return;
+      }
+
       setState(() {
         _origemLatLng = LatLng(pos.latitude, pos.longitude);
         _posCarregada = true;
@@ -1578,7 +1632,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         });
       } catch (_) {
         if (!silencioso) {
-          debugPrint('Origem definida pelo GPS (falha no endereço).');
+          _showErrorSnackbar('Origem definida pelo GPS (falha no endereço).');
         }
       }
       _origemTextoConfirmado = _origemCtrl.text.trim();
@@ -1586,47 +1640,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     } catch (e) {
       if (!mounted) return;
       if (!silencioso) {
-        debugPrint('Erro ao obter localização: ${friendlyError(e)}');
+        _showErrorSnackbar('Erro ao obter localização: ${friendlyError(e)}');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  void _onOrigemChanged(String texto) {
-    final trimmed = texto.trim();
-    if (_origemLatLng != null && trimmed != _origemTextoConfirmado) {
-      if (mounted) {
-        setState(() {
-          _origemLatLng = null;
-          _origemTextoConfirmado = '';
-        });
-      } else {
-        _origemLatLng = null;
-        _origemTextoConfirmado = '';
-      }
-      _limparRotaCorrida();
-    }
-    _debounceOrigem?.cancel();
-    _debounceOrigem = Timer(PassengerSettings.suggestionDebounce, () => _buscarSugestoesOrigem(texto));
-  }
-
-  void _onDestinoChanged(String texto) {
-    final trimmed = texto.trim();
-    if (_destinoLatLng != null && trimmed != _destinoTextoConfirmado) {
-      if (mounted) {
-        setState(() {
-          _destinoLatLng = null;
-          _destinoTextoConfirmado = '';
-        });
-      } else {
-        _destinoLatLng = null;
-        _destinoTextoConfirmado = '';
-      }
-      _limparRotaCorrida();
-    }
-    _debounceDestino?.cancel();
-    _debounceDestino = Timer(PassengerSettings.suggestionDebounce, () => _buscarSugestoesDestino(texto));
   }
 
   Future<void> _finalizarCorrida() async {
@@ -1645,7 +1663,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final msg = remaining != null && remaining > Duration.zero
           ? 'Aguarde ${_formatTempoRestante(remaining)} para finalizar.'
           : 'Corrida ainda nao pode ser finalizada.';
-      debugPrint(msg);
+      _showErrorSnackbar(msg);
       setState(() => _loading = false);
       return;
     }
@@ -1656,10 +1674,20 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _encerrarCorrida(limparEnderecos: true);
       });
     } catch (e) {
-      debugPrint('Erro ao finalizar: ${friendlyError(e)}');
+      _showErrorSnackbar('Erro ao finalizar: ${friendlyError(e)}');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showErrorSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   Future<void> _pedirCorrida() async {
@@ -1679,7 +1707,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         final msg = remaining != null && remaining > Duration.zero && status == 'aceita'
             ? 'Aguarde ${_formatTempoRestante(remaining)} para cancelar.'
             : 'Corrida já aceita. Não é possível cancelar agora.';
-        debugPrint(msg);
+        _showErrorSnackbar(msg);
         setState(() => _loading = false);
         return;
       }
@@ -1693,7 +1721,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (e is DioException) {
           await _atualizarCorridaAtiva();
         }
-        debugPrint('Erro ao cancelar: ${friendlyError(e)}');
+        _showErrorSnackbar('Erro ao cancelar: ${friendlyError(e)}');
       } finally {
         setState(() => _loading = false);
       }
@@ -1705,16 +1733,28 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     });
     int perfilId = 0;
     try {
+      try {
+        final pos = await Geolocator.getCurrentPosition();
+        final isPassengerOk = await _geo.isInsideServiceArea(pos.latitude, pos.longitude);
+        if (!isPassengerOk) {
+          _showErrorSnackbar('Você precisa estar na ilha para pedir uma corrida.');
+          return;
+        }
+      } catch (e) {
+        _showErrorSnackbar('Não foi possível obter sua localização atual.');
+        return;
+      }
+
       final user = ref.read(authProvider).valueOrNull;
       perfilId = user?.perfilId ?? 0;
       if (perfilId == 0) {
-        debugPrint('Perfil do usuário não encontrado.');
+        _showErrorSnackbar('Perfil do usuário não encontrado.');
         return;
       }
-    if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
-      debugPrint('Selecione 1 ou 2 assentos.');
-      return;
-    }
+      if (_lugaresSolicitados < 1 || _lugaresSolicitados > 2) {
+        _showErrorSnackbar('Selecione 1 ou 2 assentos.');
+        return;
+      }
       if (_origemLatLng == null && _origemCtrl.text.isNotEmpty) {
         final res = await _geo.forward(_origemCtrl.text);
         _origemLatLng = LatLng(res.lat, res.lng);
@@ -1732,7 +1772,19 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         await _avaliarTilesPara(_destinoLatLng);
       }
       if (_origemLatLng == null || _destinoLatLng == null) {
-        debugPrint('Defina origem e destino.');
+        _showErrorSnackbar('Defina origem e destino.');
+        return;
+      }
+
+      final isOriginOk = await _geo.isInsideServiceArea(_origemLatLng!.latitude, _origemLatLng!.longitude);
+      if (!isOriginOk) {
+        _showErrorSnackbar('O endereço de origem está fora da área de serviço.');
+        return;
+      }
+
+      final isDestOk = await _geo.isInsideServiceArea(_destinoLatLng!.latitude, _destinoLatLng!.longitude);
+      if (!isDestOk) {
+        _showErrorSnackbar('O endereço de destino está fora da área de serviço.');
         return;
       }
 
@@ -1793,89 +1845,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           }
         }
       }
-      debugPrint('Erro ao pedir corrida: ${friendlyError(e)}');
+      _showErrorSnackbar('Erro ao pedir corrida: ${friendlyError(e)}');
     } finally {
       setState(() => _loading = false);
-    }
-  }
-
-  List<LatLng> _aStarRoute(LatLng start, LatLng goal) {
-    final dLat = (goal.latitude - start.latitude).abs();
-    final dLng = (goal.longitude - start.longitude).abs();
-    final step = max(dLat, dLng) / 50.0 + 1e-5;
-    final minLat = min(start.latitude, goal.latitude) - step * 5;
-    final minLng = min(start.longitude, goal.longitude) - step * 5;
-    final maxLat = max(start.latitude, goal.latitude) + step * 5;
-    final maxLng = max(start.longitude, goal.longitude) + step * 5;
-
-    int toRow(double lat) => ((lat - minLat) / step).round();
-    int toCol(double lng) => ((lng - minLng) / step).round();
-    double rowToLat(int r) => minLat + r * step;
-    double colToLng(int c) => minLng + c * step;
-
-    final startNode = Point<int>(toRow(start.latitude), toCol(start.longitude));
-    final goalNode = Point<int>(toRow(goal.latitude), toCol(goal.longitude));
-
-    final open = PriorityQueue<_Node>((a, b) => a.f.compareTo(b.f));
-    final gScore = <Point<int>, double>{startNode: 0};
-    final cameFrom = <Point<int>, Point<int>>{};
-
-    open.add(_Node(startNode, _heuristic(startNode, goalNode)));
-    const List<Point<int>> directions = [
-      Point<int>(1, 0),
-      Point<int>(-1, 0),
-      Point<int>(0, 1),
-      Point<int>(0, -1),
-      Point<int>(1, 1),
-      Point<int>(1, -1),
-      Point<int>(-1, 1),
-      Point<int>(-1, -1),
-    ];
-    const maxIter = 20000;
-    var iter = 0;
-
-    while (open.isNotEmpty && iter < maxIter) {
-      iter++;
-      final current = open.removeFirst().point;
-      if (current == goalNode) {
-        return _reconstructPath(cameFrom, current).map((p) => LatLng(rowToLat(p.x), colToLng(p.y))).toList();
-      }
-
-      for (final d in directions) {
-        final Point<int> neighbor = Point<int>(current.x + d.x, current.y + d.y);
-        if (neighbor.x < 0 ||
-            neighbor.y < 0 ||
-            rowToLat(neighbor.x) < minLat ||
-            rowToLat(neighbor.x) > maxLat ||
-            colToLng(neighbor.y) < minLng ||
-            colToLng(neighbor.y) > maxLng) {
-          continue;
-        }
-
-        final tentativeG = gScore[current]! + _heuristic(current, neighbor);
-        if (tentativeG < (gScore[neighbor] ?? double.infinity)) {
-          cameFrom[neighbor] = current;
-          gScore[neighbor] = tentativeG;
-          final f = tentativeG + _heuristic(neighbor, goalNode);
-          open.add(_Node(neighbor, f));
-        }
-      }
-    }
-    return [start, goal];
-  }
-
-  double _heuristic(Point<int> a, Point<int> b) {
-    final dx = (a.x - b.x).abs();
-    final dy = (a.y - b.y).abs();
-    return sqrt((dx * dx) + (dy * dy));
-  }
-
-  Iterable<Point<int>> _reconstructPath(Map<Point<int>, Point<int>> cameFrom, Point<int> current) sync* {
-    var cur = current;
-    yield cur;
-    while (cameFrom.containsKey(cur)) {
-      cur = cameFrom[cur]!;
-      yield cur;
     }
   }
 
@@ -2017,9 +1989,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                               markers: [
                                 Marker(
                                   point: _motoristaLatLng!,
-                                  width: 40,
-                                  height: 40,
-                                  child: const Icon(Icons.local_taxi, color: Colors.orange, size: 34),
+                                  width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
+                                  height: 36,
+                                  child: Transform.rotate(
+                                    angle: (_motoristaBearing) * (math.pi / 180),
+                                    child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                  ),
                                 ),
                               ],
                             ),
@@ -2056,100 +2031,138 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextField(
-                      key: _guiaOrigemKey,
-                      controller: _origemCtrl,
-                      onChanged: _onOrigemChanged,
-                      onEditingComplete: () async {
-                        await _confirmarOrigemDigitada();
+                    Autocomplete<GeoResult>(
+                      displayStringForOption: (option) => option.endereco,
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        _debounceOrigem?.cancel();
+                        final completer = Completer<Iterable<GeoResult>>();
+                        _debounceOrigem = Timer(PassengerSettings.suggestionDebounce, () async {
+                          final results = await _buscarSugestoesOrigem(textEditingValue.text);
+                          if (!completer.isCompleted) {
+                            completer.complete(results);
+                          }
+                        });
+                        return completer.future;
                       },
-                      decoration: InputDecoration(
-                        labelText: 'Endereço atual (origem)',
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          key: _guiaGpsKey,
-                          icon: const Icon(Icons.gps_fixed),
-                          onPressed: _loading ? null : _usarGPS,
-                        ),
-                      ),
-                    ),
-                    if (_sugestoesOrigem.isNotEmpty)
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 150),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: const BorderRadius.all(Radius.circular(8)),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _sugestoesOrigem.length,
-                          itemBuilder: (context, index) {
-                            final s = _sugestoesOrigem[index];
-                            return ListTile(
-                              dense: true,
-                              title: Text(s.endereco),
-                              onTap: () async {
+                      onSelected: (GeoResult selection) {
+                        if (!mounted) return;
+                        setState(() {
+                          _origemCtrl.text = selection.endereco;
+                          _origemLatLng = LatLng(selection.lat, selection.lng);
+                          _sugestoesOrigem = [];
+                        });
+                        _origemTextoConfirmado = _origemCtrl.text.trim();
+                        _avaliarTilesPara(_origemLatLng);
+                        _atualizarRotaSePossivel();
+                        FocusScope.of(context).unfocus();
+                      },
+                      fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && _origemCtrl.text != textEditingController.text) {
+                            final originalSelection = textEditingController.selection;
+                            textEditingController.text = _origemCtrl.text;
+                            textEditingController.selection = originalSelection;
+                          }
+                        });
+                        return TextField(
+                          key: _guiaOrigemKey,
+                          controller: textEditingController,
+                          focusNode: focusNode,
+                          onChanged: (text) {
+                            final trimmed = text.trim();
+                            if (_origemLatLng != null && trimmed != _origemTextoConfirmado) {
+                              if (mounted) {
                                 setState(() {
-                                  _origemCtrl.text = s.endereco;
-                                  _origemLatLng = LatLng(s.lat, s.lng);
-                                  _sugestoesOrigem = [];
+                                  _origemLatLng = null;
+                                  _origemTextoConfirmado = '';
                                 });
-                                _origemTextoConfirmado = _origemCtrl.text.trim();
-                                await _avaliarTilesPara(_origemLatLng);
-                                await _atualizarRotaSePossivel();
-                              },
-                            );
+                              }
+                              _limparRotaCorrida();
+                            }
+                            _origemCtrl.text = text;
                           },
-                        ),
-                      ),
+                          onEditingComplete: () {
+                            _confirmarOrigemDigitada();
+                            onFieldSubmitted();
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Endereço atual (origem)',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              key: _guiaGpsKey,
+                              icon: const Icon(Icons.gps_fixed),
+                              onPressed: _loading ? null : _usarGPS,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 8),
-                    TextField(
-                      key: _guiaDestinoKey,
-                      controller: _destinoCtrl,
-                      onChanged: _onDestinoChanged,
-                      onEditingComplete: () async {
-                        await _confirmarDestinoDigitado();
+                    Autocomplete<GeoResult>(
+                      displayStringForOption: (option) => option.endereco,
+                      optionsBuilder: (TextEditingValue textEditingValue) {
+                        _debounceDestino?.cancel();
+                        final completer = Completer<Iterable<GeoResult>>();
+                        _debounceDestino = Timer(PassengerSettings.suggestionDebounce, () async {
+                          final results = await _buscarSugestoesDestino(textEditingValue.text);
+                          if (!completer.isCompleted) {
+                            completer.complete(results);
+                          }
+                        });
+                        return completer.future;
                       },
-                      decoration: const InputDecoration(
-                        labelText: 'Endereço de ida (destino)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    if (_sugestoesDestino.isNotEmpty)
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 150),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: const BorderRadius.all(Radius.circular(8)),
-                        ),
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _sugestoesDestino.length,
-                          itemBuilder: (context, index) {
-                            final s = _sugestoesDestino[index];
-                            return ListTile(
-                              dense: true,
-                              title: Text(s.endereco),
-                              onTap: () async {
+                      onSelected: (GeoResult selection) {
+                        if (!mounted) return;
+                        setState(() {
+                          _destinoCtrl.text = selection.endereco;
+                          _destinoLatLng = LatLng(selection.lat, selection.lng);
+                          _sugestoesDestino = [];
+                        });
+                        _destinoTextoConfirmado = _destinoCtrl.text.trim();
+                        _avaliarTilesPara(_destinoLatLng);
+                        _atualizarRotaSePossivel();
+                        FocusScope.of(context).unfocus();
+                      },
+                      fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted && _destinoCtrl.text != textEditingController.text) {
+                            final originalSelection = textEditingController.selection;
+                            textEditingController.text = _destinoCtrl.text;
+                            textEditingController.selection = originalSelection;
+                          }
+                        });
+                        return TextField(
+                          key: _guiaDestinoKey,
+                          controller: textEditingController,
+                          focusNode: focusNode,
+                          onChanged: (text) {
+                            final trimmed = text.trim();
+                            if (_destinoLatLng != null && trimmed != _destinoTextoConfirmado) {
+                              if (mounted) {
                                 setState(() {
-                                  _destinoCtrl.text = s.endereco;
-                                  _destinoLatLng = LatLng(s.lat, s.lng);
-                                  _sugestoesDestino = [];
+                                  _destinoLatLng = null;
+                                  _destinoTextoConfirmado = '';
                                 });
-                                _destinoTextoConfirmado = _destinoCtrl.text.trim();
-                                await _avaliarTilesPara(_destinoLatLng);
-                                await _atualizarRotaSePossivel();
-                              },
-                            );
+                              }
+                              _limparRotaCorrida();
+                            }
+                            _destinoCtrl.text = text;
                           },
-                        ),
-                      ),
+                          onEditingComplete: () {
+                            _confirmarDestinoDigitado();
+                            onFieldSubmitted();
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Endereço de ida (destino)',
+                            border: OutlineInputBorder(),
+                          ),
+                        );
+                      },
+                    ),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
                       key: _guiaLugaresKey,
-                      value: _lugaresSolicitados,
+                      initialValue: _lugaresSolicitados,
                       decoration: const InputDecoration(
                         labelText: 'Quantos assentos você precisa para essa corrida?',
                         border: OutlineInputBorder(),
@@ -2225,10 +2238,4 @@ class _TileSource {
     this.minNativeZoom,
     this.maxNativeZoom,
   });
-}
-
-class _Node {
-  final Point<int> point;
-  final double f;
-  _Node(this.point, this.f);
 }

@@ -81,7 +81,7 @@ class NotificationService {
     String? payload,
   }) async {
     await initialize();
-    final android = AndroidNotificationDetails(
+    const android = AndroidNotificationDetails(
       ridesChannelId,
       'Corridas disponiveis',
       channelDescription: 'Alertas quando houver corrida para voce.',
@@ -94,7 +94,7 @@ class NotificationService {
       id,
       title,
       body,
-      NotificationDetails(android: android, iOS: ios),
+      const NotificationDetails(android: android, iOS: ios),
       payload: payload,
     );
   }

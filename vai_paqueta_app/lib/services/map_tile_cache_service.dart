@@ -6,7 +6,7 @@ import '../core/map_config.dart';
 
 class MapTileCacheService {
   static const String _storeName = 'vai_paqueta_tiles';
-  static final FMTCStore _store = FMTCStore(_storeName);
+  static const FMTCStore _store = FMTCStore(_storeName);
   static Future<void>? _initFuture;
   static Future<void>? _prefetchFuture;
   static bool _ready = false;

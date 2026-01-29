@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,6 +86,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _wsConnected = false;
   int? _wsPerfilId;
   ProviderSubscription<AsyncValue<dynamic>>? _authSub;
+  bool _exibirRotasNoMapaPrincipal = true;
+  StreamSubscription<CompassEvent>? _compassSub;
+  double _compassBearing = 0.0;
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
@@ -575,7 +579,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _assetsMaxNativeZoom = _tileMaxNativeZoom;
         _usandoFallbackRede = false;
       });
-      await _avaliarTilesPara(_posicao ?? LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng));
+      await _avaliarTilesPara(_posicao ?? const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng));
       return;
     }
     if (!mounted) return;
@@ -604,7 +608,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final rota = await _fetchRoute(start, end);
     if (!mounted) return;
     setState(() => _rotaMotorista = rota);
-    _modalSetState?.call(() {});
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+    }
   }
 
   Future<void> _carregarRotaCorrida(LatLng origem, LatLng destino) async {
@@ -614,7 +620,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final rota = await _fetchRoute(origem, destino);
     if (!mounted) return;
     setState(() => _rotaCorrida = rota);
-    _modalSetState?.call(() {});
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+    }
   }
 
   void _limparRotas() {
@@ -622,11 +630,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     setState(() {
       _rotaMotorista = [];
       _rotaCorrida = [];
-      _rotaMotoristaKey = null;
-      _rotaCorridaKey = null;
-    });
-    _modalSetState?.call(() {});
-  }
+                          _rotaMotoristaKey = null;
+                          _rotaCorridaKey = null;    });
+                  if (_modalAberto) {
+                    _modalSetState?.call(() {});
+                  }  }
 
   void _atualizarRotas(Map<String, dynamic> corrida) {
     final origem = _latLngFromMap(corrida, 'origem_lat', 'origem_lng');
@@ -861,11 +869,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (!mounted) return;
     final pos = await _posicaoAtual();
     if (pos != null) {
-      if (!mounted) return;
       setState(() {
         _posicao = LatLng(pos.latitude, pos.longitude);
       });
-      _modalSetState?.call(() {});
+      if (_modalAberto) {
+        _modalSetState?.call(() {});
+      }
       unawaited(_avaliarVelocidade(pos));
       await _avaliarTilesPara(_posicao);
       if (_corridaAtual != null) {
@@ -894,6 +903,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       if (!mounted) return;
       _configurarRealtime();
     });
+    _compassSub = FlutterCompass.events?.listen((CompassEvent event) {
+      if (!mounted) return;
+      setState(() {
+        _compassBearing = event.heading ?? 0;
+      });
+      if (_modalAberto) { // Check if modal is still open
+        _modalSetState?.call(() {});
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _solicitarPermissaoNotificacao();
       if (!mounted) return;
@@ -910,6 +928,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _backgroundAtivo = false;
     _notificationTapSub?.cancel();
     _authSub?.close();
+    _compassSub?.cancel();
     _stopRealtime();
     super.dispose();
   }
@@ -977,10 +996,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     return null;
   }
 
-  String _formatarLugares(int lugares) {
-    return lugares == 1 ? '1 assento' : '$lugares assentos';
-  }
-
   Future<void> _enviarPing({bool silencioso = false}) async {
     if (_enviando) return;
     final user = ref.read(authProvider).valueOrNull;
@@ -1009,9 +1024,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _posicao = LatLng(pos.latitude, pos.longitude);
       });
     }
-    _modalSetState?.call(() {});
+    if (_modalAberto) { // Guard for _modalSetState
+      _modalSetState?.call(() {});
+    }
     unawaited(_avaliarTilesPara(_posicao));
     unawaited(_avaliarVelocidade(pos));
+
+    if (_corridaAtual != null) {
+      _atualizarRotas(_corridaAtual!);
+    }
 
     try {
       final lat = _round6(pos.latitude);
@@ -1023,6 +1044,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           longitude: lng,
           precisaoM: pos.accuracy,
           corridaId: corridaId is int ? corridaId : null,
+          bearing: _compassBearing,
         );
       } else {
         final service = DriverService();
@@ -1031,6 +1053,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           latitude: lat,
           longitude: lng,
           precisao: pos.accuracy,
+          bearing: _compassBearing,
         );
       }
     } catch (e) {
@@ -1107,7 +1130,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (type == 'ride_update' || type == 'ride_assigned' || type == 'ride_created') {
       final raw = event['corrida'];
       if (raw is Map) {
-        final corrida = Map<String, dynamic>.from(raw as Map);
+        final corrida = Map<String, dynamic>.from(raw);
         _aplicarCorridaAtual(corrida);
       } else if (raw == null) {
         _aplicarCorridaAtual(null);
@@ -1218,7 +1241,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Material(
-                  color: Theme.of(context).dialogBackgroundColor,
+                  color: Theme.of(context).dialogTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   child: StatefulBuilder(builder: (dialogContext, setModalState) {
                     _modalSetState = setModalState;
@@ -1454,6 +1477,26 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                             maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
                                             tileBounds: bounds,
                                           ),
+                                          if (_rotaCorrida.length >= 2)
+                                            PolylineLayer(
+                                              polylines: [
+                                                Polyline(
+                                                  points: _rotaCorrida,
+                                                  strokeWidth: 3,
+                                                  color: Colors.blueAccent,
+                                                ),
+                                              ],
+                                            ),
+                                          if (_rotaMotorista.length >= 2)
+                                            PolylineLayer(
+                                              polylines: [
+                                                Polyline(
+                                                  points: _rotaMotorista,
+                                                  strokeWidth: 3,
+                                                  color: Colors.orangeAccent,
+                                                ),
+                                              ],
+                                            ),
                                           MarkerLayer(
                                             markers: [
                                               if (origem != null)
@@ -1471,34 +1514,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                                   child: const Icon(Icons.flag, color: Colors.red, size: 30),
                                                 ),
                                               if (motoristaPos != null)
-                                                Marker(
-                                                  point: motoristaPos,
-                                                  width: 36,
-                                                  height: 36,
-                                                  child: const Icon(Icons.local_taxi, color: Colors.orange, size: 30),
-                                                ),
-                                            ],
+                                                                                                  Marker(
+                                                                                                    point: motoristaPos,
+                                                                                                    width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
+                                                                                                    height: 36,
+                                                                                                                                                                                                        child: Transform.rotate(
+                                                                                                                                                                                                          angle: (_compassBearing) * (math.pi / 180),
+                                                                                                                                                                                                          child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                                                                                                                                                                                        ),                                                                                                  ),                                            ],
                                           ),
-                                          if (_rotaMotorista.length >= 2)
-                                            PolylineLayer(
-                                              polylines: [
-                                                Polyline(
-                                                  points: _rotaMotorista,
-                                                  strokeWidth: 3,
-                                                  color: Colors.orangeAccent,
-                                                ),
-                                              ],
-                                            ),
-                                          if (_rotaCorrida.length >= 2)
-                                            PolylineLayer(
-                                              polylines: [
-                                                Polyline(
-                                                  points: _rotaCorrida,
-                                                  strokeWidth: 3,
-                                                  color: Colors.blueAccent,
-                                                ),
-                                              ],
-                                            ),
                                         ],
                                       );
                                     },
@@ -1577,6 +1601,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       Map<String, dynamic>? nova;
       switch (acao) {
         case 'aceitar':
+          if (mounted) {
+            setState(() {
+              _exibirRotasNoMapaPrincipal = true;
+            });
+          }
           nova = await service.aceitarCorrida(corridaId: corridaId, motoristaId: perfilId);
           break;
         case 'iniciar':
@@ -1588,6 +1617,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         case 'rejeitar':
           await service.reatribuirCorrida(corridaId, excluirMotoristaId: perfilId);
           _corridaAtual = null;
+          _limparRotas();
           _modalSetState?.call(() {});
           if (_modalAberto && mounted) {
             Navigator.of(context, rootNavigator: true).pop();
@@ -1602,10 +1632,18 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _corridaAtual = nova;
         _atualizarRotas(nova);
       }
-      _modalSetState?.call(() {});
+      if (_modalAberto) {
+        _modalSetState?.call(() {});
+      }
       if (!mounted) return;
       if (acao == 'finalizar' || (nova != null && nova['status'] == 'concluida')) {
+        _corridaAtual = null;
         _limparRotas();
+        if (mounted) {
+          setState(() {
+            _exibirRotasNoMapaPrincipal = false;
+          });
+        }
         if (_modalAberto) {
           Navigator.of(context, rootNavigator: true).pop();
           _modalAberto = false;
@@ -1886,7 +1924,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                   maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
                                   tileBounds: bounds,
                                 ),
-                                if (_rotaMotorista.length >= 2)
+                                if (_exibirRotasNoMapaPrincipal && _rotaMotorista.length >= 2)
                                   PolylineLayer(
                                     polylines: [
                                       Polyline(
@@ -1896,7 +1934,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                       ),
                                     ],
                                   ),
-                                if (_rotaCorrida.length >= 2)
+                                if (_exibirRotasNoMapaPrincipal && _rotaCorrida.length >= 2)
                                   PolylineLayer(
                                     polylines: [
                                       Polyline(

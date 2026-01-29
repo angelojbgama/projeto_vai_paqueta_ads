@@ -132,7 +132,7 @@ O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.
         return AlertDialog(
           title: const Text('Termos de Uso'),
           scrollable: true,
-          content: SingleChildScrollView(
+          content: const SingleChildScrollView(
             child: Text(_termsText),
           ),
           actions: [
@@ -336,7 +336,7 @@ O termo pode ser atualizado. Mudancas relevantes podem exigir nova confirmacao.
                           Expanded(
                             flex: 3,
                             child: DropdownButtonFormField<String>(
-                              value: selected,
+                              initialValue: selected,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'DDI',

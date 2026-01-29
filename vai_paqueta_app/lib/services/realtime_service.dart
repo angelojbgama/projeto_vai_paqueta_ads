@@ -106,6 +106,7 @@ class RealtimeService {
     required double longitude,
     double? precisaoM,
     int? corridaId,
+    double? bearing,
   }) {
     send({
       'type': 'ping',
@@ -113,6 +114,7 @@ class RealtimeService {
       'longitude': longitude,
       if (precisaoM != null) 'precisao_m': precisaoM,
       if (corridaId != null) 'corrida_id': corridaId,
+      if (bearing != null) 'bearing': bearing,
     });
   }
 

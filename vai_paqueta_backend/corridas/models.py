@@ -83,6 +83,7 @@ class LocalizacaoPing(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     precisao_m = models.FloatField(null=True, blank=True)
+    bearing = models.FloatField(null=True, blank=True, help_text="Direção da bússola em graus (0-360).")
     criado_em = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

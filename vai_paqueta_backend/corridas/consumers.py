@@ -133,13 +133,15 @@ class DriverConsumer(BaseRideConsumer):
             lng = content.get("longitude")
             if lat is None or lng is None:
                 return
-            await self._registrar_ping(lat, lng, content.get("precisao_m"), content.get("corrida_id"))
+            await self._registrar_ping(
+                lat, lng, content.get("precisao_m"), content.get("corrida_id"), content.get("bearing")
+            )
             await self.send_json({"type": "pong"})
             return
         await super().receive_json(content, **kwargs)
 
     @database_sync_to_async
-    def _registrar_ping(self, lat, lng, precisao_m=None, corrida_id=None):
+    def _registrar_ping(self, lat, lng, precisao_m=None, corrida_id=None, bearing=None):
         if not self.perfil_id:
             return
         ping = LocalizacaoPing.objects.create(
@@ -147,6 +149,7 @@ class DriverConsumer(BaseRideConsumer):
             latitude=lat,
             longitude=lng,
             precisao_m=precisao_m,
+            bearing=bearing,
         )
         try:
             perfil = Perfil.objects.filter(id=self.perfil_id).first()
@@ -159,6 +162,7 @@ class DriverConsumer(BaseRideConsumer):
             latitude=float(ping.latitude),
             longitude=float(ping.longitude),
             precisao_m=ping.precisao_m,
+            bearing=ping.bearing,
             ping_em=ping.criado_em,
             corrida_id=corrida_id if isinstance(corrida_id, int) else None,
         )

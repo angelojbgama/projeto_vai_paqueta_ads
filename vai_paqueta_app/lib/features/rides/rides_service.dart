@@ -13,6 +13,7 @@ class CorridaResumo {
   final double? motoristaLat;
   final double? motoristaLng;
   final DateTime? motoristaPingEm;
+  final double? motoristaBearing;
   final String? origemEndereco;
   final String? destinoEndereco;
   final String? motoristaNome;
@@ -31,6 +32,7 @@ class CorridaResumo {
     this.motoristaLat,
     this.motoristaLng,
     this.motoristaPingEm,
+    this.motoristaBearing,
     this.origemEndereco,
     this.destinoEndereco,
     this.motoristaNome,
@@ -40,13 +42,13 @@ class CorridaResumo {
   });
 
   factory CorridaResumo.fromJson(Map<String, dynamic> json) {
-    double? _d(dynamic v) {
+    double? d(dynamic v) {
       if (v == null) return null;
       if (v is num) return v.toDouble();
       if (v is String) return double.tryParse(v);
       return null;
     }
-    DateTime? _dt(dynamic v) {
+    DateTime? dt(dynamic v) {
       if (v == null) return null;
       if (v is DateTime) return v;
       if (v is String) return DateTime.tryParse(v);
@@ -63,19 +65,20 @@ class CorridaResumo {
       id: json['id'] as int,
       status: json['status'] as String,
       lugares: (json['lugares'] as num?)?.toInt() ?? 1,
-      origemLat: _d(json['origem_lat']),
-      origemLng: _d(json['origem_lng']),
-      destinoLat: _d(json['destino_lat']),
-      destinoLng: _d(json['destino_lng']),
-      motoristaLat: _d(json['motorista_lat']),
-      motoristaLng: _d(json['motorista_lng']),
-      motoristaPingEm: _dt(json['motorista_ping_em']),
+      origemLat: d(json['origem_lat']),
+      origemLng: d(json['origem_lng']),
+      destinoLat: d(json['destino_lat']),
+      destinoLng: d(json['destino_lng']),
+      motoristaLat: d(json['motorista_lat']),
+      motoristaLng: d(json['motorista_lng']),
+      motoristaPingEm: dt(json['motorista_ping_em']),
+      motoristaBearing: d(json['motorista_bearing']),
       origemEndereco: (json['origem_endereco'] as String?)?.trim(),
       destinoEndereco: (json['destino_endereco'] as String?)?.trim(),
       motoristaNome: motoristaNome,
       motoristaTelefone: motoristaTelefone,
-      atualizadoEm: _dt(json['atualizado_em']),
-      serverTime: _dt(json['server_time']),
+      atualizadoEm: dt(json['atualizado_em']),
+      serverTime: dt(json['server_time']),
     );
   }
 }
