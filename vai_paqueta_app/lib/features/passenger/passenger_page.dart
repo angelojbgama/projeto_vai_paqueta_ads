@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -1308,22 +1309,22 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _modalAberto = true;
     await Future<void>.delayed(Duration.zero);
     try {
-      await showGeneralDialog<void>(
+      await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        barrierLabel: 'Corrida',
         barrierColor: Colors.black54,
-        transitionDuration: UiTimings.modalTransition,
-        pageBuilder: (ctx, anim, __) {
+        useRootNavigator: true,
+        builder: (dialogContext) {
           return SafeArea(
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
-                child: Material(
-                  color: Theme.of(context).dialogBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
+                child: Dialog(
+                  backgroundColor: Theme.of(context).dialogBackgroundColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   child: StatefulBuilder(
-                    builder: (dialogContext, setModalState) {
+                    builder: (context, setModalState) {
                       _modalSetState = setModalState;
                       final origem = _origemLatLng;
                       final destino = _destinoLatLng;
@@ -1482,15 +1483,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                   ),
                 ),
               ),
-            ),
-          );
-        },
-        transitionBuilder: (ctx, anim, secondary, child) {
-          return FadeTransition(
-            opacity: anim,
-            child: ScaleTransition(
-              scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-              child: child ?? const SizedBox.shrink(),
             ),
           );
         },
@@ -1698,6 +1690,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           _encerrarCorrida();
         });
       } catch (e) {
+        if (e is DioException) {
+          await _atualizarCorridaAtiva();
+        }
         debugPrint('Erro ao cancelar: ${friendlyError(e)}');
       } finally {
         setState(() => _loading = false);
@@ -1708,9 +1703,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     setState(() {
       _loading = true;
     });
+    int perfilId = 0;
     try {
       final user = ref.read(authProvider).valueOrNull;
-      final perfilId = user?.perfilId ?? 0;
+      perfilId = user?.perfilId ?? 0;
       if (perfilId == 0) {
         debugPrint('Perfil do usuário não encontrado.');
         return;
@@ -1771,6 +1767,32 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _mostrarAvisoPagamento(rideId: corrida.id);
       });
     } catch (e) {
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map && data['corrida'] is Map) {
+          try {
+            final corrida = CorridaResumo.fromJson(
+              Map<String, dynamic>.from(data['corrida'] as Map),
+            );
+            _aplicarCorridaResumo(corrida);
+            return;
+          } catch (_) {
+            // segue com tratamento padrão
+          }
+        }
+        final status = e.response?.statusCode;
+        if (status != null && status >= 500 && perfilId != 0) {
+          try {
+            final corrida = await RidesService().buscarCorridaAtiva(perfilId: perfilId);
+            if (corrida != null) {
+              _aplicarCorridaResumo(corrida);
+              return;
+            }
+          } catch (_) {
+            // ignora fallback
+          }
+        }
+      }
       debugPrint('Erro ao pedir corrida: ${friendlyError(e)}');
     } finally {
       setState(() => _loading = false);

@@ -109,6 +109,8 @@ class ApiClient {
   late final Dio _refreshDio;
   Future<String?>? _refreshFuture;
 
+  static Future<String?> refreshAccessToken() => _instance._refreshToken();
+
   Future<String?> _refreshToken() async {
     if (_refreshFuture != null) return _refreshFuture!;
     final refresh = await AuthStorage.getRefreshToken();
