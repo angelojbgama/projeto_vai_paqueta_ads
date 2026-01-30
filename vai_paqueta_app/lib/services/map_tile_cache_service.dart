@@ -52,13 +52,13 @@ class MapTileCacheService {
     return _store.getTileProvider();
   }
 
-  static Future<void> prefetchDefault() {
+  static Future<void> prefetchDefault({LatLngBounds? bounds, int? minZoom, int? maxZoom}) {
     if (kIsWeb || MapTileConfig.useAssets) return Future.value();
-    _prefetchFuture ??= _prefetchInternal();
+    _prefetchFuture ??= _prefetchInternal(bounds: bounds, minZoom: minZoom, maxZoom: maxZoom);
     return _prefetchFuture!;
   }
 
-  static Future<void> _prefetchInternal() async {
+  static Future<void> _prefetchInternal({LatLngBounds? bounds, int? minZoom, int? maxZoom}) async {
     await initialize();
     if (!_ready) return;
     try {
@@ -66,9 +66,12 @@ class MapTileCacheService {
       if (!ready) return;
       final length = await _store.stats.length;
       if (length > 0) return;
-      final region = RectangleRegion(MapTileConfig.tilesBounds).toDownloadable(
-        minZoom: MapTileConfig.assetsMinZoom,
-        maxZoom: MapTileConfig.assetsMaxZoom,
+      final effectiveBounds = bounds ?? MapTileConfig.tilesBounds;
+      final effectiveMinZoom = minZoom ?? MapTileConfig.assetsMinZoom;
+      final effectiveMaxZoom = maxZoom ?? MapTileConfig.assetsMaxZoom;
+      final region = RectangleRegion(effectiveBounds).toDownloadable(
+        minZoom: effectiveMinZoom,
+        maxZoom: effectiveMaxZoom,
         options: TileLayer(
           urlTemplate: MapTileConfig.networkTemplate,
         ),

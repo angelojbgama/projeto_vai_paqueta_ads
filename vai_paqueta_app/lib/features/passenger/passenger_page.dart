@@ -115,6 +115,27 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return _tileUsingAssets ? AssetTileProvider() : MapTileCacheService.networkTileProvider();
   }
 
+  int _effectiveMinNativeZoom() {
+    if (_tileMinNativeZoom != null) return _tileMinNativeZoom!;
+    return _tileUsingAssets ? MapTileConfig.assetsMinZoom : MapTileConfig.passengerMinZoom;
+  }
+
+  int _effectiveMaxNativeZoom() {
+    if (_tileMaxNativeZoom != null) return _tileMaxNativeZoom!;
+    return _tileUsingAssets ? MapTileConfig.assetsMaxZoom : MapTileConfig.passengerMaxZoom;
+  }
+
+  double _effectiveMinZoom() {
+    return math.min(
+      MapTileConfig.displayMinZoom.toDouble(),
+      _effectiveMinNativeZoom().toDouble(),
+    );
+  }
+
+  double _effectiveMaxZoom() {
+    return _effectiveMaxNativeZoom().toDouble();
+  }
+
   String _normalizarStatus(String? status) {
     final raw = (status ?? '').trim().toLowerCase();
     if (raw.isEmpty) return '';
@@ -640,9 +661,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _configurarFonteTiles();
-    if (!MapTileConfig.useAssets) {
-      MapTileCacheService.prefetchDefault();
-    }
     _carregarCorridaAtiva();
     _carregarPosicao();
     _configurarRealtime();
@@ -745,6 +763,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     return _TileSource(
       template: MapTileConfig.networkTemplate,
       usingAssets: false,
+      minNativeZoom: MapTileConfig.passengerMinZoom,
+      maxNativeZoom: MapTileConfig.passengerMaxZoom,
     );
   }
 
@@ -1402,10 +1422,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                           MapViewport.centerForPins(pins),
                                           bounds,
                                         );
+                                        final minZoom = _effectiveMinZoom();
+                                        final maxZoom = _effectiveMaxZoom();
                                         final zoom = MapViewport.zoomForPins(
                                           pins,
-                                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                          minZoom: minZoom,
+                                          maxZoom: maxZoom,
                                           fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
                                         );
                                         final fitBounds = MapViewport.boundsForPins(pins);
@@ -1414,34 +1436,50 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                             : CameraFit.bounds(
                                                 bounds: fitBounds,
                                                 padding: const EdgeInsets.all(24),
-                                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                                minZoom: minZoom,
+                                                maxZoom: maxZoom,
                                               );
-                                        final key = ValueKey(
-                                          'pass-modal-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                                        );
-                                        return FlutterMap(
-                                          key: key,
-                                          options: MapOptions(
-                                            initialCenter: center,
-                                            initialZoom: zoom,
-                                            initialCameraFit: fit,
-                                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                                            cameraConstraint: CameraConstraint.contain(bounds: bounds),
-                                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                          ),
-                                          children: [
-                                            TileLayer(
-                                              urlTemplate: _tileUrl,
-                                              tileProvider: _buildTileProvider(),
-                                              userAgentPackageName: 'com.example.vai_paqueta_app',
-                                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                              minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
-                                              maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
-                                              tileBounds: bounds,
-                                            ),
+                                                                                final key = ValueKey(
+                                                                                  'pass-modal-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                                                                                );
+                                                                                return FlutterMap(
+                                                                                  key: key,
+                                                                                  options: MapOptions(
+                                                                                    initialCenter: center,
+                                                                                    initialZoom: zoom,
+                                                                                    initialCameraFit: fit,
+                                                                                    interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                                                                                    cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                                                                                    minZoom: minZoom,
+                                                                                    maxZoom: maxZoom,
+                                                                                  ),
+                                                                                  children: [
+                                                                                    TileLayer(
+                                                                                      urlTemplate: _tileUrl,
+                                                                                      tileProvider: _buildTileProvider(),
+                                                                                      userAgentPackageName: 'com.example.vai_paqueta_app',
+                                                                                      minZoom: minZoom,
+                                                                                      maxZoom: maxZoom,
+                                                                                      minNativeZoom: _effectiveMinNativeZoom(),
+                                                                                      maxNativeZoom: _effectiveMaxNativeZoom(),
+                                                                                      tileBounds: bounds,
+                                                                                    ),
+                                            if (_rota.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(points: _rota, strokeWidth: 3, color: Colors.blueAccent),
+                                                ],
+                                              ),
+                                            if (_rotaMotorista.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(
+                                                    points: _rotaMotorista,
+                                                    strokeWidth: 3,
+                                                    color: Colors.orangeAccent,
+                                                  ),
+                                                ],
+                                              ),
                                             MarkerLayer(
                                               markers: [
                                                 if (origem != null)
@@ -1470,22 +1508,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                   ),
                                               ],
                                             ),
-                                            if (_rota.length >= 2)
-                                              PolylineLayer(
-                                                polylines: [
-                                                  Polyline(points: _rota, strokeWidth: 3, color: Colors.blueAccent),
-                                                ],
-                                              ),
-                                            if (_rotaMotorista.length >= 2)
-                                              PolylineLayer(
-                                                polylines: [
-                                                  Polyline(
-                                                    points: _rotaMotorista,
-                                                    strokeWidth: 3,
-                                                    color: Colors.orangeAccent,
-                                                  ),
-                                                ],
-                                              ),
                                           ],
                                         );
                                       },
@@ -1920,10 +1942,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       MapViewport.centerForPins(pins),
                       bounds,
                     );
+                    final minZoom = _effectiveMinZoom();
+                    final maxZoom = _effectiveMaxZoom();
                     final zoom = MapViewport.zoomForPins(
                       pins,
-                      minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                      maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                      minZoom: minZoom,
+                      maxZoom: maxZoom,
                       fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
                     );
                     final fitBounds = MapViewport.boundsForPins(pins);
@@ -1932,8 +1956,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                         : CameraFit.bounds(
                             bounds: fitBounds,
                             padding: const EdgeInsets.all(24),
-                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                            minZoom: minZoom,
+                            maxZoom: maxZoom,
                           );
                     final key = ValueKey(
                       'pass-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
@@ -1946,22 +1970,42 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                           initialCenter: center,
                           initialZoom: zoom,
                           initialCameraFit: fit,
-                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                          interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
                           cameraConstraint: CameraConstraint.contain(bounds: bounds),
-                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                          minZoom: minZoom,
+                          maxZoom: maxZoom,
                         ),
                         children: [
                           TileLayer(
                             urlTemplate: _tileUrl,
                             userAgentPackageName: 'com.example.vai_paqueta_app',
                             tileProvider: _buildTileProvider(),
-                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                            minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
-                            maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                            minZoom: minZoom,
+                            maxZoom: maxZoom,
+                            minNativeZoom: _effectiveMinNativeZoom(),
+                            maxNativeZoom: _effectiveMaxNativeZoom(),
                             tileBounds: bounds,
                           ),
+                          if (_rota.length >= 2)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: _rota,
+                                  strokeWidth: 4,
+                                  color: Colors.blueAccent,
+                                ),
+                              ],
+                            ),
+                          if (_rotaMotorista.length >= 2)
+                            PolylineLayer(
+                              polylines: <Polyline>[
+                                Polyline(
+                                  points: _rotaMotorista,
+                                  strokeWidth: 3,
+                                  color: Colors.orangeAccent,
+                                ),
+                              ],
+                            ),
                           if (_origemLatLng != null)
                             MarkerLayer(
                               markers: [
@@ -1995,26 +2039,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                     angle: (_motoristaBearing) * (math.pi / 180),
                                     child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
                                   ),
-                                ),
-                              ],
-                            ),
-                          if (_rota.length >= 2)
-                            PolylineLayer(
-                              polylines: [
-                                Polyline(
-                                  points: _rota,
-                                  strokeWidth: 4,
-                                  color: Colors.blueAccent,
-                                ),
-                              ],
-                            ),
-                          if (_rotaMotorista.length >= 2)
-                            PolylineLayer(
-                              polylines: <Polyline>[
-                                Polyline(
-                                  points: _rotaMotorista,
-                                  strokeWidth: 3,
-                                  color: Colors.orangeAccent,
                                 ),
                               ],
                             ),

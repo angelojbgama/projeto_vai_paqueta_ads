@@ -39,6 +39,19 @@ class MapTileConfig {
   static final double tilesWest = _doubleFromEnv(_tilesWestEnv, -43.133396);
   static final double tilesNorth = _doubleFromEnv(_tilesNorthEnv, -22.741042);
   static final double tilesEast = _doubleFromEnv(_tilesEastEnv, -43.090621);
+
+  static const _passengerSouthEnv = String.fromEnvironment('MAP_TILE_PASSENGER_SOUTH', defaultValue: '');
+  static const _passengerWestEnv = String.fromEnvironment('MAP_TILE_PASSENGER_WEST', defaultValue: '');
+  static const _passengerNorthEnv = String.fromEnvironment('MAP_TILE_PASSENGER_NORTH', defaultValue: '');
+  static const _passengerEastEnv = String.fromEnvironment('MAP_TILE_PASSENGER_EAST', defaultValue: '');
+  static final double passengerSouth = _doubleFromEnv(_passengerSouthEnv, -22.770);
+  static final double passengerWest = _doubleFromEnv(_passengerWestEnv, -43.120);
+  static final double passengerNorth = _doubleFromEnv(_passengerNorthEnv, -22.750);
+  static final double passengerEast = _doubleFromEnv(_passengerEastEnv, -43.100);
+
+  static const passengerMinZoom = int.fromEnvironment('MAP_TILE_PASSENGER_MIN_ZOOM', defaultValue: 14);
+  static const passengerMaxZoom = int.fromEnvironment('MAP_TILE_PASSENGER_MAX_ZOOM', defaultValue: 17);
+
   static const defaultCenterLat = -22.763;
   static const defaultCenterLng = -43.106;
 
@@ -58,6 +71,14 @@ class MapTileConfig {
       LatLng(tilesNorth, tilesEast),
     );
   }
+
+  static LatLngBounds get passengerBounds {
+    return LatLngBounds(
+      LatLng(passengerSouth, passengerWest),
+      LatLng(passengerNorth, passengerEast),
+    );
+  }
+
 
   static double _doubleFromEnv(String raw, double fallback) {
     final value = raw.trim();
