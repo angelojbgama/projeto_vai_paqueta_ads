@@ -89,6 +89,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _exibirRotasNoMapaPrincipal = true;
   StreamSubscription<CompassEvent>? _compassSub;
   double _compassBearing = 0.0;
+  double? _velocidadeKmh;
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1030,6 +1031,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     unawaited(_avaliarTilesPara(_posicao));
     unawaited(_avaliarVelocidade(pos));
 
+    final speedMps = _extrairVelocidadeMps(pos);
+    final currentSpeedKmh = (speedMps != null && speedMps.isFinite) ? speedMps * 3.6 : null;
+    if (mounted) {
+      setState(() {
+        _velocidadeKmh = currentSpeedKmh;
+      });
+    }
+
     if (_corridaAtual != null) {
       _atualizarRotas(_corridaAtual!);
     }
@@ -1694,6 +1703,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         if (mudou) {
           _recebendoCorridas = ativo;
         }
+        if (!ativo) {
+          _velocidadeKmh = null;
+        }
+
       });
     }
     if (salvarPreferencias) {
@@ -1847,125 +1860,200 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                       key: _guiaRecebimentoKey,
                       value: _recebendoCorridas,
                       onChanged: _onToggleRecebimentoCorridas,
-                      title: const Text('Ativar recebimento de corridas'),
-                      subtitle: const Text('Fique disponível para receber novas corridas.'),
+                      title: const Text('Receber Corridas'),
+                      subtitle: const Text('Fique disponível para corridas.'),
                     ),
                     Divider(height: 1, color: Colors.grey.shade200),
                     SwitchListTile.adaptive(
                       key: _guiaLocalizacaoBgKey,
                       value: _enviarLocalizacaoBg,
                       onChanged: _onToggleLocalizacaoSegundoPlano,
-                      title: const Text('Enviar localização em segundo plano'),
-                      subtitle: const Text(
-                        'Permite que o app continue enviando sua localização mesmo em segundo plano, '
-                        'para te conectar às corridas mais próximas.',
-                      ),
+                      title: const Text('Receber corridas em segundo plano'),
+                      subtitle: const Text('Enviar localização e receber corridas com app em segundo plano.'),
                     ),
                   ],
                 ),
               ),
+              if (_velocidadeKmh != null && _recebendoCorridas)
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Velocidade: ${_velocidadeKmh!.toStringAsFixed(1)} km/h',
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 12),
-              SizedBox(
-                key: _guiaMapaKey,
-                height: 220,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: _posicao == null
-                      ? Container(
-                          color: Colors.grey.shade100,
-                          child: const Center(child: Text('Localização não disponível')),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            final bounds = MapTileConfig.tilesBounds;
-                            final rawPins = MapViewport.collectPins([_posicao]);
-                            final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
-                            final center = MapViewport.clampCenter(
-                              MapViewport.centerForPins(pins),
-                              bounds,
-                            );
-                            final zoom = MapViewport.zoomForPins(
-                              pins,
-                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                              fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
-                            );
-                            final fitBounds = MapViewport.boundsForPins(pins);
-                            final fit = fitBounds == null
-                                ? null
-                                : CameraFit.bounds(
-                                    bounds: fitBounds,
-                                    padding: const EdgeInsets.all(24),
-                                    minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                    maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                  );
-                            final key = ValueKey(
-                              'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                            );
-                            return FlutterMap(
-                              key: key,
-                              options: MapOptions(
-                                initialCenter: center,
-                                initialZoom: zoom,
-                                initialCameraFit: fit,
-                                interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                                cameraConstraint: CameraConstraint.contain(bounds: bounds),
-                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: _tileUrl,
-                                  tileProvider: _buildTileProvider(),
-                                  userAgentPackageName: 'com.example.vai_paqueta_app',
-                                  minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                  maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                  minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
-                                  maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
-                                  tileBounds: bounds,
-                                ),
-                                if (_exibirRotasNoMapaPrincipal && _rotaMotorista.length >= 2)
-                                  PolylineLayer(
-                                    polylines: [
-                                      Polyline(
-                                        points: _rotaMotorista,
-                                        strokeWidth: 3,
-                                        color: Colors.orangeAccent,
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SizedBox(
+                      key: _guiaMapaKey,
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: _posicao == null
+                              ? Container(
+                                  color: Colors.grey.shade100,
+                                  child: const Center(child: Text('Localização não disponível')),
+                                )
+                              : _recebendoCorridas
+                                  ? Builder(
+                                      builder: (context) {
+                                        final bounds = MapTileConfig.tilesBounds;
+                                        final rawPins = MapViewport.collectPins([_posicao]);
+                                        final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                                        final center = MapViewport.clampCenter(
+                                          MapViewport.centerForPins(pins),
+                                          bounds,
+                                        );
+                                        final zoom = MapViewport.zoomForPins(
+                                          pins,
+                                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                          fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                                        );
+                                        final fitBounds = MapViewport.boundsForPins(pins);
+                                        final fit = fitBounds == null
+                                            ? null
+                                            : CameraFit.bounds(
+                                                bounds: fitBounds,
+                                                padding: const EdgeInsets.all(24),
+                                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                              );
+                                        final key = ValueKey(
+                                          'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
+                                        );
+                                        return FlutterMap(
+                                          key: key,
+                                          options: MapOptions(
+                                            initialCenter: center,
+                                            initialZoom: zoom,
+                                            initialCameraFit: fit,
+                                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                                            cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                          ),
+                                          children: [
+                                            TileLayer(
+                                              urlTemplate: _tileUrl,
+                                              tileProvider: _buildTileProvider(),
+                                              userAgentPackageName: 'com.example.vai_paqueta_app',
+                                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                              minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                              maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                              tileBounds: bounds,
+                                            ),
+                                            if (_exibirRotasNoMapaPrincipal && _rotaMotorista.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(
+                                                    points: _rotaMotorista,
+                                                    strokeWidth: 3,
+                                                    color: Colors.orangeAccent,
+                                                  ),
+                                                ],
+                                              ),
+                                            if (_exibirRotasNoMapaPrincipal && _rotaCorrida.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(
+                                                    points: _rotaCorrida,
+                                                    strokeWidth: 3,
+                                                    color: Colors.blueAccent,
+                                                  ),
+                                                ],
+                                              ),
+                                            MarkerLayer(
+                                              markers: [
+                                                Marker(
+                                                  point: _posicao!,
+                                                  width: 54,
+                                                  height: 36,
+                                                  child: Transform.rotate(
+                                                    angle: (_compassBearing) * (math.pi / 180),
+                                                    child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      color: Colors.grey.shade100,
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: const [
+                                            Text(
+                                              'Você está offline para corridas.',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(color: Colors.grey, fontSize: 16),
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Ative "Receber Corridas" ',
+                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                                  ),
+                                                  const WidgetSpan(
+                                                    alignment: PlaceholderAlignment.middle,
+                                                    child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
+                                                  ),
+                                                  const TextSpan(
+                                                    text: ' para ficar disponível.',
+                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                                  ),
+                                                ],
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                            SizedBox(height: 4),
+                                            Text.rich(
+                                              TextSpan(
+                                                children: [
+                                                  const TextSpan(
+                                                    text: 'Ative "Receber corridas em segundo plano" ',
+                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                                  ),
+                                                  const WidgetSpan(
+                                                    alignment: PlaceholderAlignment.middle,
+                                                    child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
+                                                  ),
+                                                  const TextSpan(
+                                                    text: ' para sempre estar disponível.',
+                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                                                  ),
+                                                ],
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                if (_exibirRotasNoMapaPrincipal && _rotaCorrida.length >= 2)
-                                  PolylineLayer(
-                                    polylines: [
-                                      Polyline(
-                                        points: _rotaCorrida,
-                                        strokeWidth: 3,
-                                        color: Colors.blueAccent,
-                                      ),
-                                    ],
-                                  ),
-                                MarkerLayer(
-                                  markers: [
-                                    Marker(
-                                      point: _posicao!,
-                                      width: 40,
-                                      height: 40,
-                                      child: const Icon(Icons.location_pin, color: Colors.red, size: 36),
                                     ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          },
                         ),
+                      ),
+                    );
+                  },
                 ),
               ),
-            const SizedBox(height: 16),
-            Text(
-              _recebendoCorridas
-                  ? 'O app envia sua localização automaticamente a cada 10s e verifica corridas atribuídas.'
-                  : 'Recebimento de corridas pausado. Ative para enviar sua localização e verificar corridas atribuídas.',
-            ),
+
           ],
         ),
       ),

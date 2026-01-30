@@ -30,7 +30,7 @@ class MapTileConfig {
   static const assetsMaxZoom = int.fromEnvironment('MAP_TILE_MAX_ZOOM', defaultValue: 19);
   static const _displayMinZoomEnv = int.fromEnvironment('MAP_TILE_DISPLAY_MIN_ZOOM', defaultValue: -1);
   static const _displayMaxZoomEnv = int.fromEnvironment('MAP_TILE_DISPLAY_MAX_ZOOM', defaultValue: -1);
-  static const assetsSampleZoom = int.fromEnvironment('MAP_TILE_SAMPLE_ZOOM', defaultValue: 14);
+  static const assetsSampleZoom = int.fromEnvironment('MAP_TILE_SAMPLE_ZOOM', defaultValue: 16);
   static const _tilesSouthEnv = String.fromEnvironment('MAP_TILE_SOUTH', defaultValue: '');
   static const _tilesWestEnv = String.fromEnvironment('MAP_TILE_WEST', defaultValue: '');
   static const _tilesNorthEnv = String.fromEnvironment('MAP_TILE_NORTH', defaultValue: '');
