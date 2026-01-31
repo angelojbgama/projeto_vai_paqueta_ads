@@ -786,51 +786,56 @@ class MotoristasProximosView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        lat_param = request.query_params.get("lat")
+        lng_param = request.query_params.get("lng")
+
         if not request.user or not request.user.is_staff:
             try:
                 perfil = _perfil_usuario(request.user, tipo="passageiro")
             except PermissionDenied:
                 return Response({"detail": "Ação restrita."}, status=status.HTTP_403_FORBIDDEN)
-            corrida = (
-                Corrida.objects.filter(cliente=perfil, status__in=ACTIVE_STATUSES)
-                .order_by("-atualizado_em", "-criado_em")
-                .first()
-            )
-            if not corrida or not corrida.motorista_id:
-                return Response([], status=status.HTTP_200_OK)
-            ping = (
-                LocalizacaoPing.objects.filter(perfil_id=corrida.motorista_id)
-                .order_by("-criado_em")
-                .values("latitude", "longitude", "precisao_m", "criado_em")
-                .first()
-            )
-            if not ping:
-                return Response([], status=status.HTTP_200_OK)
-            dist_km = None
-            if corrida.origem_lat is not None and corrida.origem_lng is not None:
-                dist_km = _haversine_km(
-                    float(corrida.origem_lat),
-                    float(corrida.origem_lng),
-                    float(ping["latitude"]),
-                    float(ping["longitude"]),
+
+            if lat_param is None or lng_param is None:
+                corrida = (
+                    Corrida.objects.filter(cliente=perfil, status__in=ACTIVE_STATUSES)
+                    .order_by("-atualizado_em", "-criado_em")
+                    .first()
                 )
-            return Response(
-                [
-                    {
-                        "perfil_id": corrida.motorista_id,
-                        "latitude": float(ping["latitude"]),
-                        "longitude": float(ping["longitude"]),
-                        "precisao_m": ping["precisao_m"],
-                        "dist_km": round(dist_km, 3) if dist_km is not None else 0.0,
-                        "ping_em": ping["criado_em"],
-                    }
-                ],
-                status=status.HTTP_200_OK,
-            )
+                if not corrida or not corrida.motorista_id:
+                    return Response([], status=status.HTTP_200_OK)
+                ping = (
+                    LocalizacaoPing.objects.filter(perfil_id=corrida.motorista_id)
+                    .order_by("-criado_em")
+                    .values("latitude", "longitude", "precisao_m", "criado_em")
+                    .first()
+                )
+                if not ping:
+                    return Response([], status=status.HTTP_200_OK)
+                dist_km = None
+                if corrida.origem_lat is not None and corrida.origem_lng is not None:
+                    dist_km = _haversine_km(
+                        float(corrida.origem_lat),
+                        float(corrida.origem_lng),
+                        float(ping["latitude"]),
+                        float(ping["longitude"]),
+                    )
+                return Response(
+                    [
+                        {
+                            "perfil_id": corrida.motorista_id,
+                            "latitude": float(ping["latitude"]),
+                            "longitude": float(ping["longitude"]),
+                            "precisao_m": ping["precisao_m"],
+                            "dist_km": round(dist_km, 3) if dist_km is not None else 0.0,
+                            "ping_em": ping["criado_em"],
+                        }
+                    ],
+                    status=status.HTTP_200_OK,
+                )
 
         try:
-            lat = float(request.query_params.get("lat"))
-            lng = float(request.query_params.get("lng"))
+            lat = float(lat_param)
+            lng = float(lng_param)
         except (TypeError, ValueError):
             return Response({"detail": "lat e lng são obrigatórios."}, status=status.HTTP_400_BAD_REQUEST)
 

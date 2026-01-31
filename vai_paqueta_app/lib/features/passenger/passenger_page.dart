@@ -32,7 +32,7 @@ class PassengerPage extends ConsumerStatefulWidget {
   ConsumerState<PassengerPage> createState() => _PassengerPageState();
 }
 
-class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver {
+class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver, TickerProviderStateMixin {
   static const _prefsCorridaKey = 'corrida_ativa_id';
   static const _prefsGuiaPassageiroKey = 'passageiro_guia_visto';
   final GlobalKey _guiaMapaKey = GlobalKey();
@@ -76,6 +76,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _usandoFallbackRede = false;
   bool _posCarregada = false;
   int _lugaresSolicitados = 1;
+  List<MotoristaProximo> _motoristasOnline = [];
+  Timer? _motoristasOnlineTimer;
+  bool _carregandoMotoristasOnline = false;
   final GeoService _geo = GeoService();
   final RouteService _routeService = RouteService();
   List<GeoResult> _sugestoesOrigem = [];
@@ -89,6 +92,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Timer? _corridaTimer;
   Timer? _cancelUnlockTimer;
   Timer? _finalUnlockTimer;
+  final MapController _mapController = MapController();
+  Timer? _mapResetTimer;
+  AnimationController? _mapResetAnimation;
+  LatLng? _mapDefaultCenter;
+  double? _mapDefaultZoom;
+  LatLng? _mapLastCenter;
+  double? _mapLastZoom;
+  bool _mapUserInteracting = false;
   bool _appPausado = false;
   Duration _corridaPollInterval = PassengerSettings.corridaPollIntervalBase;
   RealtimeService? _realtime;
@@ -500,6 +511,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _rotaKey = null;
     _rotaMotoristaKey = null;
     _lugaresSolicitados = 1;
+    _motoristasOnline = [];
+    _motoristasOnlineTimer?.cancel();
     if (limparEnderecos) {
       _origemCtrl.clear();
       _destinoCtrl.clear();
@@ -515,6 +528,61 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _cancelUnlockTimer?.cancel();
     _finalUnlockTimer?.cancel();
     _fecharModalCorrida();
+    _iniciarMotoristasOnlinePolling();
+  }
+
+  void _scheduleMapReset() {
+    _mapUserInteracting = true;
+    _mapResetTimer?.cancel();
+    _mapResetTimer = Timer(const Duration(seconds: 5), _resetMapToDefault);
+  }
+
+  void _resetMapToDefault() {
+    if (!mounted) return;
+    final center = _mapDefaultCenter;
+    final zoom = _mapDefaultZoom;
+    if (center == null || zoom == null) return;
+    _mapUserInteracting = false;
+    _animateMapMove(center, zoom);
+  }
+
+  void _stopMapAnimation() {
+    final controller = _mapResetAnimation;
+    if (controller == null) return;
+    controller.stop();
+    controller.dispose();
+    _mapResetAnimation = null;
+  }
+
+  void _animateMapMove(LatLng destCenter, double destZoom) {
+    final startCenter = _mapLastCenter ?? destCenter;
+    final startZoom = _mapLastZoom ?? destZoom;
+    _stopMapAnimation();
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _mapResetAnimation = controller;
+    final curved = CurvedAnimation(parent: controller, curve: Curves.easeOutCubic);
+    final latTween = Tween<double>(begin: startCenter.latitude, end: destCenter.latitude);
+    final lngTween = Tween<double>(begin: startCenter.longitude, end: destCenter.longitude);
+    final zoomTween = Tween<double>(begin: startZoom, end: destZoom);
+
+    controller.addListener(() {
+      final lat = latTween.evaluate(curved);
+      final lng = lngTween.evaluate(curved);
+      final zoom = zoomTween.evaluate(curved);
+      _mapController.move(LatLng(lat, lng), zoom);
+    });
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+        if (_mapResetAnimation == controller) {
+          _mapResetAnimation = null;
+        }
+      }
+    });
+    controller.forward();
   }
 
   void _fecharModalCorrida() {
@@ -663,6 +731,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _configurarFonteTiles();
     _carregarCorridaAtiva();
     _carregarPosicao();
+    _iniciarMotoristasOnlinePolling();
     _configurarRealtime();
     _authSub = ref.listenManual(authProvider, (_, __) {
       if (!mounted) return;
@@ -684,6 +753,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _corridaTimer?.cancel();
     _cancelUnlockTimer?.cancel();
     _finalUnlockTimer?.cancel();
+    _motoristasOnlineTimer?.cancel();
+    _mapResetTimer?.cancel();
+    _mapResetAnimation?.dispose();
     _authSub?.close();
     _stopRealtime();
     super.dispose();
@@ -697,6 +769,10 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _corridaTimer?.cancel();
       _cancelUnlockTimer?.cancel();
       _finalUnlockTimer?.cancel();
+      _motoristasOnlineTimer?.cancel();
+      _mapResetTimer?.cancel();
+      _stopMapAnimation();
+      _mapUserInteracting = false;
     } else if (state == AppLifecycleState.resumed && _appPausado) {
       _appPausado = false;
       if (_corridaIdAtual != null) {
@@ -708,6 +784,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
       }
       _gerenciarTimerCancelamento();
+      if (!_corridaAtiva) {
+        _iniciarMotoristasOnlinePolling();
+      }
     }
   }
 
@@ -963,6 +1042,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         _lugaresSolicitados = current.lugares;
       });
+      _pararMotoristasOnlinePolling(limpar: true);
       _origemTextoConfirmado = _origemCtrl.text.trim();
       _destinoTextoConfirmado = _destinoCtrl.text.trim();
       _sincronizarModalCorrida();
@@ -1012,6 +1092,48 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       _agendarPoll();
     });
+  }
+
+  void _iniciarMotoristasOnlinePolling() {
+    if (!mounted || _corridaAtiva) return;
+    _motoristasOnlineTimer?.cancel();
+    _motoristasOnlineTimer = Timer.periodic(const Duration(seconds: 10), (_) => _atualizarMotoristasOnline());
+    unawaited(_atualizarMotoristasOnline());
+  }
+
+  void _pararMotoristasOnlinePolling({bool limpar = false}) {
+    _motoristasOnlineTimer?.cancel();
+    if (limpar && mounted) {
+      setState(() {
+        _motoristasOnline = [];
+      });
+    }
+  }
+
+  Future<void> _atualizarMotoristasOnline() async {
+    if (!mounted || _corridaAtiva) return;
+    final origem = _origemLatLng;
+    if (origem == null) return;
+    if (_carregandoMotoristasOnline) return;
+    _carregandoMotoristasOnline = true;
+    try {
+      final rides = RidesService();
+      final lista = await rides.motoristasProximos(
+        lat: _round6(origem.latitude),
+        lng: _round6(origem.longitude),
+        raioKm: 5,
+        minutos: 10,
+        limite: 50,
+      );
+      if (!mounted) return;
+      setState(() {
+        _motoristasOnline = lista;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar motoristas online: ${friendlyError(e)}');
+    } finally {
+      _carregandoMotoristasOnline = false;
+    }
   }
 
   void _configurarRealtime() {
@@ -1142,6 +1264,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       _lugaresSolicitados = corrida.lugares;
     });
+    _pararMotoristasOnlinePolling(limpar: true);
     _origemTextoConfirmado = _origemCtrl.text.trim();
     _destinoTextoConfirmado = _destinoCtrl.text.trim();
     _sincronizarModalCorrida();
@@ -1659,6 +1782,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       _origemTextoConfirmado = _origemCtrl.text.trim();
       await _atualizarRotaSePossivel();
+      unawaited(_atualizarMotoristasOnline());
     } catch (e) {
       if (!mounted) return;
       if (!silencioso) {
@@ -1834,6 +1958,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _corridaLugares = corrida.lugares;
         _lugaresSolicitados = corrida.lugares;
       });
+      _pararMotoristasOnlinePolling(limpar: true);
       _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
@@ -1959,18 +2084,38 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                             minZoom: minZoom,
                             maxZoom: maxZoom,
                           );
-                    final key = ValueKey(
-                      'pass-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                    );
+                    final prevCenter = _mapDefaultCenter;
+                    final prevZoom = _mapDefaultZoom;
+                    _mapDefaultCenter = center;
+                    _mapDefaultZoom = zoom;
+                    final defaultMudou = prevCenter == null ||
+                        prevZoom == null ||
+                        prevCenter.latitude != center.latitude ||
+                        prevCenter.longitude != center.longitude ||
+                        prevZoom != zoom;
+                    if (defaultMudou && !_mapUserInteracting && _mapResetAnimation == null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted || _mapUserInteracting || _mapResetAnimation != null) return;
+                        _mapController.move(center, zoom);
+                      });
+                    }
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: FlutterMap(
-                        key: key,
+                        mapController: _mapController,
                         options: MapOptions(
                           initialCenter: center,
                           initialZoom: zoom,
                           initialCameraFit: fit,
                           interactionOptions: const InteractionOptions(flags: InteractiveFlag.all),
+                          onPositionChanged: (position, hasGesture) {
+                            _mapLastCenter = position.center;
+                            _mapLastZoom = position.zoom;
+                            if (hasGesture) {
+                              _stopMapAnimation();
+                              _scheduleMapReset();
+                            }
+                          },
                           cameraConstraint: CameraConstraint.contain(bounds: bounds),
                           minZoom: minZoom,
                           maxZoom: maxZoom,
@@ -2005,6 +2150,26 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                   color: Colors.orangeAccent,
                                 ),
                               ],
+                            ),
+                          if (!_corridaAtiva && _motoristasOnline.isNotEmpty)
+                            MarkerLayer(
+                              markers: _motoristasOnline
+                                  .map(
+                                    (motorista) => Marker(
+                                      point: LatLng(motorista.latitude, motorista.longitude),
+                                      width: 36,
+                                      height: 24,
+                                      child: Opacity(
+                                        opacity: 0.85,
+                                        child: Image.asset(
+                                          'assets/icons/ecotaxi.png',
+                                          width: 36,
+                                          height: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                             ),
                           if (_origemLatLng != null)
                             MarkerLayer(

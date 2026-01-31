@@ -33,7 +33,7 @@ class DriverPage extends ConsumerStatefulWidget {
   ConsumerState<DriverPage> createState() => _DriverPageState();
 }
 
-class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObserver {
+class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObserver, TickerProviderStateMixin {
   static const _prefsRecebendoCorridasKey = 'driver_recebendo_corridas';
   static const _prefsLocalizacaoBgKey = 'driver_localizacao_bg';
   static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
@@ -88,6 +88,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   ProviderSubscription<AsyncValue<dynamic>>? _authSub;
   bool _exibirRotasNoMapaPrincipal = true;
   StreamSubscription<CompassEvent>? _compassSub;
+  StreamSubscription<Position>? _posicaoStreamSub;
+  final MapController _mapController = MapController();
+  Timer? _mapResetTimer;
+  AnimationController? _mapResetAnimation;
+  LatLng? _mapDefaultCenter;
+  double? _mapDefaultZoom;
+  LatLng? _mapLastCenter;
+  double? _mapLastZoom;
+  bool _mapUserInteracting = false;
   double _compassBearing = 0.0;
   double? _velocidadeKmh;
 
@@ -839,6 +848,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (!mounted) return;
     if (_appPausado || _guiaAtivo) return;
     if (_avisoVelocidadeAberto) return;
+    if (!_corridaEmAndamento()) return;
     final speedMps = _extrairVelocidadeMps(pos);
     if (speedMps == null || !speedMps.isFinite) return;
     final speedKmh = speedMps * 3.6;
@@ -866,6 +876,127 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
   }
 
+  bool _corridaEmAndamento() {
+    final status = _normalizarStatus(_corridaAtual?['status']?.toString());
+    return status == 'em_andamento';
+  }
+
+  void _scheduleMapReset() {
+    _mapUserInteracting = true;
+    _mapResetTimer?.cancel();
+    _mapResetTimer = Timer(const Duration(seconds: 5), _resetMapToDefault);
+  }
+
+  void _resetMapToDefault() {
+    if (!mounted) return;
+    final center = _mapDefaultCenter;
+    final zoom = _mapDefaultZoom;
+    if (center == null || zoom == null) return;
+    _mapUserInteracting = false;
+    _animateMapMove(center, zoom);
+  }
+
+  void _stopMapAnimation() {
+    final controller = _mapResetAnimation;
+    if (controller == null) return;
+    controller.stop();
+    controller.dispose();
+    _mapResetAnimation = null;
+  }
+
+  void _animateMapMove(LatLng destCenter, double destZoom) {
+    final startCenter = _mapLastCenter ?? destCenter;
+    final startZoom = _mapLastZoom ?? destZoom;
+    _stopMapAnimation();
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _mapResetAnimation = controller;
+    final curved = CurvedAnimation(parent: controller, curve: Curves.easeOutCubic);
+    final latTween = Tween<double>(begin: startCenter.latitude, end: destCenter.latitude);
+    final lngTween = Tween<double>(begin: startCenter.longitude, end: destCenter.longitude);
+    final zoomTween = Tween<double>(begin: startZoom, end: destZoom);
+
+    controller.addListener(() {
+      final lat = latTween.evaluate(curved);
+      final lng = lngTween.evaluate(curved);
+      final zoom = zoomTween.evaluate(curved);
+      _mapController.move(LatLng(lat, lng), zoom);
+    });
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+        if (_mapResetAnimation == controller) {
+          _mapResetAnimation = null;
+        }
+      }
+    });
+    controller.forward();
+  }
+
+  void _updateMapDefaultFromPosition(LatLng pos) {
+    final bounds = MapTileConfig.tilesBounds;
+    final rawPins = MapViewport.collectPins([pos]);
+    final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+    final center = MapViewport.clampCenter(MapViewport.centerForPins(pins), bounds);
+    final zoom = MapViewport.zoomForPins(
+      pins,
+      minZoom: MapTileConfig.displayMinZoom.toDouble(),
+      maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+      fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+    );
+    _mapDefaultCenter = center;
+    _mapDefaultZoom = zoom;
+    if (!_mapUserInteracting && _recebendoCorridas && _mapResetAnimation == null) {
+      _mapController.move(center, zoom);
+    }
+  }
+
+  Future<void> _iniciarStreamVelocidade({bool solicitarPermissao = false}) async {
+    await _posicaoStreamSub?.cancel();
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied && solicitarPermissao) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() {
+          _velocidadeKmh = null;
+        });
+      }
+      return;
+    }
+    const locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 1,
+    );
+    _posicaoStreamSub = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+      _onPosicaoStream,
+      onError: (error) {
+        if (!mounted) return;
+        setState(() {
+          _velocidadeKmh = null;
+        });
+      },
+    );
+  }
+
+  void _onPosicaoStream(Position pos) {
+    if (!mounted || _appPausado || _guiaAtivo) return;
+    final speedMps = _extrairVelocidadeMps(pos);
+    final currentSpeedKmh = (speedMps != null && speedMps.isFinite) ? speedMps * 3.6 : null;
+    setState(() {
+      _posicao = LatLng(pos.latitude, pos.longitude);
+      _velocidadeKmh = currentSpeedKmh;
+    });
+    _updateMapDefaultFromPosition(_posicao!);
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+    }
+    unawaited(_avaliarVelocidade(pos));
+  }
+
   Future<void> _atualizarPosicao() async {
     if (!mounted) return;
     final pos = await _posicaoAtual();
@@ -873,6 +1004,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       setState(() {
         _posicao = LatLng(pos.latitude, pos.longitude);
       });
+      _updateMapDefaultFromPosition(_posicao!);
       if (_modalAberto) {
         _modalSetState?.call(() {});
       }
@@ -898,6 +1030,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       MapTileCacheService.prefetchDefault();
     }
     _atualizarPosicao();
+    _iniciarStreamVelocidade();
     _carregarPreferencias();
     _configurarRealtime();
     _authSub = ref.listenManual(authProvider, (_, __) {
@@ -925,11 +1058,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     WidgetsBinding.instance.removeObserver(this);
     _pingTimer?.cancel();
     _pollTimer?.cancel();
+    _mapResetTimer?.cancel();
+    _mapResetAnimation?.dispose();
     DriverBackgroundService.stop();
     _backgroundAtivo = false;
     _notificationTapSub?.cancel();
     _authSub?.close();
     _compassSub?.cancel();
+    _posicaoStreamSub?.cancel();
     _stopRealtime();
     super.dispose();
   }
@@ -941,6 +1077,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _appPausado = true;
       _pingTimer?.cancel();
       _pollTimer?.cancel();
+      _mapResetTimer?.cancel();
+      _stopMapAnimation();
+      _mapUserInteracting = false;
+      _posicaoStreamSub?.cancel();
       final user = ref.read(authProvider).valueOrNull;
       final perfilId = user?.perfilId ?? 0;
       final perfilTipo = user?.perfilTipo ?? '';
@@ -960,6 +1100,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         _backgroundAtivo = false;
       }
       _atualizarPosicao();
+      _iniciarStreamVelocidade();
       if (_recebendoCorridas) {
         if (_wsConnected) {
           _realtime?.sendSync();
@@ -1690,6 +1831,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       return;
     }
     _setRecebimentoCorridas(true);
+    _iniciarStreamVelocidade();
   }
 
   void _setRecebimentoCorridas(
@@ -1703,10 +1845,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         if (mudou) {
           _recebendoCorridas = ativo;
         }
-        if (!ativo) {
-          _velocidadeKmh = null;
-        }
-
       });
     }
     if (salvarPreferencias) {
@@ -1874,22 +2012,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   ],
                 ),
               ),
-              if (_velocidadeKmh != null && _recebendoCorridas)
-                Align(
-                  alignment: Alignment.center,
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 12.0),
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      'Velocidade: ${_velocidadeKmh!.toStringAsFixed(1)} km/h',
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
               const SizedBox(height: 12),
               Expanded(
                 child: LayoutBuilder(
@@ -1900,153 +2022,186 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                         aspectRatio: 1.0,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: _posicao == null
-                              ? Container(
+                          child: Builder(
+                            builder: (context) {
+                              Widget mapChild;
+                              if (_posicao == null) {
+                                mapChild = Container(
                                   color: Colors.grey.shade100,
                                   child: const Center(child: Text('Localização não disponível')),
-                                )
-                              : _recebendoCorridas
-                                  ? Builder(
-                                      builder: (context) {
-                                        final bounds = MapTileConfig.tilesBounds;
-                                        final rawPins = MapViewport.collectPins([_posicao]);
-                                        final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
-                                        final center = MapViewport.clampCenter(
-                                          MapViewport.centerForPins(pins),
-                                          bounds,
-                                        );
-                                        final zoom = MapViewport.zoomForPins(
-                                          pins,
-                                          minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                          maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                          fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
-                                        );
-                                        final fitBounds = MapViewport.boundsForPins(pins);
-                                        final fit = fitBounds == null
-                                            ? null
-                                            : CameraFit.bounds(
-                                                bounds: fitBounds,
-                                                padding: const EdgeInsets.all(24),
-                                                minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                                maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                              );
-                                        final key = ValueKey(
-                                          'driver-main-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                                        );
-                                        return FlutterMap(
-                                          key: key,
-                                          options: MapOptions(
-                                            initialCenter: center,
-                                            initialZoom: zoom,
-                                            initialCameraFit: fit,
-                                            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
-                                            cameraConstraint: CameraConstraint.contain(bounds: bounds),
-                                            minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                            maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                          ),
-                                          children: [
-                                            TileLayer(
-                                              urlTemplate: _tileUrl,
-                                              tileProvider: _buildTileProvider(),
-                                              userAgentPackageName: 'com.example.vai_paqueta_app',
-                                              minZoom: MapTileConfig.displayMinZoom.toDouble(),
-                                              maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
-                                              minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
-                                              maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
-                                              tileBounds: bounds,
-                                            ),
-                                            if (_exibirRotasNoMapaPrincipal && _rotaMotorista.length >= 2)
-                                              PolylineLayer(
-                                                polylines: [
-                                                  Polyline(
-                                                    points: _rotaMotorista,
-                                                    strokeWidth: 3,
-                                                    color: Colors.orangeAccent,
-                                                  ),
-                                                ],
-                                              ),
-                                            if (_exibirRotasNoMapaPrincipal && _rotaCorrida.length >= 2)
-                                              PolylineLayer(
-                                                polylines: [
-                                                  Polyline(
-                                                    points: _rotaCorrida,
-                                                    strokeWidth: 3,
-                                                    color: Colors.blueAccent,
-                                                  ),
-                                                ],
-                                              ),
-                                            MarkerLayer(
-                                              markers: [
-                                                Marker(
-                                                  point: _posicao!,
-                                                  width: 54,
-                                                  height: 36,
-                                                  child: Transform.rotate(
-                                                    angle: (_compassBearing) * (math.pi / 180),
-                                                    child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    )
-                                  : Container(
-                                      color: Colors.grey.shade100,
-                                      child: Center(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: const [
-                                            Text(
-                                              'Você está offline para corridas.',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(color: Colors.grey, fontSize: 16),
-                                            ),
-                                            SizedBox(height: 8),
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Ative "Receber Corridas" ',
-                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                                                  ),
-                                                  const WidgetSpan(
-                                                    alignment: PlaceholderAlignment.middle,
-                                                    child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
-                                                  ),
-                                                  const TextSpan(
-                                                    text: ' para ficar disponível.',
-                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                                                  ),
-                                                ],
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            SizedBox(height: 4),
-                                            Text.rich(
-                                              TextSpan(
-                                                children: [
-                                                  const TextSpan(
-                                                    text: 'Ative "Receber corridas em segundo plano" ',
-                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                                                  ),
-                                                  const WidgetSpan(
-                                                    alignment: PlaceholderAlignment.middle,
-                                                    child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
-                                                  ),
-                                                  const TextSpan(
-                                                    text: ' para sempre estar disponível.',
-                                                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                                                  ),
-                                                ],
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                );
+                              } else if (_recebendoCorridas) {
+                                final bounds = MapTileConfig.tilesBounds;
+                                final rawPins = MapViewport.collectPins([_posicao]);
+                                final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                                final center = MapViewport.clampCenter(
+                                  MapViewport.centerForPins(pins),
+                                  bounds,
+                                );
+                                final zoom = MapViewport.zoomForPins(
+                                  pins,
+                                  minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                  maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                  fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+                                );
+                                _mapDefaultCenter = center;
+                                _mapDefaultZoom = zoom;
+                                final fitBounds = MapViewport.boundsForPins(pins);
+                                final fit = fitBounds == null
+                                    ? null
+                                    : CameraFit.bounds(
+                                        bounds: fitBounds,
+                                        padding: const EdgeInsets.all(24),
+                                        minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                        maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                      );
+                                mapChild = FlutterMap(
+                                  mapController: _mapController,
+                                  options: MapOptions(
+                                    initialCenter: center,
+                                    initialZoom: zoom,
+                                    initialCameraFit: fit,
+                                    interactionOptions: const InteractionOptions(
+                                      flags: InteractiveFlag.drag |
+                                          InteractiveFlag.pinchZoom |
+                                          InteractiveFlag.doubleTapZoom |
+                                          InteractiveFlag.flingAnimation,
                                     ),
+                                    onPositionChanged: (position, hasGesture) {
+                                      _mapLastCenter = position.center;
+                                      _mapLastZoom = position.zoom;
+                                      if (hasGesture) {
+                                        _stopMapAnimation();
+                                        _scheduleMapReset();
+                                      }
+                                    },
+                                    cameraConstraint: CameraConstraint.contain(bounds: bounds),
+                                    minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                    maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                  ),
+                                  children: [
+                                    TileLayer(
+                                      urlTemplate: _tileUrl,
+                                      tileProvider: _buildTileProvider(),
+                                      userAgentPackageName: 'com.example.vai_paqueta_app',
+                                      minZoom: MapTileConfig.displayMinZoom.toDouble(),
+                                      maxZoom: MapTileConfig.displayMaxZoom.toDouble(),
+                                      minNativeZoom: _tileMinNativeZoom ?? MapTileConfig.assetsMinZoom,
+                                      maxNativeZoom: _tileMaxNativeZoom ?? MapTileConfig.assetsMaxZoom,
+                                      tileBounds: bounds,
+                                    ),
+                                    if (_exibirRotasNoMapaPrincipal && _rotaMotorista.length >= 2)
+                                      PolylineLayer(
+                                        polylines: [
+                                          Polyline(
+                                            points: _rotaMotorista,
+                                            strokeWidth: 3,
+                                            color: Colors.orangeAccent,
+                                          ),
+                                        ],
+                                      ),
+                                    if (_exibirRotasNoMapaPrincipal && _rotaCorrida.length >= 2)
+                                      PolylineLayer(
+                                        polylines: [
+                                          Polyline(
+                                            points: _rotaCorrida,
+                                            strokeWidth: 3,
+                                            color: Colors.blueAccent,
+                                          ),
+                                        ],
+                                      ),
+                                    MarkerLayer(
+                                      markers: [
+                                        Marker(
+                                          point: _posicao!,
+                                          width: 54,
+                                          height: 36,
+                                          child: Transform.rotate(
+                                            angle: (_compassBearing) * (math.pi / 180),
+                                            child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                );
+                              } else {
+                                mapChild = Container(
+                                  color: Colors.grey.shade100,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Text(
+                                          'Você está offline para corridas.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: 'Ative "Receber Corridas" ',
+                                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                              ),
+                                              const WidgetSpan(
+                                                alignment: PlaceholderAlignment.middle,
+                                                child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
+                                              ),
+                                              const TextSpan(
+                                                text: ' para ficar disponível.',
+                                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        SizedBox(height: 4),
+                                        Text.rich(
+                                          TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: 'Ative "Receber corridas em segundo plano" ',
+                                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                              ),
+                                              const WidgetSpan(
+                                                alignment: PlaceholderAlignment.middle,
+                                                child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
+                                              ),
+                                              const TextSpan(
+                                                text: ' para sempre estar disponível.',
+                                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return Stack(
+                                children: [
+                                  Positioned.fill(child: mapChild),
+                                  Positioned(
+                                    right: 12,
+                                    bottom: 12,
+                                    child: _SpeedometerCard(
+                                      speedKmh: _velocidadeKmh,
+                                      warningKmh: DriverSettings.speedWarningThresholdKmh,
+                                      compact: true,
+                                      backgroundColor: Colors.black.withOpacity(0.2),
+                                      borderColor: Colors.transparent,
+                                      textColor: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     );
@@ -2059,5 +2214,181 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       ),
     ),
     );
+  }
+}
+
+class _SpeedometerCard extends StatelessWidget {
+  const _SpeedometerCard({
+    required this.speedKmh,
+    required this.warningKmh,
+    this.compact = false,
+    this.backgroundColor,
+    this.borderColor,
+    this.textColor,
+  });
+
+  final double? speedKmh;
+  final double warningKmh;
+  final bool compact;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? textColor;
+
+  Color _resolveSpeedColor(Color base, double speed, double warning) {
+    if (speed <= 0) return base;
+    if (speed >= warning) return Colors.redAccent;
+    if (speed >= warning * 0.8) return Colors.orangeAccent;
+    return base;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final speed = speedKmh ?? 0;
+    final maxKmh = math.max(warningKmh * 1.3, 120);
+    final progress = (speed / maxKmh).clamp(0.0, 1.0);
+    final baseColor = theme.colorScheme.primary;
+    final accentColor = _resolveSpeedColor(baseColor, speed, warningKmh);
+    final displaySpeed = speedKmh == null ? '--' : speedKmh!.toStringAsFixed(0);
+    final displayTitle = compact ? 'Veloc.' : 'Velocímetro';
+    final primaryTextColor = textColor ?? theme.textTheme.bodyMedium?.color;
+    final secondaryTextColor = textColor != null ? textColor!.withOpacity(0.85) : Colors.grey.shade600;
+
+    return Card(
+      elevation: 0,
+      color: backgroundColor ?? Colors.grey.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: borderColor ?? Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: compact ? const EdgeInsets.all(8) : const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              displayTitle,
+              style: (compact ? theme.textTheme.labelMedium : theme.textTheme.titleMedium)
+                  ?.copyWith(color: primaryTextColor),
+            ),
+            SizedBox(height: compact ? 4 : 8),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final size = math.min(constraints.maxWidth, compact ? 120.0 : 180.0);
+                return SizedBox.square(
+                  dimension: size,
+                  child: CustomPaint(
+                    painter: _SpeedometerPainter(
+                      progress: progress,
+                      progressColor: accentColor,
+                      backgroundColor: Colors.grey.shade300,
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            displaySpeed,
+                            style: (compact ? theme.textTheme.headlineSmall : theme.textTheme.displaySmall)?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: accentColor,
+                            ),
+                          ),
+                          Text(
+                            'km/h',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: secondaryTextColor,
+                              fontSize: compact ? 10 : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (speedKmh == null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Aguardando sinal GPS',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: secondaryTextColor,
+                    fontSize: compact ? 10 : null,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpeedometerPainter extends CustomPainter {
+  _SpeedometerPainter({
+    required this.progress,
+    required this.progressColor,
+    required this.backgroundColor,
+  });
+
+  final double progress;
+  final Color progressColor;
+  final Color backgroundColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final strokeWidth = size.width * 0.08;
+    final radius = (size.width - strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    const startAngle = 3 * math.pi / 4;
+    const sweepAngle = 3 * math.pi / 2;
+
+    final basePaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, startAngle, sweepAngle, false, basePaint);
+
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, startAngle, sweepAngle * progress, false, progressPaint);
+
+    final tickPaint = Paint()
+      ..color = Colors.grey.shade400
+      ..strokeWidth = strokeWidth * 0.18
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i <= 10; i += 1) {
+      final t = i / 10;
+      final angle = startAngle + sweepAngle * t;
+      final inner = center + Offset(math.cos(angle), math.sin(angle)) * (radius - strokeWidth * 0.4);
+      final outer = center + Offset(math.cos(angle), math.sin(angle)) * (radius + strokeWidth * 0.1);
+      canvas.drawLine(inner, outer, tickPaint);
+    }
+
+    final needleAngle = startAngle + sweepAngle * progress;
+    final needleLength = radius - strokeWidth * 0.9;
+    final needlePaint = Paint()
+      ..color = progressColor
+      ..strokeWidth = strokeWidth * 0.35
+      ..strokeCap = StrokeCap.round;
+    final needleEnd = center + Offset(math.cos(needleAngle), math.sin(needleAngle)) * needleLength;
+    canvas.drawLine(center, needleEnd, needlePaint);
+
+    final hubPaint = Paint()..color = progressColor;
+    canvas.drawCircle(center, strokeWidth * 0.35, hubPaint);
+  }
+
+  @override
+  bool shouldRepaint(_SpeedometerPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.progressColor != progressColor ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }
