@@ -806,7 +806,7 @@ class MotoristasProximosView(APIView):
                 ping = (
                     LocalizacaoPing.objects.filter(perfil_id=corrida.motorista_id)
                     .order_by("-criado_em")
-                    .values("latitude", "longitude", "precisao_m", "criado_em")
+                    .values("latitude", "longitude", "precisao_m", "bearing", "criado_em")
                     .first()
                 )
                 if not ping:
@@ -826,6 +826,7 @@ class MotoristasProximosView(APIView):
                             "latitude": float(ping["latitude"]),
                             "longitude": float(ping["longitude"]),
                             "precisao_m": ping["precisao_m"],
+                            "bearing": ping.get("bearing"),
                             "dist_km": round(dist_km, 3) if dist_km is not None else 0.0,
                             "ping_em": ping["criado_em"],
                         }
@@ -866,6 +867,7 @@ class MotoristasProximosView(APIView):
                     "latitude": float(ping.latitude),
                     "longitude": float(ping.longitude),
                     "precisao_m": ping.precisao_m,
+                    "bearing": ping.bearing,
                     "dist_km": round(dist, 3),
                     "ping_em": ping.criado_em,
                 }
