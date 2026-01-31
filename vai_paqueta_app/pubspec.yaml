@@ -24,6 +24,7 @@ dependencies:
   flutter_local_notifications: ^17.1.2
   web_socket_channel: ^2.4.0
   flutter_compass: ^0.8.0
+  audioplayers: ^5.2.1
 
   collection: any
 dev_dependencies:
@@ -37,3 +38,4 @@ flutter:
     - assets/tiles/
     - assets/logo/
     - assets/icons/
+    - assets/sounds/

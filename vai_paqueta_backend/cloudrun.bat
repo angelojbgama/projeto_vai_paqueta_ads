@@ -27,10 +27,9 @@ if "%DJANGO_ALLOWED_HOSTS%"=="" set "DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,.t
 if "%DJANGO_CSRF_TRUSTED_ORIGINS%"=="" set "DJANGO_CSRF_TRUSTED_ORIGINS=https://*.trycloudflare.com"
 if "%DJANGO_USE_REDIS%"=="" set "DJANGO_USE_REDIS=0"
 
-python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 python manage.py makemigrations
-python manage.py migrate
+python manage.py migrate --noinput
 
 
 if exist ".venv\Scripts\daphne.exe" (

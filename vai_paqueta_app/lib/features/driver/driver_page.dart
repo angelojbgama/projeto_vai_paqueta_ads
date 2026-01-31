@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter/services.dart';
@@ -39,10 +39,20 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
   static const _prefsConsentimentoNotificacaoKey = 'driver_notificacao_consentimento';
   static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
+  static const _prefsVibrarCorridaKey = 'driver_vibrar_corrida';
+  static const _prefsSomCorridaKey = 'driver_som_corrida';
+  static const String _somSistemaValue = '__system__';
   final GlobalKey _guiaConfigKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
+  final GlobalKey _guiaConfigCorridaKey = GlobalKey();
   final GlobalKey _guiaRecebimentoKey = GlobalKey();
   final GlobalKey _guiaLocalizacaoBgKey = GlobalKey();
+  final GlobalKey _guiaVibrarKey = GlobalKey();
+  final GlobalKey _guiaSomKey = GlobalKey();
+  final GlobalKey _guiaSomPlayKey = GlobalKey();
+  final GlobalKey _guiaConfigVoltarKey = GlobalKey();
+  final GlobalKey _guiaModalContainerKey = GlobalKey();
+  final GlobalKey _guiaVelocimetroKey = GlobalKey();
   final GlobalKey _guiaMapaKey = GlobalKey();
   final GlobalKey _guiaModalStatusKey = GlobalKey();
   final GlobalKey _guiaModalPassageiroKey = GlobalKey();
@@ -90,6 +100,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   StreamSubscription<CompassEvent>? _compassSub;
   StreamSubscription<Position>? _posicaoStreamSub;
   final MapController _mapController = MapController();
+  final AudioPlayer _alertPlayer = AudioPlayer();
   Timer? _mapResetTimer;
   AnimationController? _mapResetAnimation;
   LatLng? _mapDefaultCenter;
@@ -99,12 +110,18 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   bool _mapUserInteracting = false;
   double _compassBearing = 0.0;
   double? _velocidadeKmh;
+  bool _vibrarAoReceber = true;
+  String? _somCorridaSelecionado;
+  List<_SomCorridaOption> _sonsCorridaDisponiveis = const [];
+  bool _configModalAberto = false;
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     final recebendo = prefs.getBool(_prefsRecebendoCorridasKey) ?? false;
     final consentimentoBg = prefs.getBool(_prefsConsentimentoBgKey) ?? false;
     final localizacaoBgSalva = prefs.getBool(_prefsLocalizacaoBgKey);
+    final vibrar = prefs.getBool(_prefsVibrarCorridaKey) ?? true;
+    final somSalvo = prefs.getString(_prefsSomCorridaKey);
     var localizacaoBg = localizacaoBgSalva ?? false;
     if (!consentimentoBg) {
       localizacaoBg = false;
@@ -117,6 +134,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _recebendoCorridas = recebendo;
       _enviarLocalizacaoBg = localizacaoBg;
       _consentimentoLocalizacaoBg = consentimentoBg;
+      _vibrarAoReceber = vibrar;
+      _somCorridaSelecionado = (somSalvo == null || somSalvo.trim().isEmpty) ? null : somSalvo;
     });
     _configurarRealtime();
     if (_recebendoCorridas) {
@@ -124,12 +143,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       _iniciarAutoPing();
       _iniciarPollingCorrida();
     }
+    unawaited(_carregarSonsCorrida());
   }
 
   Future<void> _salvarPreferencias({
     bool? recebendoCorridas,
     bool? localizacaoBg,
     bool? consentimentoLocalizacaoBg,
+    bool? vibrarCorrida,
+    String? somCorrida,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     if (recebendoCorridas != null) {
@@ -140,6 +162,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
     if (consentimentoLocalizacaoBg != null) {
       await prefs.setBool(_prefsConsentimentoBgKey, consentimentoLocalizacaoBg);
+    }
+    if (vibrarCorrida != null) {
+      await prefs.setBool(_prefsVibrarCorridaKey, vibrarCorrida);
+    }
+    if (somCorrida != null) {
+      if (somCorrida.trim().isEmpty) {
+        await prefs.remove(_prefsSomCorridaKey);
+      } else {
+        await prefs.setString(_prefsSomCorridaKey, somCorrida);
+      }
     }
   }
 
@@ -175,6 +207,35 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     await prefs.setBool(_prefsGuiaMotoristaKey, true);
   }
 
+  Future<void> _mostrarGuiaMotoristaManual() async {
+    if (!mounted) return;
+    if (_modalAberto || _configModalAberto || _guiaAtivo) return;
+    final verGuia = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Guia interativo'),
+          content: const Text('Quer iniciar o guia do modo Ecotaxista?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Iniciar guia'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (verGuia == true) {
+      await _mostrarGuiaMotorista();
+    }
+  }
+
   Future<void> _mostrarGuiaMotorista() async {
     if (!mounted) return;
     FocusScope.of(context).unfocus();
@@ -183,8 +244,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       final concluido = await showCoachMarks(context, [
         CoachMarkStep(
           targetKey: _guiaConfigKey,
-          title: 'Configurações',
-          description: 'Edite seus dados do perfil e encontre o botão Sair.',
+          title: 'Configurações do perfil',
+          description: 'Edite seus dados e encontre opções da conta.',
         ),
         CoachMarkStep(
           targetKey: _guiaTrocarKey,
@@ -192,23 +253,27 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           description: 'Mude para o modo Passageiro.',
         ),
         CoachMarkStep(
-          targetKey: _guiaRecebimentoKey,
-          title: 'Receber corridas',
-          description: 'Ative para ficar disponível e receber solicitações.',
-        ),
-        CoachMarkStep(
-          targetKey: _guiaLocalizacaoBgKey,
-          title: 'Localização em segundo plano',
-          description: 'Mantém o envio de localização com o app fechado.',
+          targetKey: _guiaConfigCorridaKey,
+          title: 'Configurações da corrida',
+          description: 'Abra para ajustar disponibilidade, segundo plano, vibração e som.',
         ),
         CoachMarkStep(
           targetKey: _guiaMapaKey,
           title: 'Mapa e corrida',
           description:
-              'Mostra você, origem, destino e rotas. Quando aparecer corrida, você verá botões para aceitar, rejeitar, iniciar e finalizar, além do WhatsApp.',
+              'Mostra sua posição, origem, destino e rotas. Quando surgir corrida, você verá ações para aceitar, rejeitar, iniciar e finalizar.',
+          bubblePlacement: CoachMarkBubblePlacement.center,
+        ),
+        CoachMarkStep(
+          targetKey: _guiaVelocimetroKey,
+          title: 'Velocímetro',
+          description:
+              'Mostra sua velocidade em km/h usando o GPS. Atualiza automaticamente enquanto você se move.',
         ),
       ]);
       if (!concluido || !mounted) return;
+      await _mostrarGuiaConfiguracoesCorrida();
+      if (!mounted) return;
       await _mostrarGuiaModalCorrida();
     } finally {
       _retomarAtualizacoesAposGuia();
@@ -240,36 +305,88 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   List<CoachMarkStep> _buildGuiaCorridaSteps() {
     return [
       CoachMarkStep(
+        targetKey: _guiaModalContainerKey,
+        title: 'Aviso de corrida',
+        description:
+            'Quando você receber uma corrida, este modal aparece na tela para você decidir o que fazer.',
+        highlightPadding: const EdgeInsets.all(12),
+        borderRadius: 16,
+        bubblePlacement: CoachMarkBubblePlacement.center,
+      ),
+      CoachMarkStep(
         targetKey: _guiaModalStatusKey,
         title: 'Status da corrida',
-        description: 'Mostra se esta aguardando, aceita, em andamento ou concluida.',
+        description: 'Mostra em que etapa a corrida está.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalStatusKey,
+        title: 'Fases da corrida',
+        description:
+            'Aguardando: pedido novo. Aceita: você confirmou. Em andamento: corrida iniciada. Concluída: finalizada.',
       ),
       CoachMarkStep(
         targetKey: _guiaModalPassageiroKey,
         title: 'Passageiro',
-        description: 'Veja o nome e o telefone do passageiro.',
+        description: 'Aqui você vê o nome e o telefone do passageiro.',
       ),
       CoachMarkStep(
         targetKey: _guiaModalWhatsKey,
         title: 'WhatsApp',
-        description: 'Fale com o passageiro direto no WhatsApp.',
+        description: 'Toque para falar com o passageiro no WhatsApp.',
         highlightPadding: const EdgeInsets.all(6),
       ),
         CoachMarkStep(
           targetKey: _guiaModalRotaKey,
           title: 'Rota',
-          description: 'Confirme origem, destino e quantidade de assentos.',
+          description: 'Confira origem, destino e quantidade de assentos.',
         ),
       CoachMarkStep(
         targetKey: _guiaModalMapaKey,
         title: 'Mapa da corrida',
-        description: 'Mostra voce, origem, destino e as rotas.',
+        description: 'Mostra sua posição, origem, destino e as rotas.',
       ),
       CoachMarkStep(
         targetKey: _guiaModalAcoesKey,
-        title: 'Acoes',
+        title: 'Ações',
         description:
-            'Use Aceitar ou Rejeitar. Depois aparecem Iniciar e Finalizar conforme a corrida avanca.',
+            'Use Aceitar ou Rejeitar. Depois, aparecem Iniciar e Finalizar conforme a corrida avança.',
+      ),
+    ];
+  }
+
+  List<CoachMarkStep> _buildGuiaConfiguracoesSteps() {
+    return [
+      CoachMarkStep(
+        targetKey: _guiaConfigVoltarKey,
+        title: 'Voltar',
+        description: 'Fecha as configurações e retorna para a tela principal.',
+        highlightPadding: const EdgeInsets.all(6),
+      ),
+      CoachMarkStep(
+        targetKey: _guiaRecebimentoKey,
+        title: 'Receber corridas',
+        description: 'Deixe ligado para ficar online e receber novas corridas.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaLocalizacaoBgKey,
+        title: 'Segundo plano',
+        description: 'Mantém o recebimento de corridas mesmo com o app fechado.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaVibrarKey,
+        title: 'Vibrar',
+        description: 'Ative para vibrar quando chegar uma nova corrida.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaSomKey,
+        title: 'Som da notificação',
+        description: 'Escolha o som que será tocado ao receber uma corrida.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaSomPlayKey,
+        title: 'Ouvir som',
+        description: 'Toque para escutar o som selecionado.',
+        highlightPadding: const EdgeInsets.all(6),
       ),
     ];
   }
@@ -301,6 +418,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (!mounted) return;
     if (_modalAberto || _corridaAtual != null) return;
     await _mostrarModalCorrida(_buildCorridaGuia(), guia: true);
+  }
+
+  Future<void> _mostrarGuiaConfiguracoesCorrida() async {
+    if (!mounted) return;
+    if (_configModalAberto) return;
+    await _mostrarModalConfiguracoesCorrida(guia: true);
   }
 
   Future<bool> _mostrarConsentimentoLocalizacaoBg() async {
@@ -668,8 +791,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<Map<String, dynamic>?> _carregarManifesto() async {
     try {
-      final jsonStr = await rootBundle.loadString('AssetManifest.json');
-      return json.decode(jsonStr) as Map<String, dynamic>;
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      return {for (final path in manifest.listAssets()) path: true};
     } catch (_) {
       return null;
     }
@@ -844,6 +967,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     return speedMps;
   }
 
+  double? _resolverBearing(Position pos) {
+    final heading = pos.heading;
+    if (heading.isFinite && heading >= 0) return heading;
+    if (_compassBearing.isFinite) return _compassBearing;
+    return null;
+  }
+
   Future<void> _avaliarVelocidade(Position pos) async {
     if (!mounted) return;
     if (_appPausado || _guiaAtivo) return;
@@ -874,6 +1004,68 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     } finally {
       _avisoVelocidadeAberto = false;
     }
+  }
+
+  Future<void> _carregarSonsCorrida() async {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      final soundAssets = manifest.listAssets().where((path) => path.startsWith('assets/sounds/')).toList()
+        ..sort();
+      final options = <_SomCorridaOption>[
+        const _SomCorridaOption(label: 'Padrão do sistema', assetPath: null),
+        ...soundAssets.map(
+          (path) => _SomCorridaOption(label: _nomeSomDoAsset(path), assetPath: path),
+        ),
+      ];
+      if (!mounted) return;
+      setState(() {
+        _sonsCorridaDisponiveis = options;
+        _somCorridaSelecionado = _selecionarSomValido(_somCorridaSelecionado, options);
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar sons: ${friendlyError(e)}');
+    }
+  }
+
+  String _nomeSomDoAsset(String assetPath) {
+    final file = assetPath.split('/').last;
+    final semExt = file.replaceAll(RegExp(r'\.[^\.]+$'), '');
+    if (semExt.isEmpty) return 'Som';
+    final cleaned = semExt.replaceAll('_', ' ').replaceAll('-', ' ');
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
+  }
+
+  String? _selecionarSomValido(String? atual, List<_SomCorridaOption> options) {
+    if (atual == null || atual.trim().isEmpty) return null;
+    final match = options.any((opt) => opt.assetPath == atual);
+    return match ? atual : null;
+  }
+
+  String _assetParaAudioSource(String assetPath) {
+    return assetPath.startsWith('assets/') ? assetPath.substring('assets/'.length) : assetPath;
+  }
+
+  Future<void> _tocarSomCorridaSelecionado() async {
+    final asset = _somCorridaSelecionado;
+    if (asset == null || asset.trim().isEmpty) {
+      await SystemSound.play(SystemSoundType.alert);
+      return;
+    }
+    try {
+      await _alertPlayer.stop();
+      await _alertPlayer.play(AssetSource(_assetParaAudioSource(asset)));
+    } catch (e) {
+      debugPrint('Erro ao tocar som da corrida: ${friendlyError(e)}');
+      await SystemSound.play(SystemSoundType.alert);
+    }
+  }
+
+  void _onToggleVibrar(bool ativo) {
+    if (!mounted) return;
+    setState(() {
+      _vibrarAoReceber = ativo;
+    });
+    _salvarPreferencias(vibrarCorrida: ativo);
   }
 
   bool _corridaEmAndamento() {
@@ -949,7 +1141,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _mapDefaultCenter = center;
     _mapDefaultZoom = zoom;
     if (!_mapUserInteracting && _recebendoCorridas && _mapResetAnimation == null) {
-      _mapController.move(center, zoom);
+      try {
+        _mapController.move(center, zoom);
+      } catch (_) {
+        // aguarda renderização do mapa antes de mover
+      }
     }
   }
 
@@ -1060,6 +1256,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _pollTimer?.cancel();
     _mapResetTimer?.cancel();
     _mapResetAnimation?.dispose();
+    _alertPlayer.dispose();
     DriverBackgroundService.stop();
     _backgroundAtivo = false;
     _notificationTapSub?.cancel();
@@ -1187,6 +1384,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     try {
       final lat = _round6(pos.latitude);
       final lng = _round6(pos.longitude);
+      final bearingToSend = _resolverBearing(pos);
       if (_wsConnected && _realtime != null) {
         final corridaId = _corridaAtual?['id'];
         _realtime!.sendPing(
@@ -1194,7 +1392,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           longitude: lng,
           precisaoM: pos.accuracy,
           corridaId: corridaId is int ? corridaId : null,
-          bearing: _compassBearing,
+          bearing: bearingToSend,
         );
       } else {
         final service = DriverService();
@@ -1203,7 +1401,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           latitude: lat,
           longitude: lng,
           precisao: pos.accuracy,
-          bearing: _compassBearing,
+          bearing: bearingToSend,
         );
       }
     } catch (e) {
@@ -1361,9 +1559,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         title: 'Nova corrida disponível',
         body: 'Confirme para aceitar a corrida.',
         payload: 'ride:$corridaId',
+        vibrate: _vibrarAoReceber,
       );
     } catch (_) {}
-    await SystemSound.play(SystemSoundType.alert);
+    await _tocarSomCorridaSelecionado();
+    if (_vibrarAoReceber) {
+      HapticFeedback.vibrate();
+    }
   }
 
   Future<void> _mostrarModalCorrida(Map<String, dynamic> corrida, {bool guia = false}) async {
@@ -1391,6 +1593,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Material(
+                  key: _guiaModalContainerKey,
                   color: Theme.of(context).dialogTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   child: StatefulBuilder(builder: (dialogContext, setModalState) {
@@ -1666,11 +1869,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                               if (motoristaPos != null)
                                                                                                   Marker(
                                                                                                     point: motoristaPos,
-                                                                                                    width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
-                                                                                                    height: 36,
+                                                                                                    width: 72, // Adjusted for 1536x1024 aspect ratio (1.5 * 48)
+                                                                                                    height: 48,
                                                                                                                                                                                                         child: Transform.rotate(
                                                                                                                                                                                                           angle: (_compassBearing) * (math.pi / 180),
-                                                                                                                                                                                                          child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                                                                                                                                                                                          child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48), // Adjusted for 1536x1024 aspect ratio
                                                                                                                                                                                                         ),                                                                                                  ),                                            ],
                                           ),
                                         ],
@@ -1927,6 +2130,158 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
   }
 
+  Future<void> _mostrarModalConfiguracoesCorrida({bool guia = false}) async {
+    if (_configModalAberto) return;
+    _configModalAberto = true;
+    await Future<void>.delayed(Duration.zero);
+    var guiaIniciado = false;
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (context, setModalState) {
+              if (guia && !guiaIniciado) {
+                guiaIniciado = true;
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!mounted) return;
+                  await showCoachMarks(dialogContext, _buildGuiaConfiguracoesSteps());
+                  if (mounted && Navigator.of(dialogContext).canPop()) {
+                    Navigator.of(dialogContext).pop();
+                  }
+                });
+              }
+              final theme = Theme.of(context);
+              final options = _sonsCorridaDisponiveis.isEmpty
+                  ? const [_SomCorridaOption(label: 'Padrão do sistema', assetPath: null)]
+                  : _sonsCorridaDisponiveis;
+              final selected = _selecionarSomValido(_somCorridaSelecionado, options) ?? _somSistemaValue;
+              return PopScope(
+                canPop: !guia,
+                child: Dialog(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                IconButton(
+                                  key: _guiaConfigVoltarKey,
+                                  icon: const Icon(Icons.arrow_back),
+                                  onPressed: guia ? null : () => Navigator.of(dialogContext).pop(),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'Configurações da corrida',
+                                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            SwitchListTile.adaptive(
+                              key: _guiaRecebimentoKey,
+                              value: _recebendoCorridas,
+                              onChanged: guia
+                                  ? null
+                                  : (value) {
+                                      _onToggleRecebimentoCorridas(value);
+                                      setModalState(() {});
+                                    },
+                              title: const Text('Receber Corridas'),
+                              subtitle: const Text('Fique disponível para corridas.'),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile.adaptive(
+                              key: _guiaLocalizacaoBgKey,
+                              value: _enviarLocalizacaoBg,
+                              onChanged: guia
+                                  ? null
+                                  : (value) async {
+                                      _onToggleLocalizacaoSegundoPlano(value);
+                                      setModalState(() {});
+                                    },
+                              title: const Text('Receber corridas em segundo plano'),
+                              subtitle: const Text('Enviar localização e receber corridas com app em segundo plano.'),
+                            ),
+                            const Divider(height: 1),
+                            SwitchListTile.adaptive(
+                              key: _guiaVibrarKey,
+                              value: _vibrarAoReceber,
+                              onChanged: guia
+                                  ? null
+                                  : (value) {
+                                      _onToggleVibrar(value);
+                                      setModalState(() {});
+                                    },
+                              title: const Text('Vibrar ao receber corrida'),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Som de notificação',
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    key: _guiaSomKey,
+                                    value: selected,
+                                    isExpanded: true,
+                                    items: options
+                                        .map(
+                                          (opt) => DropdownMenuItem<String>(
+                                            value: opt.assetPath ?? _somSistemaValue,
+                                            child: Text(opt.label, overflow: TextOverflow.ellipsis),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: guia
+                                        ? null
+                                        : (value) {
+                                            final normalized = value == _somSistemaValue ? null : value;
+                                            setState(() {
+                                              _somCorridaSelecionado = normalized;
+                                            });
+                                            _salvarPreferencias(somCorrida: normalized ?? '');
+                                            setModalState(() {});
+                                          },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  key: _guiaSomPlayKey,
+                                  tooltip: 'Tocar som',
+                                  icon: const Icon(Icons.play_arrow),
+                                  onPressed: guia ? null : _tocarSomCorridaSelecionado,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      _configModalAberto = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -1960,6 +2315,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
+          IconButton(
+            tooltip: 'Guia interativo',
+            icon: const Icon(Icons.help_outline),
+            onPressed: _mostrarGuiaMotoristaManual,
+          ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -1985,31 +2345,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Card(
-                elevation: 0,
-                color: Colors.grey.shade50,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
-                ),
-                child: Column(
-                  children: [
-                    SwitchListTile.adaptive(
-                      key: _guiaRecebimentoKey,
-                      value: _recebendoCorridas,
-                      onChanged: _onToggleRecebimentoCorridas,
-                      title: const Text('Receber Corridas'),
-                      subtitle: const Text('Fique disponível para corridas.'),
-                    ),
-                    Divider(height: 1, color: Colors.grey.shade200),
-                    SwitchListTile.adaptive(
-                      key: _guiaLocalizacaoBgKey,
-                      value: _enviarLocalizacaoBg,
-                      onChanged: _onToggleLocalizacaoSegundoPlano,
-                      title: const Text('Receber corridas em segundo plano'),
-                      subtitle: const Text('Enviar localização e receber corridas com app em segundo plano.'),
-                    ),
-                  ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: _guiaConfigCorridaKey,
+                  icon: const Icon(Icons.tune),
+                  label: const Text('Configurações da corrida'),
+                  onPressed: _mostrarModalConfiguracoesCorrida,
                 ),
               ),
               const SizedBox(height: 12),
@@ -2114,11 +2456,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                       markers: [
                                         Marker(
                                           point: _posicao!,
-                                          width: 54,
-                                          height: 36,
+                                          width: 72,
+                                          height: 48,
                                           child: Transform.rotate(
                                             angle: (_compassBearing) * (math.pi / 180),
-                                            child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36),
+                                            child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48),
                                           ),
                                         ),
                                       ],
@@ -2190,6 +2532,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                     right: 12,
                                     bottom: 12,
                                     child: _SpeedometerCard(
+                                      key: _guiaVelocimetroKey,
                                       speedKmh: _velocidadeKmh,
                                       warningKmh: DriverSettings.speedWarningThresholdKmh,
                                       compact: true,
@@ -2217,8 +2560,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 }
 
+class _SomCorridaOption {
+  final String label;
+  final String? assetPath;
+  const _SomCorridaOption({required this.label, required this.assetPath});
+}
+
 class _SpeedometerCard extends StatelessWidget {
   const _SpeedometerCard({
+    super.key,
     required this.speedKmh,
     required this.warningKmh,
     this.compact = false,

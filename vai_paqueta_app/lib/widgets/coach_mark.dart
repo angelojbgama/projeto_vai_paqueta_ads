@@ -11,6 +11,7 @@ class CoachMarkStep {
   final String description;
   final EdgeInsets highlightPadding;
   final double borderRadius;
+  final CoachMarkBubblePlacement bubblePlacement;
 
   const CoachMarkStep({
     required this.targetKey,
@@ -18,8 +19,11 @@ class CoachMarkStep {
     required this.description,
     this.highlightPadding = const EdgeInsets.all(8),
     this.borderRadius = 12,
+    this.bubblePlacement = CoachMarkBubblePlacement.auto,
   });
 }
+
+enum CoachMarkBubblePlacement { auto, center }
 
 Future<bool> showCoachMarks(BuildContext context, List<CoachMarkStep> steps) async {
   final overlay = Overlay.of(context, rootOverlay: true);
@@ -137,11 +141,20 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay> {
     final showBelow = hasSpaceBelow || highlightRect.center.dy < size.height * 0.45;
     final left = (highlightRect.center.dx - bubbleWidth / 2).clamp(16.0, size.width - bubbleWidth - 16.0);
     final arrowLeft = (highlightRect.center.dx - left).clamp(16.0, bubbleWidth - 16.0);
-    final bubble = _SpeechBubble(
+    final autoBubble = _SpeechBubble(
       title: widget.step.title,
       description: widget.step.description,
       arrowUp: showBelow,
       arrowLeft: arrowLeft,
+      isLast: widget.isLast,
+      onNext: widget.onNext,
+      onSkip: widget.onSkip,
+    );
+    final centerBubble = _SpeechBubble(
+      title: widget.step.title,
+      description: widget.step.description,
+      arrowUp: true,
+      arrowLeft: bubbleWidth / 2,
       isLast: widget.isLast,
       onNext: widget.onNext,
       onSkip: widget.onSkip,
@@ -171,19 +184,26 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay> {
               ),
             ),
           ),
-          if (showBelow)
+          if (widget.step.bubblePlacement == CoachMarkBubblePlacement.center)
+            Center(
+              child: SizedBox(
+                width: bubbleWidth,
+                child: centerBubble,
+              ),
+            )
+          else if (showBelow)
             Positioned(
               left: left,
               top: min(size.height - 16.0, highlightRect.bottom + 12.0),
               width: bubbleWidth,
-              child: bubble,
+              child: autoBubble,
             )
           else
             Positioned(
               left: left,
               bottom: min(size.height - 16.0, size.height - highlightRect.top + 12.0),
               width: bubbleWidth,
-              child: bubble,
+              child: autoBubble,
             ),
         ],
       ),

@@ -89,6 +89,7 @@ class MotoristaProximo {
   final double longitude;
   final double? precisaoM;
   final double distKm;
+  final double? bearing;
 
   MotoristaProximo({
     required this.perfilId,
@@ -96,6 +97,7 @@ class MotoristaProximo {
     required this.longitude,
     required this.distKm,
     this.precisaoM,
+    this.bearing,
   });
 
   factory MotoristaProximo.fromJson(Map<String, dynamic> json) {
@@ -105,6 +107,7 @@ class MotoristaProximo {
       longitude: (json['longitude'] as num).toDouble(),
       precisaoM: (json['precisao_m'] as num?)?.toDouble(),
       distKm: (json['dist_km'] as num).toDouble(),
+      bearing: (json['bearing'] as num?)?.toDouble(),
     );
   }
 }

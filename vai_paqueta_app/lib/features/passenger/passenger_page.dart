@@ -35,6 +35,7 @@ class PassengerPage extends ConsumerStatefulWidget {
 class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver, TickerProviderStateMixin {
   static const _prefsCorridaKey = 'corrida_ativa_id';
   static const _prefsGuiaPassageiroKey = 'passageiro_guia_visto';
+  static const _prefsGuiaModalPassageiroKey = 'passageiro_guia_modal_visto';
   final GlobalKey _guiaMapaKey = GlobalKey();
   final GlobalKey _guiaOrigemKey = GlobalKey();
   final GlobalKey _guiaGpsKey = GlobalKey();
@@ -43,6 +44,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   final GlobalKey _guiaPedirKey = GlobalKey();
   final GlobalKey _guiaConfigKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
+  final GlobalKey _guiaModalContainerKey = GlobalKey();
+  final GlobalKey _guiaModalStatusKey = GlobalKey();
+  final GlobalKey _guiaModalMotoristaKey = GlobalKey();
+  final GlobalKey _guiaModalRotaKey = GlobalKey();
+  final GlobalKey _guiaModalMapaKey = GlobalKey();
+  final GlobalKey _guiaModalAcoesKey = GlobalKey();
   final _origemCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
   String _origemTextoConfirmado = '';
@@ -97,6 +104,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   AnimationController? _mapResetAnimation;
   LatLng? _mapDefaultCenter;
   double? _mapDefaultZoom;
+  CameraFit? _mapDefaultFit;
   LatLng? _mapLastCenter;
   double? _mapLastZoom;
   bool _mapUserInteracting = false;
@@ -189,6 +197,24 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   String _formatarLugares(int lugares) {
     return lugares == 1 ? '1 assento' : '$lugares assentos';
+  }
+
+  bool _mostrarMotoristaNoMapa() {
+    final status = _normalizarStatus(_statusCorrida);
+    return status == 'aceita' || status == 'em_andamento';
+  }
+
+  bool _podeMostrarMotoristasOnline() {
+    if (!_corridaAtiva) return true;
+    return !_mostrarMotoristaNoMapa();
+  }
+
+  void _sincronizarMotoristasOnline() {
+    if (_podeMostrarMotoristasOnline()) {
+      _iniciarMotoristasOnlinePolling();
+    } else {
+      _pararMotoristasOnlinePolling(limpar: true);
+    }
   }
 
   DateTime _nowServer() {
@@ -363,6 +389,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _rota = [];
       _rotaKey = null;
     });
+    _atualizarDefaultMapaPrincipal(forcar: true);
   }
 
   Future<void> _atualizarRotaSePossivel() async {
@@ -371,9 +398,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     final destino = _destinoLatLng;
     if (origem == null || destino == null) {
       _limparRotaCorrida();
+      _atualizarDefaultMapaPrincipal(forcar: true);
       return;
     }
+    _atualizarDefaultMapaPrincipal(forcar: true);
     await _carregarRotaCorrida(origem, destino);
+    _atualizarDefaultMapaPrincipal(forcar: true);
   }
 
   Future<void> _confirmarOrigemDigitada() async {
@@ -528,7 +558,87 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _cancelUnlockTimer?.cancel();
     _finalUnlockTimer?.cancel();
     _fecharModalCorrida();
-    _iniciarMotoristasOnlinePolling();
+    _sincronizarMotoristasOnline();
+  }
+
+  List<LatLng> _pinsMapaPrincipal() {
+    if (_rota.length >= 2) {
+      final pins = List<LatLng>.from(_rota);
+      if (_motoristaLatLng != null && _mostrarMotoristaNoMapa()) {
+        pins.add(_motoristaLatLng!);
+      }
+      return pins;
+    }
+    final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
+    return MapViewport.collectPins([_origemLatLng, _destinoLatLng, motorista]);
+  }
+
+  List<LatLng> _pinsMapaModal() {
+    if (_rota.length >= 2) {
+      final pins = List<LatLng>.from(_rota);
+      final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
+      if (motorista != null) {
+        pins.add(motorista);
+      }
+      return pins;
+    }
+    final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
+    return MapViewport.collectPins([_origemLatLng, _destinoLatLng, motorista]);
+  }
+
+  void _atualizarDefaultMapaPrincipal({bool forcar = false}) {
+    final bounds = MapTileConfig.tilesBounds;
+    final rawPins = _pinsMapaPrincipal();
+    final pins = rawPins.isEmpty ? rawPins : MapViewport.clampPinsToBounds(rawPins, bounds);
+    final center = MapViewport.clampCenter(MapViewport.centerForPins(pins), bounds);
+    final minZoom = _effectiveMinZoom();
+    final maxZoom = _effectiveMaxZoom();
+    final zoom = MapViewport.zoomForPins(
+      pins,
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+      fallbackZoom: MapTileConfig.assetsSampleZoom.toDouble(),
+    );
+    final fitBounds = MapViewport.boundsForPins(pins);
+    final fit = fitBounds == null
+        ? null
+        : CameraFit.bounds(
+            bounds: fitBounds,
+            padding: const EdgeInsets.all(24),
+            minZoom: minZoom,
+            maxZoom: maxZoom,
+          );
+
+    final prevCenter = _mapDefaultCenter;
+    final prevZoom = _mapDefaultZoom;
+    _mapDefaultCenter = center;
+    _mapDefaultZoom = zoom;
+    _mapDefaultFit = fit;
+
+    final mudou = prevCenter == null ||
+        prevZoom == null ||
+        prevCenter.latitude != center.latitude ||
+        prevCenter.longitude != center.longitude ||
+        prevZoom != zoom;
+    if (forcar) {
+      _mapUserInteracting = false;
+      _stopMapAnimation();
+    }
+    if ((mudou || forcar) && !_mapUserInteracting && _mapResetAnimation == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _mapUserInteracting || _mapResetAnimation != null) return;
+        if (_mapDefaultFit != null) {
+          try {
+            final fitted = _mapDefaultFit!.fit(_mapController.camera);
+            _animateMapMove(fitted.center, fitted.zoom);
+            return;
+          } catch (_) {
+            // ignora e usa fallback
+          }
+        }
+        _animateMapMove(center, zoom);
+      });
+    }
   }
 
   void _scheduleMapReset() {
@@ -543,6 +653,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     final zoom = _mapDefaultZoom;
     if (center == null || zoom == null) return;
     _mapUserInteracting = false;
+    if (_mapDefaultFit != null) {
+      try {
+        final fitted = _mapDefaultFit!.fit(_mapController.camera);
+        _animateMapMove(fitted.center, fitted.zoom);
+        return;
+      } catch (_) {
+        // ignora e usa fallback
+      }
+    }
     _animateMapMove(center, zoom);
   }
 
@@ -675,10 +794,39 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     await prefs.setBool(_prefsGuiaPassageiroKey, true);
   }
 
+  Future<void> _mostrarGuiaPassageiroManual() async {
+    if (!mounted) return;
+    if (_modalAberto || _paymentWarningOpen) return;
+    final verGuia = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Guia interativo'),
+          content: const Text('Quer iniciar o guia do modo Passageiro?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Iniciar guia'),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (verGuia == true) {
+      await _mostrarGuiaPassageiro();
+    }
+  }
+
   Future<void> _mostrarGuiaPassageiro() async {
     if (!mounted) return;
     FocusScope.of(context).unfocus();
-    await showCoachMarks(context, [
+    final concluido = await showCoachMarks(context, [
       CoachMarkStep(
         targetKey: _guiaConfigKey,
         title: 'Configurações',
@@ -722,6 +870,89 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             'Envia sua solicitação. Depois pode virar Cancelar ou Finalizar quando permitido.',
       ),
     ]);
+    if (!concluido || !mounted) return;
+    await _mostrarGuiaModalPassageiro();
+  }
+
+  List<CoachMarkStep> _buildGuiaModalPassageiroSteps() {
+    return [
+      CoachMarkStep(
+        targetKey: _guiaModalContainerKey,
+        title: 'Modal da corrida',
+        description:
+            'Quando você pede uma corrida, este modal aparece para acompanhar o status e a rota.',
+        highlightPadding: const EdgeInsets.all(12),
+        borderRadius: 16,
+        bubblePlacement: CoachMarkBubblePlacement.center,
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalStatusKey,
+        title: 'Status da corrida',
+        description: 'Mostra se está aguardando, aceita ou em andamento.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalMotoristaKey,
+        title: 'Motorista',
+        description: 'Quando a corrida é aceita, aparecem nome, telefone e WhatsApp.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalRotaKey,
+        title: 'Rota',
+        description: 'Confira origem, destino e quantidade de assentos.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalMapaKey,
+        title: 'Mapa da corrida',
+        description: 'Mostra sua posição, origem, destino e o motorista quando disponível.',
+      ),
+      CoachMarkStep(
+        targetKey: _guiaModalAcoesKey,
+        title: 'Ações',
+        description: 'Aqui você pode cancelar ou finalizar quando permitido.',
+      ),
+    ];
+  }
+
+  Future<void> _mostrarGuiaModalPassageiro() async {
+    if (!mounted || _modalAberto || _paymentWarningOpen) return;
+    final snapshot = _PassengerModalSnapshot.fromState(this);
+    final baseLat = _origemLatLng?.latitude ?? MapTileConfig.defaultCenterLat;
+    final baseLng = _origemLatLng?.longitude ?? MapTileConfig.defaultCenterLng;
+    final origem = LatLng(baseLat + 0.0011, baseLng + 0.0010);
+    final destino = LatLng(baseLat - 0.0012, baseLng - 0.0014);
+    setState(() {
+      _corridaAtiva = true;
+      _corridaIdAtual = -1;
+      _statusCorrida = 'aguardando';
+      _corridaLugares = 1;
+      _corridaAceitaEm = null;
+      _corridaIniciadaEm = null;
+      _motoristaNome = 'Motorista Exemplo';
+      _motoristaTelefone = '(21) 99999-0000';
+      _origemEnderecoCorrida = 'Praia José Bonifácio, Paquetá';
+      _destinoEnderecoCorrida = 'Cais da Barca, Paquetá';
+      _origemLatLng = origem;
+      _destinoLatLng = destino;
+      _motoristaLatLng = null;
+      _motoristaBearing = 0.0;
+      _rota = [origem, destino];
+      _rotaKey = 'guia-modal';
+      _rotaMotorista = [];
+      _rotaMotoristaKey = null;
+      if (_origemCtrl.text.trim().isEmpty) {
+        _origemCtrl.text = _origemEnderecoCorrida!;
+      }
+      if (_destinoCtrl.text.trim().isEmpty) {
+        _destinoCtrl.text = _destinoEnderecoCorrida!;
+      }
+    });
+    try {
+      await _mostrarModalCorrida(guia: true);
+    } finally {
+      if (mounted) {
+        setState(() => snapshot.restore(this));
+      }
+    }
   }
 
   @override
@@ -784,9 +1015,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
       }
       _gerenciarTimerCancelamento();
-      if (!_corridaAtiva) {
-        _iniciarMotoristasOnlinePolling();
-      }
+      _sincronizarMotoristasOnline();
     }
   }
 
@@ -826,6 +1055,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (!mounted) return;
     setState(() => _rota = rota);
     _modalSetState?.call(() {});
+    _atualizarDefaultMapaPrincipal(forcar: true);
   }
 
   Future<void> _carregarRotaMotorista(LatLng start, LatLng end) async {
@@ -1042,7 +1272,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         _lugaresSolicitados = current.lugares;
       });
-      _pararMotoristasOnlinePolling(limpar: true);
+      _sincronizarMotoristasOnline();
       _origemTextoConfirmado = _origemCtrl.text.trim();
       _destinoTextoConfirmado = _destinoCtrl.text.trim();
       _sincronizarModalCorrida();
@@ -1095,7 +1325,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   void _iniciarMotoristasOnlinePolling() {
-    if (!mounted || _corridaAtiva) return;
+    if (!mounted || !_podeMostrarMotoristasOnline()) return;
     _motoristasOnlineTimer?.cancel();
     _motoristasOnlineTimer = Timer.periodic(const Duration(seconds: 10), (_) => _atualizarMotoristasOnline());
     unawaited(_atualizarMotoristasOnline());
@@ -1111,16 +1341,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   }
 
   Future<void> _atualizarMotoristasOnline() async {
-    if (!mounted || _corridaAtiva) return;
-    final origem = _origemLatLng;
-    if (origem == null) return;
+    if (!mounted || !_podeMostrarMotoristasOnline()) return;
+    final referencia = _origemLatLng ??
+        _mapDefaultCenter ??
+        const LatLng(MapTileConfig.defaultCenterLat, MapTileConfig.defaultCenterLng);
     if (_carregandoMotoristasOnline) return;
     _carregandoMotoristasOnline = true;
     try {
       final rides = RidesService();
       final lista = await rides.motoristasProximos(
-        lat: _round6(origem.latitude),
-        lng: _round6(origem.longitude),
+        lat: _round6(referencia.latitude),
+        lng: _round6(referencia.longitude),
         raioKm: 5,
         minutos: 10,
         limite: 50,
@@ -1264,7 +1495,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       _lugaresSolicitados = corrida.lugares;
     });
-    _pararMotoristasOnlinePolling(limpar: true);
+    _sincronizarMotoristasOnline();
     _origemTextoConfirmado = _origemCtrl.text.trim();
     _destinoTextoConfirmado = _destinoCtrl.text.trim();
     _sincronizarModalCorrida();
@@ -1377,7 +1608,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     );
   }
 
-  Widget _buildRideInfoCard(BuildContext context, {EdgeInsetsGeometry? margin}) {
+  Widget _buildRideInfoCard(
+    BuildContext context, {
+    EdgeInsetsGeometry? margin,
+    Key? statusKey,
+    Key? motoristaKey,
+    Key? rotaKey,
+  }) {
     if (!_corridaAtiva || _corridaIdAtual == null) {
       return const SizedBox.shrink();
     }
@@ -1411,86 +1648,106 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.green.shade200),
+          KeyedSubtree(
+            key: statusKey,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'STATUS',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(letterSpacing: 1, color: Colors.green.shade700),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    status,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(hint, style: Theme.of(context).textTheme.bodySmall),
+                  if (_cancelamentoBloqueado()) ...[
+                    const SizedBox(height: 8),
+                    _buildCancelCountdown(context),
+                  ],
+                  if (_finalizacaoBloqueada()) ...[
+                    const SizedBox(height: 8),
+                    _buildFinalizarCountdown(context),
+                  ],
+                ],
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'STATUS',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(letterSpacing: 1, color: Colors.green.shade700),
-                ),
+          ),
+          const SizedBox(height: 12),
+          KeyedSubtree(
+            key: motoristaKey,
+            child: _infoBox(
+              context,
+              'Motorista',
+              [
+                Text(driverName, style: Theme.of(context).textTheme.bodyMedium),
                 const SizedBox(height: 6),
-                Text(
-                  status,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      driverPhone,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700),
+                    ),
+                    if (link != null)
+                      OutlinedButton.icon(
+                        onPressed: () => _abrirWhatsApp(_motoristaTelefone),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                        label: const Text('WhatsApp'),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(hint, style: Theme.of(context).textTheme.bodySmall),
-                if (_cancelamentoBloqueado()) ...[
-                  const SizedBox(height: 8),
-                  _buildCancelCountdown(context),
-                ],
-                if (_finalizacaoBloqueada()) ...[
-                  const SizedBox(height: 8),
-                  _buildFinalizarCountdown(context),
-                ],
               ],
             ),
           ),
           const SizedBox(height: 12),
-          _infoBox(
-            context,
-            'Motorista',
-            [
-              Text(driverName, style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(driverPhone, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade700)),
-                  if (link != null)
-                    OutlinedButton.icon(
-                      onPressed: () => _abrirWhatsApp(_motoristaTelefone),
-                      icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                      label: const Text('WhatsApp'),
-                    ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _infoBox(
-            context,
-            'Rota',
-            [
-              Text('Origem: $origem', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 4),
-              Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 4),
-              Text(
-                'Quantos assentos você precisa para essa corrida? ${_formatarLugares(_corridaLugares)}',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            ],
+          KeyedSubtree(
+            key: rotaKey,
+            child: _infoBox(
+              context,
+              'Rota',
+              [
+                Text('Origem: $origem', style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 4),
+                Text('Destino: $destino', style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Quantos assentos você precisa para essa corrida? ${_formatarLugares(_corridaLugares)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _mostrarModalCorrida() async {
+  Future<void> _mostrarModalCorrida({bool guia = false}) async {
     if (_modalAberto || !mounted) return;
     _modalAberto = true;
     await Future<void>.delayed(Duration.zero);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final guiaModalVisto = prefs.getBool(_prefsGuiaModalPassageiroKey) ?? false;
+      final statusAtual = _normalizarStatus(_statusCorrida);
+      final deveMostrarGuiaModal = guia || (!guiaModalVisto && statusAtual == 'aguardando');
+      var guiaIniciado = false;
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -1502,15 +1759,29 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Dialog(
+                  key: _guiaModalContainerKey,
                   backgroundColor: Theme.of(context).dialogTheme.backgroundColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   child: StatefulBuilder(
                     builder: (context, setModalState) {
                       _modalSetState = setModalState;
-                      final origem = _origemLatLng;
-                      final destino = _destinoLatLng;
-                      final motorista = _motoristaLatLng;
+                      if (deveMostrarGuiaModal && !guiaIniciado) {
+                        guiaIniciado = true;
+                        WidgetsBinding.instance.addPostFrameCallback((_) async {
+                          if (!mounted) return;
+                          final concluido = await showCoachMarks(dialogContext, _buildGuiaModalPassageiroSteps());
+                          if (concluido) {
+                            await prefs.setBool(_prefsGuiaModalPassageiroKey, true);
+                          }
+                          if (guia && mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
+                            Navigator.of(dialogContext, rootNavigator: true).pop();
+                          }
+                        });
+                      }
+                                                final origem = _origemLatLng;
+                                                final destino = _destinoLatLng;
+                                                final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                         child: SingleChildScrollView(
@@ -1529,18 +1800,25 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              _buildRideInfoCard(context, margin: EdgeInsets.zero),
+                              _buildRideInfoCard(
+                                context,
+                                margin: EdgeInsets.zero,
+                                statusKey: _guiaModalStatusKey,
+                                motoristaKey: _guiaModalMotoristaKey,
+                                rotaKey: _guiaModalRotaKey,
+                              ),
                               const SizedBox(height: 12),
                               if (origem != null || destino != null || motorista != null)
                                 SizedBox(
+                                  key: _guiaModalMapaKey,
                                   height: 220,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(12),
                                     child: Builder(
                                       builder: (context) {
                                         final bounds = MapTileConfig.tilesBounds;
-                                        final rawPins = MapViewport.collectPins([origem, destino, motorista]);
-                                        final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
+                                      final rawPins = _pinsMapaModal();
+                                      final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
                                         final center = MapViewport.clampCenter(
                                           MapViewport.centerForPins(pins),
                                           bounds,
@@ -1562,9 +1840,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                 minZoom: minZoom,
                                                 maxZoom: maxZoom,
                                               );
-                                                                                final key = ValueKey(
-                                                                                  'pass-modal-${fitBounds == null ? zoom.toStringAsFixed(2) : 'fit'}-${MapViewport.signatureForPins(pins)}',
-                                                                                );
+                                      final key = ValueKey(
+                                        'pass-modal-${_rotaKey ?? 'sem-rota'}-${MapViewport.signatureForPins(
+                                          MapViewport.collectPins([origem, destino, motorista]),
+                                        )}',
+                                      );
                                                                                 return FlutterMap(
                                                                                   key: key,
                                                                                   options: MapOptions(
@@ -1622,11 +1902,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                 if (motorista != null)
                                                   Marker(
                                                     point: motorista,
-                                                    width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
-                                                    height: 36,
+                                                    width: 72, // Adjusted for 1536x1024 aspect ratio (1.5 * 48)
+                                                    height: 48,
                                                     child: Transform.rotate(
                                                       angle: (_motoristaBearing) * (math.pi / 180),
-                                                      child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                                      child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48), // Adjusted for 1536x1024 aspect ratio
                                                     ),
                                                   ),
                                               ],
@@ -1642,19 +1922,20 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: Wrap(
+                                    key: _guiaModalAcoesKey,
                                     spacing: 8,
                                     runSpacing: 8,
                                     alignment: WrapAlignment.end,
                                     children: [
                                       if (_podeCancelarCorrida)
                                         OutlinedButton.icon(
-                                          onPressed: _loading ? null : _pedirCorrida,
+                                          onPressed: guia || _loading ? null : _pedirCorrida,
                                           icon: const Icon(Icons.cancel),
                                           label: const Text('Cancelar'),
                                         ),
                                       if (_podeFinalizarCorrida)
                                         ElevatedButton.icon(
-                                          onPressed: _loading ? null : _finalizarCorrida,
+                                          onPressed: guia || _loading ? null : _finalizarCorrida,
                                           icon: const Icon(Icons.flag),
                                           label: const Text('Finalizar'),
                                         ),
@@ -1691,6 +1972,14 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       return;
     }
     final normalized = _normalizarStatus(status);
+    if (normalized != 'aceita' && normalized != 'em_andamento') {
+      if (!mounted) return;
+      setState(() {
+        _rotaMotorista = [];
+        _rotaMotoristaKey = null;
+      });
+      return;
+    }
     final alvo = normalized == 'em_andamento' ? _destinoLatLng : _origemLatLng;
     if (alvo == null) {
       if (!mounted) return;
@@ -1958,7 +2247,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _corridaLugares = corrida.lugares;
         _lugaresSolicitados = corrida.lugares;
       });
-      _pararMotoristasOnlinePolling(limpar: true);
+      _sincronizarMotoristasOnline();
       _sincronizarModalCorrida();
       _salvarCorridaLocal(_corridaIdAtual);
       _iniciarPollingCorrida();
@@ -2031,6 +2320,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
+          IconButton(
+            tooltip: 'Guia interativo',
+            icon: const Icon(Icons.help_outline),
+            onPressed: _mostrarGuiaPassageiroManual,
+          ),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -2057,11 +2351,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
                 key: _guiaMapaKey,
-                height: 220,
+                height: math.min(420, MediaQuery.of(context).size.height * 0.45),
                 child: Builder(
                   builder: (context) {
                     final bounds = MapTileConfig.tilesBounds;
-                    final rawPins = MapViewport.collectPins([_origemLatLng, _destinoLatLng, _motoristaLatLng]);
+                    final rawPins = _pinsMapaPrincipal();
                     final pins = MapViewport.clampPinsToBounds(rawPins, bounds);
                     final center = MapViewport.clampCenter(
                       MapViewport.centerForPins(pins),
@@ -2084,21 +2378,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                             minZoom: minZoom,
                             maxZoom: maxZoom,
                           );
-                    final prevCenter = _mapDefaultCenter;
-                    final prevZoom = _mapDefaultZoom;
                     _mapDefaultCenter = center;
                     _mapDefaultZoom = zoom;
-                    final defaultMudou = prevCenter == null ||
-                        prevZoom == null ||
-                        prevCenter.latitude != center.latitude ||
-                        prevCenter.longitude != center.longitude ||
-                        prevZoom != zoom;
-                    if (defaultMudou && !_mapUserInteracting && _mapResetAnimation == null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted || _mapUserInteracting || _mapResetAnimation != null) return;
-                        _mapController.move(center, zoom);
-                      });
-                    }
+                    _mapDefaultFit = fit;
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: FlutterMap(
@@ -2151,20 +2433,23 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 ),
                               ],
                             ),
-                          if (!_corridaAtiva && _motoristasOnline.isNotEmpty)
+                          if (_motoristasOnline.isNotEmpty && _podeMostrarMotoristasOnline())
                             MarkerLayer(
                               markers: _motoristasOnline
                                   .map(
                                     (motorista) => Marker(
                                       point: LatLng(motorista.latitude, motorista.longitude),
-                                      width: 36,
-                                      height: 24,
+                                      width: 48,
+                                      height: 32,
                                       child: Opacity(
                                         opacity: 0.85,
-                                        child: Image.asset(
-                                          'assets/icons/ecotaxi.png',
-                                          width: 36,
-                                          height: 24,
+                                        child: Transform.rotate(
+                                          angle: (motorista.bearing ?? 0) * (math.pi / 180),
+                                          child: Image.asset(
+                                            'assets/icons/ecotaxi.png',
+                                            width: 48,
+                                            height: 32,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -2193,16 +2478,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 ),
                               ],
                             ),
-                          if (_motoristaLatLng != null)
+                          if (_motoristaLatLng != null && _mostrarMotoristaNoMapa())
                             MarkerLayer(
                               markers: [
                                 Marker(
                                   point: _motoristaLatLng!,
-                                  width: 54, // Adjusted for 1536x1024 aspect ratio (1.5 * 36)
-                                  height: 36,
+                                  width: 72, // Adjusted for 1536x1024 aspect ratio (1.5 * 48)
+                                  height: 48,
                                   child: Transform.rotate(
                                     angle: (_motoristaBearing) * (math.pi / 180),
-                                    child: Image.asset('assets/icons/ecotaxi.png', width: 54, height: 36), // Adjusted for 1536x1024 aspect ratio
+                                    child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48), // Adjusted for 1536x1024 aspect ratio
                                   ),
                                 ),
                               ],
@@ -2408,6 +2693,108 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         ),
       ),
     );
+  }
+}
+
+class _PassengerModalSnapshot {
+  _PassengerModalSnapshot({
+    required this.corridaAtiva,
+    required this.corridaIdAtual,
+    required this.statusCorrida,
+    required this.corridaLugares,
+    required this.corridaAceitaEm,
+    required this.corridaIniciadaEm,
+    required this.motoristaNome,
+    required this.motoristaTelefone,
+    required this.origemEnderecoCorrida,
+    required this.destinoEnderecoCorrida,
+    required this.origemLatLng,
+    required this.destinoLatLng,
+    required this.motoristaLatLng,
+    required this.motoristaBearing,
+    required this.rota,
+    required this.rotaKey,
+    required this.rotaMotorista,
+    required this.rotaMotoristaKey,
+    required this.origemCtrlText,
+    required this.destinoCtrlText,
+    required this.origemTextoConfirmado,
+    required this.destinoTextoConfirmado,
+  });
+
+  final bool corridaAtiva;
+  final int? corridaIdAtual;
+  final String? statusCorrida;
+  final int corridaLugares;
+  final DateTime? corridaAceitaEm;
+  final DateTime? corridaIniciadaEm;
+  final String? motoristaNome;
+  final String? motoristaTelefone;
+  final String? origemEnderecoCorrida;
+  final String? destinoEnderecoCorrida;
+  final LatLng? origemLatLng;
+  final LatLng? destinoLatLng;
+  final LatLng? motoristaLatLng;
+  final double motoristaBearing;
+  final List<LatLng> rota;
+  final String? rotaKey;
+  final List<LatLng> rotaMotorista;
+  final String? rotaMotoristaKey;
+  final String origemCtrlText;
+  final String destinoCtrlText;
+  final String origemTextoConfirmado;
+  final String destinoTextoConfirmado;
+
+  factory _PassengerModalSnapshot.fromState(_PassengerPageState state) {
+    return _PassengerModalSnapshot(
+      corridaAtiva: state._corridaAtiva,
+      corridaIdAtual: state._corridaIdAtual,
+      statusCorrida: state._statusCorrida,
+      corridaLugares: state._corridaLugares,
+      corridaAceitaEm: state._corridaAceitaEm,
+      corridaIniciadaEm: state._corridaIniciadaEm,
+      motoristaNome: state._motoristaNome,
+      motoristaTelefone: state._motoristaTelefone,
+      origemEnderecoCorrida: state._origemEnderecoCorrida,
+      destinoEnderecoCorrida: state._destinoEnderecoCorrida,
+      origemLatLng: state._origemLatLng,
+      destinoLatLng: state._destinoLatLng,
+      motoristaLatLng: state._motoristaLatLng,
+      motoristaBearing: state._motoristaBearing,
+      rota: List<LatLng>.from(state._rota),
+      rotaKey: state._rotaKey,
+      rotaMotorista: List<LatLng>.from(state._rotaMotorista),
+      rotaMotoristaKey: state._rotaMotoristaKey,
+      origemCtrlText: state._origemCtrl.text,
+      destinoCtrlText: state._destinoCtrl.text,
+      origemTextoConfirmado: state._origemTextoConfirmado,
+      destinoTextoConfirmado: state._destinoTextoConfirmado,
+    );
+  }
+
+  void restore(_PassengerPageState state) {
+    state._corridaAtiva = corridaAtiva;
+    state._corridaIdAtual = corridaIdAtual;
+    state._statusCorrida = statusCorrida;
+    state._corridaLugares = corridaLugares;
+    state._corridaAceitaEm = corridaAceitaEm;
+    state._corridaIniciadaEm = corridaIniciadaEm;
+    state._motoristaNome = motoristaNome;
+    state._motoristaTelefone = motoristaTelefone;
+    state._origemEnderecoCorrida = origemEnderecoCorrida;
+    state._destinoEnderecoCorrida = destinoEnderecoCorrida;
+    state._origemLatLng = origemLatLng;
+    state._destinoLatLng = destinoLatLng;
+    state._motoristaLatLng = motoristaLatLng;
+    state._motoristaBearing = motoristaBearing;
+    state._rota = List<LatLng>.from(rota);
+    state._rotaKey = rotaKey;
+    state._rotaMotorista = List<LatLng>.from(rotaMotorista);
+    state._rotaMotoristaKey = rotaMotoristaKey;
+    state._origemCtrl.text = origemCtrlText;
+    state._destinoCtrl.text = destinoCtrlText;
+    state._origemTextoConfirmado = origemTextoConfirmado;
+    state._destinoTextoConfirmado = destinoTextoConfirmado;
   }
 }
 

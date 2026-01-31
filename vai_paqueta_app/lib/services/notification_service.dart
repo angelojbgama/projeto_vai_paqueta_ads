@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -14,6 +15,7 @@ class NotificationService {
   static bool _initialized = false;
   static final StreamController<String?> _tapController = StreamController<String?>.broadcast();
   static String? _pendingPayload;
+  static final Int64List _rideVibrationPattern = Int64List.fromList([0, 500, 250, 500]);
 
   static Stream<String?> get onNotificationTap => _tapController.stream;
 
@@ -49,11 +51,14 @@ class NotificationService {
       ),
     );
     await android.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         ridesChannelId,
         'Corridas disponiveis',
         description: 'Alertas quando houver corrida para voce.',
         importance: Importance.high,
+        enableVibration: true,
+        vibrationPattern: _rideVibrationPattern,
+        playSound: true,
       ),
     );
     await android.createNotificationChannel(
@@ -79,22 +84,30 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    bool vibrate = true,
+    bool playSound = true,
   }) async {
     await initialize();
-    const android = AndroidNotificationDetails(
+    final android = AndroidNotificationDetails(
       ridesChannelId,
       'Corridas disponiveis',
       channelDescription: 'Alertas quando houver corrida para voce.',
       importance: Importance.max,
       priority: Priority.high,
       ticker: 'corrida_disponivel',
+      enableVibration: vibrate,
+      vibrationPattern: vibrate ? _rideVibrationPattern : null,
+      playSound: playSound,
     );
-    const ios = DarwinNotificationDetails();
+    final ios = DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: playSound,
+    );
     await _plugin.show(
       id,
       title,
       body,
-      const NotificationDetails(android: android, iOS: ios),
+      NotificationDetails(android: android, iOS: ios),
       payload: payload,
     );
   }

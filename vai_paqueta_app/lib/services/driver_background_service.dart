@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/driver_settings.dart';
 import '../features/driver/driver_service.dart';
@@ -121,11 +122,13 @@ void driverServiceOnStart(ServiceInstance service) async {
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+      final heading = pos.heading;
       await DriverService().enviarPing(
         perfilId: perfilId,
         latitude: _round6(pos.latitude),
         longitude: _round6(pos.longitude),
         precisao: pos.accuracy,
+        bearing: heading.isFinite && heading >= 0 ? heading : null,
       );
     } catch (e) {
       debugPrint('Erro ao enviar ping em segundo plano: $e');
@@ -142,11 +145,14 @@ void driverServiceOnStart(ServiceInstance service) async {
       if (corridaId is int) {
         final key = '$corridaId:$status';
         if (status == 'aguardando' && key != lastRideKey) {
+          final prefs = await SharedPreferences.getInstance();
+          final vibrar = prefs.getBool('driver_vibrar_corrida') ?? true;
           await NotificationService.showRideAvailable(
             id: corridaId,
             title: 'Corrida disponivel',
             body: 'Abra o app para aceitar a corrida.',
             payload: 'ride:$corridaId',
+            vibrate: vibrar,
           );
           lastRideKey = key;
         }
