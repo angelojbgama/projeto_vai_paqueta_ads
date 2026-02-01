@@ -88,3 +88,15 @@ class LocalizacaoPing(models.Model):
 
     def __str__(self):
         return f"Ping {self.perfil_id} ({self.latitude}, {self.longitude})"
+
+
+class FcmDeviceToken(models.Model):
+    perfil = models.ForeignKey(Perfil, related_name="fcm_tokens", on_delete=models.CASCADE)
+    token = models.TextField(unique=True)
+    plataforma = models.CharField(max_length=50, blank=True)
+    ativo = models.BooleanField(default=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"FCM {self.perfil_id} ({self.plataforma})"

@@ -85,6 +85,15 @@ else:
         "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
     }
 
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", REDIS_URL)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+FIREBASE_SERVICE_ACCOUNT_PATH = os.environ.get("FIREBASE_SERVICE_ACCOUNT_PATH", "")
+FCM_ANDROID_CHANNEL_ID = os.environ.get("FCM_ANDROID_CHANNEL_ID", "vaipaqueta_corridas")
+
 DB_PATH = os.environ.get("DJANGO_DB_PATH")
 DATABASES = {
     "default": {
@@ -99,6 +108,8 @@ LANGUAGE_CODE = "pt-br"
 TIME_ZONE = "America/Sao_Paulo"
 USE_I18N = True
 USE_TZ = True
+
+CELERY_TIMEZONE = TIME_ZONE
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

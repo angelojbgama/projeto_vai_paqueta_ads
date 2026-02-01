@@ -12,18 +12,20 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Corrida, LocalizacaoPing, Perfil
+from .constants import PING_MAX_AGE_MINUTES
+from .models import Corrida, FcmDeviceToken, LocalizacaoPing, Perfil
 from .serializers import (
     CorridaCreateSerializer,
     CorridaSerializer,
     CorridaStatusSerializer,
+    FcmDeviceTokenSerializer,
     LocalizacaoPingSerializer,
     PerfilSerializer,
 )
+from .tasks import notificar_sem_motoristas
 from .realtime import notify_corrida, notify_driver_location
 
 ACTIVE_STATUSES = ["aguardando", "aceita", "em_andamento"]
-PING_MAX_AGE_MINUTES = 5
 DISTANCIA_MAX_INICIO_KM = 0.25  # motorista precisa estar próximo da origem para iniciar
 TEMPO_CANCELAMENTO_APOS_ACEITE = timedelta(minutes=2)
 TEMPO_CANCELAMENTO_APOS_INICIO = timedelta(minutes=1)
@@ -50,6 +52,11 @@ def _limitar_motoristas_tentados(lista):
     if len(unique) > MAX_MOTORISTAS_TENTADOS:
         unique = unique[-MAX_MOTORISTAS_TENTADOS:]
     return unique
+
+
+def _ha_ecotaxista_online() -> bool:
+    limite_tempo = datetime.now(timezone.utc) - timedelta(minutes=PING_MAX_AGE_MINUTES)
+    return LocalizacaoPing.objects.filter(perfil__tipo="ecotaxista", criado_em__gte=limite_tempo).exists()
 
 
 def _auto_atribuir_por_ping(perfil: Perfil, lat: float, lng: float) -> Corrida | None:
@@ -144,6 +151,8 @@ class DeviceRegisterView(APIView):
 
         payload_uuid = request.data.get("device_uuid")
         plataforma = request.data.get("plataforma", "")
+        fcm_token = request.data.get("fcm_token") or request.data.get("token")
+        fcm_plataforma = request.data.get("fcm_plataforma") or request.data.get("fcm_platform") or plataforma
         tipo = request.data.get("tipo", "passageiro")
         nome = (request.data.get("nome") or "").strip() or user.first_name
 
@@ -168,6 +177,16 @@ class DeviceRegisterView(APIView):
             perfil.nome = nome
         perfil.save()
 
+        if fcm_token:
+            FcmDeviceToken.objects.update_or_create(
+                token=fcm_token,
+                defaults={
+                    "perfil": perfil,
+                    "plataforma": fcm_plataforma or "",
+                    "ativo": True,
+                },
+            )
+
         return Response(
             {
                 "device": {"device_uuid": str(perfil.device_uuid), "plataforma": perfil.plataforma},
@@ -175,6 +194,24 @@ class DeviceRegisterView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class DeviceFcmRegisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        perfil = _perfil_usuario(request.user)
+        serializer = FcmDeviceTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data["token"]
+        plataforma = serializer.validated_data.get("plataforma", "") or ""
+
+        FcmDeviceToken.objects.update_or_create(
+            token=token,
+            defaults={"perfil": perfil, "plataforma": plataforma, "ativo": True},
+        )
+
+        return Response({"detail": "ok"}, status=status.HTTP_200_OK)
 
 
 class CorridaViewSet(viewsets.ModelViewSet):
@@ -370,7 +407,13 @@ class CorridaViewSet(viewsets.ModelViewSet):
             origem_endereco=data.get("origem_endereco", ""),
             destino_endereco=data.get("destino_endereco", ""),
         )
-        self._atribuir_motorista_proximo(corrida)
+        motorista = self._atribuir_motorista_proximo(corrida)
+        if not motorista and not _ha_ecotaxista_online():
+            try:
+                notificar_sem_motoristas.delay(corrida.id)
+            except Exception:
+                # Evita quebrar a criação da corrida se o broker estiver indisponível.
+                pass
         notify_corrida(corrida, event_type="ride_created")
         return Response(CorridaSerializer(corrida).data, status=status.HTTP_201_CREATED)
 

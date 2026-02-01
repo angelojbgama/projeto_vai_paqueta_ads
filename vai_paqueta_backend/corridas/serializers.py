@@ -117,3 +117,8 @@ class LocalizacaoPingSerializer(serializers.ModelSerializer):
         model = LocalizacaoPing
         fields = ["id", "perfil", "latitude", "longitude", "precisao_m", "bearing", "criado_em"]
         read_only_fields = ["id", "criado_em"]
+
+
+class FcmDeviceTokenSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    plataforma = serializers.CharField(required=False, allow_blank=True)
