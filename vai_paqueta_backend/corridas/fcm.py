@@ -9,6 +9,12 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 
 
+class _SimpleBatchResponse:
+    def __init__(self, success_count: int, failure_count: int):
+        self.success_count = success_count
+        self.failure_count = failure_count
+
+
 def _init_firebase() -> None:
     if firebase_admin._apps:
         return
@@ -52,4 +58,28 @@ def send_push_to_tokens(
         android=android,
         apns=apns,
     )
-    return messaging.send_multicast(message)
+    try:
+        # Prefer the per-message API to avoid /batch endpoint issues.
+        send_each = getattr(messaging, "send_each_for_multicast", None)
+        if send_each:
+            return send_each(message)
+        return messaging.send_multicast(message)
+    except Exception:
+        # Fallback: envia token a token.
+        success = 0
+        failure = 0
+        for token in tokens_list:
+            try:
+                messaging.send(
+                    messaging.Message(
+                        token=token,
+                        notification=notification,
+                        data=data or {},
+                        android=android,
+                        apns=apns,
+                    )
+                )
+                success += 1
+            except Exception:
+                failure += 1
+        return _SimpleBatchResponse(success, failure)
