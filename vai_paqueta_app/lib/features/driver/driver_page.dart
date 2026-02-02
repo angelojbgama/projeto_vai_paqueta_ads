@@ -18,6 +18,7 @@ import '../../core/driver_settings.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../services/driver_background_service.dart';
+import '../../services/fcm_service.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/route_service.dart';
@@ -37,16 +38,20 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   static const _prefsRecebendoCorridasKey = 'driver_recebendo_corridas';
   static const _prefsLocalizacaoBgKey = 'driver_localizacao_bg';
   static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
-  static const _prefsConsentimentoNotificacaoKey = 'driver_notificacao_consentimento';
+  static const _prefsRecebimentoModalKey = 'driver_recebimento_modal_visto';
+  static const _prefsConsentimentoNotificacaoKey = 'app_notificacao_consentimento';
+  static const _prefsConsentimentoNotificacaoLegacyKey = 'driver_notificacao_consentimento';
   static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
+  static const _prefsGuiaMotoristaPromptKey = 'motorista_guia_prompt_visto';
   static const _prefsVibrarCorridaKey = 'driver_vibrar_corrida';
   static const _prefsSomCorridaKey = 'driver_som_corrida';
   static const String _somSistemaValue = '__system__';
+  static const double _bearingSmoothFactor = 0.2;
+  static const double _compassSmoothFactor = 0.15;
   final GlobalKey _guiaConfigKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
   final GlobalKey _guiaConfigCorridaKey = GlobalKey();
   final GlobalKey _guiaRecebimentoKey = GlobalKey();
-  final GlobalKey _guiaLocalizacaoBgKey = GlobalKey();
   final GlobalKey _guiaVibrarKey = GlobalKey();
   final GlobalKey _guiaSomKey = GlobalKey();
   final GlobalKey _guiaSomPlayKey = GlobalKey();
@@ -101,42 +106,55 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   StreamSubscription<Position>? _posicaoStreamSub;
   final MapController _mapController = MapController();
   final AudioPlayer _alertPlayer = AudioPlayer();
+  Future<void>? _prefsFuture;
   Timer? _mapResetTimer;
   AnimationController? _mapResetAnimation;
+  AnimationController? _mapFollowAnimation;
   LatLng? _mapDefaultCenter;
   double? _mapDefaultZoom;
   LatLng? _mapLastCenter;
   double? _mapLastZoom;
   bool _mapUserInteracting = false;
   double _compassBearing = 0.0;
+  bool _compassIniciado = false;
+  double? _bearingAtual;
   double? _velocidadeKmh;
   bool _vibrarAoReceber = true;
   String? _somCorridaSelecionado;
   List<_SomCorridaOption> _sonsCorridaDisponiveis = const [];
   bool _configModalAberto = false;
+  bool _guiaMotoristaConcluido = false;
+  late final AnimationController _guiaPulseController;
+  late final Animation<double> _guiaPulseAnim;
+  late final AnimationController _configPulseController;
+  late final Animation<double> _configPulseAnim;
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
     final recebendo = prefs.getBool(_prefsRecebendoCorridasKey) ?? false;
     final consentimentoBg = prefs.getBool(_prefsConsentimentoBgKey) ?? false;
-    final localizacaoBgSalva = prefs.getBool(_prefsLocalizacaoBgKey);
+    final localizacaoBgSalva = prefs.getBool(_prefsLocalizacaoBgKey) ?? false;
     final vibrar = prefs.getBool(_prefsVibrarCorridaKey) ?? true;
     final somSalvo = prefs.getString(_prefsSomCorridaKey);
-    var localizacaoBg = localizacaoBgSalva ?? false;
+    var ativo = recebendo || localizacaoBgSalva;
     if (!consentimentoBg) {
-      localizacaoBg = false;
-      if (localizacaoBgSalva == true) {
-        await prefs.setBool(_prefsLocalizacaoBgKey, false);
-      }
+      ativo = false;
+    }
+    if (recebendo != ativo) {
+      await prefs.setBool(_prefsRecebendoCorridasKey, ativo);
+    }
+    if (localizacaoBgSalva != ativo) {
+      await prefs.setBool(_prefsLocalizacaoBgKey, ativo);
     }
     if (!mounted) return;
     setState(() {
-      _recebendoCorridas = recebendo;
-      _enviarLocalizacaoBg = localizacaoBg;
+      _recebendoCorridas = ativo;
+      _enviarLocalizacaoBg = ativo;
       _consentimentoLocalizacaoBg = consentimentoBg;
       _vibrarAoReceber = vibrar;
       _somCorridaSelecionado = (somSalvo == null || somSalvo.trim().isEmpty) ? null : somSalvo;
     });
+    _atualizarConfigPulse();
     _configurarRealtime();
     if (_recebendoCorridas) {
       _verificarCorrida();
@@ -177,8 +195,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<void> _mostrarGuiaMotoristaSeNecessario() async {
     final prefs = await SharedPreferences.getInstance();
-    final jaViu = prefs.getBool(_prefsGuiaMotoristaKey) ?? false;
-    if (jaViu || !mounted) return;
+    final promptVisto = prefs.getBool(_prefsGuiaMotoristaPromptKey) ?? false;
+    if (promptVisto || !mounted) return;
     if (_modalAberto) return;
     final verGuia = await showDialog<bool>(
       context: context,
@@ -204,7 +222,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (verGuia == true) {
       await _mostrarGuiaMotorista();
     }
-    await prefs.setBool(_prefsGuiaMotoristaKey, true);
+    await prefs.setBool(_prefsGuiaMotoristaPromptKey, true);
   }
 
   Future<void> _mostrarGuiaMotoristaManual() async {
@@ -236,6 +254,131 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
   }
 
+  Future<void> _carregarEstadoGuiaMotorista() async {
+    final prefs = await SharedPreferences.getInstance();
+    final concluido = prefs.getBool(_prefsGuiaMotoristaKey) ?? false;
+    if (!mounted) return;
+    setState(() => _guiaMotoristaConcluido = concluido);
+    _atualizarGuiaPulse();
+  }
+
+  Future<void> _mostrarModalReceberCorridasSeNecessario() async {
+    if (!mounted) return;
+    if (_recebendoCorridas) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsRecebimentoModalKey, true);
+      return;
+    }
+    if (_modalAberto || _configModalAberto || _guiaAtivo) return;
+    final prefs = await SharedPreferences.getInstance();
+    final jaMostrou = prefs.getBool(_prefsRecebimentoModalKey) ?? false;
+    if (jaMostrou) return;
+    await _mostrarModalConfiguracoesCorrida();
+    if (!mounted) return;
+    await prefs.setBool(_prefsRecebimentoModalKey, true);
+  }
+
+  Future<void> _marcarGuiaMotoristaConcluido() async {
+    if (!mounted) return;
+    setState(() => _guiaMotoristaConcluido = true);
+    _atualizarGuiaPulse();
+  }
+
+  void _atualizarGuiaPulse() {
+    if (_guiaMotoristaConcluido) {
+      _guiaPulseController.stop();
+      _guiaPulseController.value = 0.0;
+    } else if (!_guiaPulseController.isAnimating) {
+      _guiaPulseController.repeat(reverse: true);
+    }
+  }
+
+  bool get _precisaAtivarCorridas => !_recebendoCorridas;
+
+  void _atualizarConfigPulse() {
+    if (_precisaAtivarCorridas) {
+      if (!_configPulseController.isAnimating) {
+        _configPulseController.repeat(reverse: true);
+      }
+    } else {
+      _configPulseController.stop();
+      _configPulseController.value = 0.0;
+    }
+  }
+
+  Widget _buildConfigCorridaButton() {
+    final button = OutlinedButton.icon(
+      key: _guiaConfigCorridaKey,
+      icon: const Icon(Icons.tune),
+      label: const Text('Configurações da corrida'),
+      onPressed: _mostrarModalConfiguracoesCorrida,
+    );
+    if (!_precisaAtivarCorridas) return button;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedBuilder(
+          animation: _configPulseAnim,
+          builder: (context, child) {
+            final t = _configPulseAnim.value;
+            final bg = Color.lerp(Colors.transparent, Colors.red.withOpacity(0.14), t)!;
+            final border = Color.lerp(Colors.red.shade300, Colors.red.shade700, t)!;
+            return OutlinedButton.icon(
+              key: _guiaConfigCorridaKey,
+              icon: const Icon(Icons.tune),
+              label: const Text('Configurações da corrida'),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: bg,
+                side: BorderSide(color: border, width: 1.5),
+                foregroundColor: border,
+              ),
+              onPressed: _mostrarModalConfiguracoesCorrida,
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Ative para receber corridas',
+          style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuiaIconButton({required VoidCallback onPressed}) {
+    final button = IconButton(
+      tooltip: 'Guia interativo',
+      icon: const Icon(Icons.help_outline),
+      onPressed: onPressed,
+    );
+    if (_guiaMotoristaConcluido) return button;
+    return AnimatedBuilder(
+      animation: _guiaPulseAnim,
+      child: button,
+      builder: (context, child) {
+        final t = _guiaPulseAnim.value;
+        final glow = 0.15 + 0.25 * t;
+        final scale = 1.0 + 0.03 * t;
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amberAccent.withOpacity(0.7 * glow),
+                  blurRadius: 4 + 4 * glow,
+                  spreadRadius: 0.2 + 0.6 * glow,
+                ),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _mostrarGuiaMotorista() async {
     if (!mounted) return;
     FocusScope.of(context).unfocus();
@@ -255,7 +398,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         CoachMarkStep(
           targetKey: _guiaConfigCorridaKey,
           title: 'Configurações da corrida',
-          description: 'Abra para ajustar disponibilidade, segundo plano, vibração e som.',
+          description: 'Abra para ajustar disponibilidade (inclui segundo plano), vibração e som.',
         ),
         CoachMarkStep(
           targetKey: _guiaMapaKey,
@@ -272,6 +415,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         ),
       ]);
       if (!concluido || !mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_prefsGuiaMotoristaKey, true);
+      await prefs.setBool(_prefsRecebimentoModalKey, true);
+      await _marcarGuiaMotoristaConcluido();
       await _mostrarGuiaConfiguracoesCorrida();
       if (!mounted) return;
       await _mostrarGuiaModalCorrida();
@@ -365,12 +512,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       CoachMarkStep(
         targetKey: _guiaRecebimentoKey,
         title: 'Receber corridas',
-        description: 'Deixe ligado para ficar online e receber novas corridas.',
-      ),
-      CoachMarkStep(
-        targetKey: _guiaLocalizacaoBgKey,
-        title: 'Segundo plano',
-        description: 'Mantém o recebimento de corridas mesmo com o app fechado.',
+        description: 'Deixe ligado para ficar online e disponível mesmo com o app em segundo plano.',
       ),
       CoachMarkStep(
         targetKey: _guiaVibrarKey,
@@ -433,14 +575,14 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Localização em segundo plano'),
+          title: const Text('Permissão para receber corridas'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Para manter você disponível para corridas mesmo com o app fechado, '
-                'o Vai Paqueta precisa acessar sua localização em segundo plano.',
+                'Para conectar você a corridas e manter o app ativo em segundo plano, '
+                'o Vai Paquetá precisa acessar e compartilhar sua localização.',
               ),
               const SizedBox(height: 12),
               Row(
@@ -464,7 +606,21 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Enviar sua posição periodicamente, mesmo em segundo plano.',
+                      'Enviar sua posição periodicamente, mesmo com o app em segundo plano.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.shield_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Usamos esses dados apenas para conectar corridas e segurança da viagem.',
                       style: Theme.of(dialogContext).textTheme.bodySmall,
                     ),
                   ),
@@ -478,7 +634,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Você pode desativar a qualquer momento nas configurações do Ecotaxista.',
+                      'Você pode desativar a qualquer momento em Configurações da corrida.',
                       style: Theme.of(dialogContext).textTheme.bodySmall,
                     ),
                   ),
@@ -489,7 +645,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                 'Se você negar, o app continua funcionando, mas você só receberá corridas com o app aberto.',
               ),
               const SizedBox(height: 12),
-              const Text('Ao continuar, solicitaremos a permissão de localização em segundo plano.'),
+              const Text('Ao continuar, o Android vai solicitar a permissão de localização.'),
             ],
           ),
           actions: [
@@ -510,64 +666,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<bool> _mostrarConsentimentoLocalizacaoForeground() async {
     if (!mounted) return false;
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Permitir localização'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Para receber corridas e mostrar sua posição no mapa, o Vai Paquetá precisa acessar '
-                'sua localização enquanto o app estiver aberto.',
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.map_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Mostra você no mapa e calcula rotas.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.directions_car_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Usa sua posição para receber corridas quando você estiver disponível.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Agora não'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Concordo e continuar'),
-            ),
-          ],
-        );
-      },
-    );
-    return result ?? false;
+    return _mostrarConsentimentoLocalizacaoBg();
   }
 
   Future<bool> _mostrarConsentimentoNotificacao() async {
@@ -583,7 +682,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Ative as notificações para receber avisos de corridas e atualizações importantes.',
+                'Precisamos da permissão de notificação para avisar quando surgir uma corrida e enviar atualizações importantes.',
               ),
               const SizedBox(height: 12),
               Row(
@@ -593,7 +692,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Alertas quando houver corrida disponível.',
+                      'Alertas de novas corridas mesmo com o app fechado.',
                       style: Theme.of(dialogContext).textTheme.bodySmall,
                     ),
                   ),
@@ -603,11 +702,25 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.info_outline, size: 20),
+                  const Icon(Icons.volume_up_outlined, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Você pode ajustar isso nas configurações do Android.',
+                      'Som/vibração para você não perder corridas importantes.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.settings_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Você pode mudar isso depois nas configurações do Android.',
                       style: Theme.of(dialogContext).textTheme.bodySmall,
                     ),
                   ),
@@ -633,12 +746,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
 
   Future<void> _solicitarPermissaoNotificacao() async {
     final prefs = await SharedPreferences.getInstance();
-    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ?? false;
+    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ??
+        prefs.getBool(_prefsConsentimentoNotificacaoLegacyKey) ??
+        false;
     if (jaPediu) return;
     final aceitou = await _mostrarConsentimentoNotificacao();
     await prefs.setBool(_prefsConsentimentoNotificacaoKey, true);
+    await prefs.setBool(_prefsConsentimentoNotificacaoLegacyKey, true);
     if (!aceitou) return;
     await NotificationService.requestPermissions();
+    await FcmService.requestPermissions();
   }
 
   Future<bool> _garantirConsentimentoLocalizacaoBg() async {
@@ -968,10 +1085,26 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   double? _resolverBearing(Position pos) {
+    if (_compassIniciado && _compassBearing.isFinite) return _compassBearing;
     final heading = pos.heading;
     if (heading.isFinite && heading >= 0) return heading;
-    if (_compassBearing.isFinite) return _compassBearing;
     return null;
+  }
+
+  double _normalizeBearing(double value) {
+    final normalized = value % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  }
+
+  double _lerpBearing(double from, double to, double t) {
+    final diff = ((to - from + 540) % 360) - 180;
+    return _normalizeBearing(from + diff * t);
+  }
+
+  double _smoothBearing({required double? previous, required double target, required double factor}) {
+    final normalized = _normalizeBearing(target);
+    if (previous == null || !previous.isFinite) return normalized;
+    return _lerpBearing(previous, normalized, factor);
   }
 
   Future<void> _avaliarVelocidade(Position pos) async {
@@ -1085,15 +1218,25 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     final zoom = _mapDefaultZoom;
     if (center == null || zoom == null) return;
     _mapUserInteracting = false;
+    _stopMapFollowAnimation();
     _animateMapMove(center, zoom);
   }
 
   void _stopMapAnimation() {
+    _stopMapFollowAnimation();
     final controller = _mapResetAnimation;
     if (controller == null) return;
     controller.stop();
     controller.dispose();
     _mapResetAnimation = null;
+  }
+
+  void _stopMapFollowAnimation() {
+    final controller = _mapFollowAnimation;
+    if (controller == null) return;
+    controller.stop();
+    controller.dispose();
+    _mapFollowAnimation = null;
   }
 
   void _animateMapMove(LatLng destCenter, double destZoom) {
@@ -1127,6 +1270,41 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     controller.forward();
   }
 
+  void _animateMapFollow(LatLng destCenter, double destZoom) {
+    final startCenter = _mapLastCenter ?? destCenter;
+    final startZoom = _mapLastZoom ?? destZoom;
+    _stopMapFollowAnimation();
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _mapFollowAnimation = controller;
+    final curved = CurvedAnimation(parent: controller, curve: Curves.easeOut);
+    final latTween = Tween<double>(begin: startCenter.latitude, end: destCenter.latitude);
+    final lngTween = Tween<double>(begin: startCenter.longitude, end: destCenter.longitude);
+    final zoomTween = Tween<double>(begin: startZoom, end: destZoom);
+    controller.addListener(() {
+      if (!mounted) return;
+      final lat = latTween.evaluate(curved);
+      final lng = lngTween.evaluate(curved);
+      final zoom = zoomTween.evaluate(curved);
+      try {
+        _mapController.move(LatLng(lat, lng), zoom);
+      } catch (_) {
+        // ignora até o mapa estar renderizado
+      }
+    });
+    controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed || status == AnimationStatus.dismissed) {
+        controller.dispose();
+        if (_mapFollowAnimation == controller) {
+          _mapFollowAnimation = null;
+        }
+      }
+    });
+    controller.forward();
+  }
+
   void _updateMapDefaultFromPosition(LatLng pos) {
     final bounds = MapTileConfig.tilesBounds;
     final rawPins = MapViewport.collectPins([pos]);
@@ -1141,11 +1319,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _mapDefaultCenter = center;
     _mapDefaultZoom = zoom;
     if (!_mapUserInteracting && _recebendoCorridas && _mapResetAnimation == null) {
-      try {
-        _mapController.move(center, zoom);
-      } catch (_) {
-        // aguarda renderização do mapa antes de mover
-      }
+      _animateMapFollow(center, zoom);
     }
   }
 
@@ -1216,6 +1390,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _guiaPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _guiaPulseAnim = CurvedAnimation(parent: _guiaPulseController, curve: Curves.easeInOut);
+    _configPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _configPulseAnim = CurvedAnimation(parent: _configPulseController, curve: Curves.easeInOut);
+    _carregarEstadoGuiaMotorista();
     _notificationTapSub = NotificationService.onNotificationTap.listen(_onNotificationTap);
     final pendingTap = NotificationService.consumePendingPayload();
     if (pendingTap != null) {
@@ -1227,7 +1412,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     }
     _atualizarPosicao();
     _iniciarStreamVelocidade();
-    _carregarPreferencias();
+    _prefsFuture = _carregarPreferencias();
     _configurarRealtime();
     _authSub = ref.listenManual(authProvider, (_, __) {
       if (!mounted) return;
@@ -1235,8 +1420,20 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     });
     _compassSub = FlutterCompass.events?.listen((CompassEvent event) {
       if (!mounted) return;
+      final heading = event.heading;
+      if (heading == null || !heading.isFinite) return;
       setState(() {
-        _compassBearing = event.heading ?? 0;
+        if (!_compassIniciado) {
+          _compassBearing = _normalizeBearing(heading);
+          _compassIniciado = true;
+        } else {
+          _compassBearing = _smoothBearing(
+            previous: _compassBearing,
+            target: heading,
+            factor: _compassSmoothFactor,
+          );
+        }
+        _bearingAtual = _compassBearing;
       });
       if (_modalAberto) { // Check if modal is still open
         _modalSetState?.call(() {});
@@ -1246,16 +1443,25 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       await _solicitarPermissaoNotificacao();
       if (!mounted) return;
       await _mostrarGuiaMotoristaSeNecessario();
+      if (!mounted) return;
+      if (_prefsFuture != null) {
+        await _prefsFuture;
+      }
+      if (!mounted) return;
+      await _mostrarModalReceberCorridasSeNecessario();
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _guiaPulseController.dispose();
+    _configPulseController.dispose();
     _pingTimer?.cancel();
     _pollTimer?.cancel();
     _mapResetTimer?.cancel();
     _mapResetAnimation?.dispose();
+    _mapFollowAnimation?.dispose();
     _alertPlayer.dispose();
     DriverBackgroundService.stop();
     _backgroundAtivo = false;
@@ -1369,11 +1575,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     unawaited(_avaliarTilesPara(_posicao));
     unawaited(_avaliarVelocidade(pos));
 
+    final bearingToSend = _resolverBearing(pos);
     final speedMps = _extrairVelocidadeMps(pos);
     final currentSpeedKmh = (speedMps != null && speedMps.isFinite) ? speedMps * 3.6 : null;
     if (mounted) {
       setState(() {
         _velocidadeKmh = currentSpeedKmh;
+        if (!_compassIniciado && bearingToSend != null) {
+          _bearingAtual = _normalizeBearing(bearingToSend);
+        }
       });
     }
 
@@ -1384,7 +1594,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     try {
       final lat = _round6(pos.latitude);
       final lng = _round6(pos.longitude);
-      final bearingToSend = _resolverBearing(pos);
       if (_wsConnected && _realtime != null) {
         final corridaId = _corridaAtual?['id'];
         _realtime!.sendPing(
@@ -1871,8 +2080,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                                                                                     point: motoristaPos,
                                                                                                     width: 72, // Adjusted for 1536x1024 aspect ratio (1.5 * 48)
                                                                                                     height: 48,
-                                                                                                                                                                                                        child: Transform.rotate(
-                                                                                                                                                                                                          angle: (_compassBearing) * (math.pi / 180),
+                                                                                                    child: Transform.rotate(
+                                                                                                                                                                                                          angle: ((_bearingAtual ?? _compassBearing)) * (math.pi / 180),
                                                                                                                                                                                                           child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48), // Adjusted for 1536x1024 aspect ratio
                                                                                                                                                                                                         ),                                                                                                  ),                                            ],
                                           ),
@@ -2019,6 +2228,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _verificarCorrida(force: true);
   }
 
+  void _showErrorSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   void _onToggleRecebimentoCorridas(bool ativo) {
     if (!ativo) {
       _setRecebimentoCorridas(false);
@@ -2028,12 +2247,23 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   Future<void> _habilitarRecebimentoCorridas() async {
-    final permissaoOk = await _garantirPermissaoLocalizacaoForeground();
+    if (!_consentimentoLocalizacaoBg) {
+      final aceitou = await _mostrarConsentimentoLocalizacaoBg();
+      if (!aceitou) {
+        _setRecebimentoCorridas(false, forceRebuild: true);
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _consentimentoLocalizacaoBg = true);
+      await _salvarPreferencias(consentimentoLocalizacaoBg: true);
+    }
+    final permissaoOk = await _garantirPermissaoLocalizacao();
     if (!permissaoOk) {
       _setRecebimentoCorridas(false, forceRebuild: true);
       return;
     }
     _setRecebimentoCorridas(true);
+    _setLocalizacaoSegundoPlano(true);
     _iniciarStreamVelocidade();
   }
 
@@ -2048,17 +2278,24 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
         if (mudou) {
           _recebendoCorridas = ativo;
         }
+        if (_enviarLocalizacaoBg != ativo) {
+          _enviarLocalizacaoBg = ativo;
+        }
       });
     }
     if (salvarPreferencias) {
-      _salvarPreferencias(recebendoCorridas: ativo);
+      _salvarPreferencias(recebendoCorridas: ativo, localizacaoBg: ativo);
     }
     if (ativo) {
       _configurarRealtime();
       _verificarCorrida(force: true);
       _iniciarAutoPing();
       _iniciarPollingCorrida();
+      _atualizarConfigPulse();
       return;
+    }
+    if (_enviarLocalizacaoBg) {
+      _setLocalizacaoSegundoPlano(false);
     }
     _configurarRealtime();
     _pingTimer?.cancel();
@@ -2067,11 +2304,16 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       DriverBackgroundService.stop();
       _backgroundAtivo = false;
     }
+    _atualizarConfigPulse();
   }
 
   void _onToggleLocalizacaoSegundoPlano(bool ativo) {
     if (!ativo) {
       _setLocalizacaoSegundoPlano(false);
+      return;
+    }
+    if (!_recebendoCorridas) {
+      _showErrorSnackbar('Ative "Receber Corridas" para habilitar o segundo plano.');
       return;
     }
     unawaited(_habilitarLocalizacaoSegundoPlano());
@@ -2111,6 +2353,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       DriverBackgroundService.stop();
       _backgroundAtivo = false;
     }
+    _atualizarConfigPulse();
   }
 
   Future<void> _trocarParaPassageiro() async {
@@ -2196,21 +2439,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                       _onToggleRecebimentoCorridas(value);
                                       setModalState(() {});
                                     },
-                              title: const Text('Receber Corridas'),
-                              subtitle: const Text('Fique disponível para corridas.'),
-                            ),
-                            const Divider(height: 1),
-                            SwitchListTile.adaptive(
-                              key: _guiaLocalizacaoBgKey,
-                              value: _enviarLocalizacaoBg,
-                              onChanged: guia
-                                  ? null
-                                  : (value) async {
-                                      _onToggleLocalizacaoSegundoPlano(value);
-                                      setModalState(() {});
-                                    },
-                              title: const Text('Receber corridas em segundo plano'),
-                              subtitle: const Text('Enviar localização e receber corridas com app em segundo plano.'),
+                              title: const Text('Receber corridas'),
+                              subtitle: const Text(
+                                'Fica online e disponível mesmo com o app em segundo plano.',
+                              ),
                             ),
                             const Divider(height: 1),
                             SwitchListTile.adaptive(
@@ -2315,11 +2547,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
-          IconButton(
-            tooltip: 'Guia interativo',
-            icon: const Icon(Icons.help_outline),
-            onPressed: _mostrarGuiaMotoristaManual,
-          ),
+          _buildGuiaIconButton(onPressed: _mostrarGuiaMotoristaManual),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -2347,12 +2575,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             children: [
               Align(
                 alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  key: _guiaConfigCorridaKey,
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Configurações da corrida'),
-                  onPressed: _mostrarModalConfiguracoesCorrida,
-                ),
+                child: _buildConfigCorridaButton(),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -2459,7 +2682,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                           width: 72,
                                           height: 48,
                                           child: Transform.rotate(
-                                            angle: (_compassBearing) * (math.pi / 180),
+                                            angle: ((_bearingAtual ?? _compassBearing)) * (math.pi / 180),
                                             child: Image.asset('assets/icons/ecotaxi.png', width: 72, height: 48),
                                           ),
                                         ),
@@ -2480,31 +2703,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                           style: TextStyle(color: Colors.grey, fontSize: 16),
                                         ),
                                         SizedBox(height: 8),
-                                        Text.rich(
-                                          TextSpan(
-                                            children: [
-                                              const TextSpan(
-                                                text: 'Ative "Receber Corridas" ',
-                                                style: TextStyle(color: Colors.grey, fontSize: 14),
-                                              ),
-                                              const WidgetSpan(
-                                                alignment: PlaceholderAlignment.middle,
-                                                child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
-                                              ),
-                                              const TextSpan(
-                                                text: ' para ficar disponível.',
-                                                style: TextStyle(color: Colors.grey, fontSize: 14),
-                                              ),
-                                            ],
-                                          ),
+                                        Text(
+                                          'Para ativar, vá em "Configurações da corrida".',
                                           textAlign: TextAlign.center,
+                                          style: TextStyle(color: Colors.grey, fontSize: 14),
                                         ),
-                                        SizedBox(height: 4),
+                                        SizedBox(height: 8),
                                         Text.rich(
                                           TextSpan(
                                             children: [
                                               const TextSpan(
-                                                text: 'Ative "Receber corridas em segundo plano" ',
+                                                text: 'Ative "Receber corridas" ',
                                                 style: TextStyle(color: Colors.grey, fontSize: 14),
                                               ),
                                               const WidgetSpan(
@@ -2512,7 +2721,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                                 child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
                                               ),
                                               const TextSpan(
-                                                text: ' para sempre estar disponível.',
+                                                text: ' para ficar disponível, inclusive em segundo plano.',
                                                 style: TextStyle(color: Colors.grey, fontSize: 14),
                                               ),
                                             ],
@@ -2601,30 +2810,29 @@ class _SpeedometerCard extends StatelessWidget {
     final accentColor = _resolveSpeedColor(baseColor, speed, warningKmh);
     final displaySpeed = speedKmh == null ? '--' : speedKmh!.toStringAsFixed(0);
     final displayTitle = compact ? 'Veloc.' : 'Velocímetro';
-    final primaryTextColor = textColor ?? theme.textTheme.bodyMedium?.color;
-    final secondaryTextColor = textColor != null ? textColor!.withOpacity(0.85) : Colors.grey.shade600;
+    final primaryTextColor = textColor ?? theme.colorScheme.onSurface;
+    final secondaryTextColor = textColor != null ? textColor!.withOpacity(0.7) : Colors.grey.shade600;
 
-    return Card(
-      elevation: 0,
-      color: backgroundColor ?? Colors.grey.shade50,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: borderColor ?? Colors.grey.shade200),
+        color: backgroundColor ?? Colors.white.withOpacity(0.85),
+        border: Border.all(color: borderColor ?? Colors.grey.shade200),
       ),
       child: Padding(
-        padding: compact ? const EdgeInsets.all(8) : const EdgeInsets.all(12),
+        padding: compact ? const EdgeInsets.fromLTRB(8, 8, 8, 6) : const EdgeInsets.fromLTRB(12, 10, 12, 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               displayTitle,
               style: (compact ? theme.textTheme.labelMedium : theme.textTheme.titleMedium)
-                  ?.copyWith(color: primaryTextColor),
+                  ?.copyWith(color: primaryTextColor, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: compact ? 4 : 8),
             LayoutBuilder(
               builder: (context, constraints) {
-                final size = math.min(constraints.maxWidth, compact ? 120.0 : 180.0);
+                final size = math.min(constraints.maxWidth, compact ? 110.0 : 160.0);
                 return SizedBox.square(
                   dimension: size,
                   child: CustomPaint(
@@ -2640,7 +2848,7 @@ class _SpeedometerCard extends StatelessWidget {
                           Text(
                             displaySpeed,
                             style: (compact ? theme.textTheme.headlineSmall : theme.textTheme.displaySmall)?.copyWith(
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w700,
                               color: accentColor,
                             ),
                           ),
@@ -2662,7 +2870,7 @@ class _SpeedometerCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'Aguardando sinal GPS',
+                  'Aguardando GPS',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: secondaryTextColor,
                     fontSize: compact ? 10 : null,
@@ -2690,7 +2898,7 @@ class _SpeedometerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
-    final strokeWidth = size.width * 0.08;
+    final strokeWidth = size.width * 0.07;
     final radius = (size.width - strokeWidth) / 2;
     final rect = Rect.fromCircle(center: center, radius: radius);
     const startAngle = 3 * math.pi / 4;
@@ -2708,7 +2916,9 @@ class _SpeedometerPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, startAngle, sweepAngle * progress, false, progressPaint);
+    if (progress > 0) {
+      canvas.drawArc(rect, startAngle, sweepAngle * progress, false, progressPaint);
+    }
 
     final tickPaint = Paint()
       ..color = Colors.grey.shade400
@@ -2732,7 +2942,7 @@ class _SpeedometerPainter extends CustomPainter {
     canvas.drawLine(center, needleEnd, needlePaint);
 
     final hubPaint = Paint()..color = progressColor;
-    canvas.drawCircle(center, strokeWidth * 0.35, hubPaint);
+    canvas.drawCircle(center, strokeWidth * 0.3, hubPaint);
   }
 
   @override

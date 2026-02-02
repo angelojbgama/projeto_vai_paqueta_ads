@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/platform_info.dart';
 import '../../services/api_client.dart';
+import '../../services/fcm_service.dart';
 
 class DeviceInfo {
   final String deviceUuid;
@@ -53,6 +55,7 @@ class DeviceService {
     var tipoFinal = tipo ?? await _loadTipoPreferido();
     if (tipoFinal == 'cliente') tipoFinal = 'passageiro';
     final dio = ApiClient.client;
+    final fcmToken = await FcmService.getToken();
 
     if (kDebugMode) {
       debugPrint('[DEVICE] Registrando device UUID=$uuid na API ${dio.options.baseUrl} tipo=$tipoFinal');
@@ -63,6 +66,8 @@ class DeviceService {
       'plataforma': plataforma,
       'tipo': tipoFinal,
       'nome': nome,
+      if (fcmToken != null) 'fcm_token': fcmToken,
+      if (fcmToken != null) 'fcm_plataforma': platformLabel,
     });
 
     final device = resp.data['device'] as Map<String, dynamic>;

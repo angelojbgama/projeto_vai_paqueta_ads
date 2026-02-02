@@ -20,6 +20,8 @@ import '../../core/map_viewport.dart';
 import '../../widgets/coach_mark.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/geo_service.dart';
+import '../../services/fcm_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/route_service.dart';
 import '../../services/realtime_service.dart';
 import '../rides/rides_service.dart';
@@ -35,7 +37,10 @@ class PassengerPage extends ConsumerStatefulWidget {
 class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindingObserver, TickerProviderStateMixin {
   static const _prefsCorridaKey = 'corrida_ativa_id';
   static const _prefsGuiaPassageiroKey = 'passageiro_guia_visto';
+  static const _prefsGuiaPassageiroPromptKey = 'passageiro_guia_prompt_visto';
   static const _prefsGuiaModalPassageiroKey = 'passageiro_guia_modal_visto';
+  static const _prefsConsentimentoNotificacaoKey = 'app_notificacao_consentimento';
+  static const _prefsConsentimentoNotificacaoLegacyKey = 'driver_notificacao_consentimento';
   final GlobalKey _guiaMapaKey = GlobalKey();
   final GlobalKey _guiaOrigemKey = GlobalKey();
   final GlobalKey _guiaGpsKey = GlobalKey();
@@ -56,6 +61,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   String _destinoTextoConfirmado = '';
   LatLng? _origemLatLng;
   LatLng? _destinoLatLng;
+  LatLng? _gpsLatLng;
   LatLng? _motoristaLatLng;
   String? _motoristaNome;
   String? _motoristaTelefone;
@@ -63,6 +69,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   String? _destinoEnderecoCorrida;
   List<LatLng> _rota = [];
   List<LatLng> _rotaMotorista = [];
+  List<LatLng> _rotaGps = [];
   bool _loading = false;
   bool _corridaAtiva = false;
   int? _corridaIdAtual;
@@ -72,6 +79,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   int _corridaLugares = 1;
   bool _modalAberto = false;
   StateSetter? _modalSetState;
+  bool _guiaPassageiroConcluido = false;
+  late final AnimationController _guiaPulseController;
+  late final Animation<double> _guiaPulseAnim;
   bool _paymentWarningOpen = false;
   int? _paymentWarningRideId;
   bool _tileUsingAssets = MapTileConfig.useAssets;
@@ -92,6 +102,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   List<GeoResult> _sugestoesDestino = [];
   String? _rotaKey;
   String? _rotaMotoristaKey;
+  String? _rotaGpsKey;
   Timer? _debounceOrigem;
   Timer? _debounceDestino;
   bool _trocandoPerfil = false;
@@ -132,6 +143,36 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   TileProvider _buildTileProvider() {
     return _tileUsingAssets ? AssetTileProvider() : MapTileCacheService.networkTileProvider();
+  }
+
+  Widget _buildGpsMarker() {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.blueAccent,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueAccent.withOpacity(0.99),
+            blurRadius: 3,
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: Colors.lightBlueAccent.withOpacity(0.50),
+            blurRadius: 5,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.person,
+          size: 22,
+          color: Colors.white,
+        ),
+      ),
+    );
   }
 
   int _effectiveMinNativeZoom() {
@@ -392,8 +433,43 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _atualizarDefaultMapaPrincipal(forcar: true);
   }
 
+  void _limparRotaGps() {
+    if (_rotaGps.isEmpty && _rotaGpsKey == null) return;
+    if (!mounted) {
+      _rotaGps = [];
+      _rotaGpsKey = null;
+      return;
+    }
+    setState(() {
+      _rotaGps = [];
+      _rotaGpsKey = null;
+    });
+  }
+
+  Future<void> _carregarRotaGps(LatLng gps, LatLng origem) async {
+    final key = 'gps-${_buildRouteKey(gps, origem)}';
+    if (_rotaGpsKey == key) return;
+    _rotaGpsKey = key;
+    final rota = await _fetchRoute(gps, origem);
+    if (!mounted) return;
+    setState(() => _rotaGps = rota);
+    _modalSetState?.call(() {});
+  }
+
+  Future<void> _atualizarRotaGpsSePossivel() async {
+    if (_corridaAtiva) return;
+    final gps = _gpsLatLng;
+    final origem = _origemLatLng;
+    if (gps == null || origem == null) {
+      _limparRotaGps();
+      return;
+    }
+    await _carregarRotaGps(gps, origem);
+  }
+
   Future<void> _atualizarRotaSePossivel() async {
     if (_corridaAtiva) return;
+    await _atualizarRotaGpsSePossivel();
     final origem = _origemLatLng;
     final destino = _destinoLatLng;
     if (origem == null || destino == null) {
@@ -414,6 +490,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemLatLng = null;
         _origemTextoConfirmado = '';
         _limparRotaCorrida();
+        _limparRotaGps();
         return;
       }
       setState(() {
@@ -421,6 +498,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemTextoConfirmado = '';
       });
       _limparRotaCorrida();
+      _limparRotaGps();
       return;
     }
     if (_origemLatLng != null && texto == _origemTextoConfirmado) {
@@ -437,6 +515,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         setState(() {
           _origemLatLng = null;
         });
+        _limparRotaGps();
         return;
       }
 
@@ -540,6 +619,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     _rota = [];
     _rotaKey = null;
     _rotaMotoristaKey = null;
+    _rotaGps = [];
+    _rotaGpsKey = null;
     _lugaresSolicitados = 1;
     _motoristasOnline = [];
     _motoristasOnlineTimer?.cancel();
@@ -764,8 +845,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
 
   Future<void> _mostrarGuiaPassageiroSeNecessario() async {
     final prefs = await SharedPreferences.getInstance();
-    final jaViu = prefs.getBool(_prefsGuiaPassageiroKey) ?? false;
-    if (jaViu || !mounted) return;
+    final promptVisto = prefs.getBool(_prefsGuiaPassageiroPromptKey) ?? false;
+    if (promptVisto || !mounted) return;
     if (_modalAberto || _paymentWarningOpen) return;
     final verGuia = await showDialog<bool>(
       context: context,
@@ -791,7 +872,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (verGuia == true) {
       await _mostrarGuiaPassageiro();
     }
-    await prefs.setBool(_prefsGuiaPassageiroKey, true);
+    await prefs.setBool(_prefsGuiaPassageiroPromptKey, true);
   }
 
   Future<void> _mostrarGuiaPassageiroManual() async {
@@ -821,6 +902,139 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (verGuia == true) {
       await _mostrarGuiaPassageiro();
     }
+  }
+
+  Future<void> _carregarEstadoGuiaPassageiro() async {
+    final prefs = await SharedPreferences.getInstance();
+    final concluido = prefs.getBool(_prefsGuiaPassageiroKey) ?? false;
+    if (!mounted) return;
+    setState(() => _guiaPassageiroConcluido = concluido);
+    _atualizarGuiaPulse();
+  }
+
+  Future<void> _marcarGuiaPassageiroConcluido() async {
+    if (!mounted) return;
+    setState(() => _guiaPassageiroConcluido = true);
+    _atualizarGuiaPulse();
+  }
+
+  void _atualizarGuiaPulse() {
+    if (_guiaPassageiroConcluido) {
+      _guiaPulseController.stop();
+      _guiaPulseController.value = 0.0;
+    } else if (!_guiaPulseController.isAnimating) {
+      _guiaPulseController.repeat(reverse: true);
+    }
+  }
+
+  Widget _buildGuiaIconButton({required VoidCallback onPressed}) {
+    final button = IconButton(
+      tooltip: 'Guia interativo',
+      icon: const Icon(Icons.help_outline),
+      onPressed: onPressed,
+    );
+    if (_guiaPassageiroConcluido) return button;
+    return AnimatedBuilder(
+      animation: _guiaPulseAnim,
+      child: button,
+      builder: (context, child) {
+        final t = _guiaPulseAnim.value;
+        final glow = 0.15 + 0.25 * t;
+        final scale = 1.0 + 0.03 * t;
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.amberAccent.withOpacity(0.7 * glow),
+                  blurRadius: 4 + 4 * glow,
+                  spreadRadius: 0.2 + 0.6 * glow,
+                ),
+              ],
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> _mostrarConsentimentoNotificacao() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Permitir notificações'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Precisamos da permissão de notificação para avisar sobre o andamento da sua corrida.',
+              ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notifications_outlined, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Avisos quando a corrida é aceita ou atualizada.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Você pode mudar isso depois nas configurações do Android.',
+                      style: Theme.of(dialogContext).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Agora não'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Concordo e continuar'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
+  Future<void> _solicitarPermissaoNotificacao() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ??
+        prefs.getBool(_prefsConsentimentoNotificacaoLegacyKey) ??
+        false;
+    if (jaPediu) return;
+    if (_modalAberto || _paymentWarningOpen) return;
+    final aceitou = await _mostrarConsentimentoNotificacao();
+    await prefs.setBool(_prefsConsentimentoNotificacaoKey, true);
+    await prefs.setBool(_prefsConsentimentoNotificacaoLegacyKey, true);
+    if (!aceitou) return;
+    await NotificationService.requestPermissions();
+    await FcmService.requestPermissions();
   }
 
   Future<void> _mostrarGuiaPassageiro() async {
@@ -871,6 +1085,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       ),
     ]);
     if (!concluido || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefsGuiaPassageiroKey, true);
+    await _marcarGuiaPassageiroConcluido();
     await _mostrarGuiaModalPassageiro();
   }
 
@@ -947,7 +1164,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
     });
     try {
-      await _mostrarModalCorrida(guia: true);
+      await _mostrarModalCorrida(iniciarGuia: true);
     } finally {
       if (mounted) {
         setState(() => snapshot.restore(this));
@@ -959,6 +1176,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _guiaPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _guiaPulseAnim = CurvedAnimation(parent: _guiaPulseController, curve: Curves.easeInOut);
+    _carregarEstadoGuiaPassageiro();
     _configurarFonteTiles();
     _carregarCorridaAtiva();
     _carregarPosicao();
@@ -970,6 +1193,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _solicitarPermissaoNotificacao();
       _mostrarGuiaPassageiroSeNecessario();
     });
   }
@@ -977,6 +1201,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _guiaPulseController.dispose();
     _origemCtrl.dispose();
     _destinoCtrl.dispose();
     _debounceOrigem?.cancel();
@@ -1181,9 +1406,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         query: q,
         lat: referencia.latitude,
         lng: referencia.longitude,
-        limit: 8,
+        limit: 3,
       );
-      return resultados;
+      return resultados.take(3);
     } catch (e) {
       debugPrint('Erro ao buscar sugestoes de origem: ${friendlyError(e)}');
       return const Iterable<GeoResult>.empty();
@@ -1201,9 +1426,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         query: q,
         lat: referencia.latitude,
         lng: referencia.longitude,
-        limit: 8,
+        limit: 3,
       );
-      return resultados;
+      return resultados.take(3);
     } catch (e) {
       debugPrint('Erro ao buscar sugestoes de destino: ${friendlyError(e)}');
       return const Iterable<GeoResult>.empty();
@@ -1327,7 +1552,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   void _iniciarMotoristasOnlinePolling() {
     if (!mounted || !_podeMostrarMotoristasOnline()) return;
     _motoristasOnlineTimer?.cancel();
-    _motoristasOnlineTimer = Timer.periodic(const Duration(seconds: 10), (_) => _atualizarMotoristasOnline());
+    _motoristasOnlineTimer = Timer.periodic(PassengerSettings.motoristasOnlinePollingInterval, (_) => _atualizarMotoristasOnline());
     unawaited(_atualizarMotoristasOnline());
   }
 
@@ -1611,9 +1836,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   Widget _buildRideInfoCard(
     BuildContext context, {
     EdgeInsetsGeometry? margin,
-    Key? statusKey,
-    Key? motoristaKey,
-    Key? rotaKey,
   }) {
     if (!_corridaAtiva || _corridaIdAtual == null) {
       return const SizedBox.shrink();
@@ -1649,7 +1871,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           KeyedSubtree(
-            key: statusKey,
+            key: _guiaModalStatusKey,
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1688,7 +1910,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           ),
           const SizedBox(height: 12),
           KeyedSubtree(
-            key: motoristaKey,
+            key: _guiaModalMotoristaKey,
             child: _infoBox(
               context,
               'Motorista',
@@ -1717,7 +1939,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           ),
           const SizedBox(height: 12),
           KeyedSubtree(
-            key: rotaKey,
+            key: _guiaModalRotaKey,
             child: _infoBox(
               context,
               'Rota',
@@ -1738,7 +1960,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     );
   }
 
-  Future<void> _mostrarModalCorrida({bool guia = false}) async {
+  Future<void> _mostrarModalCorrida({bool iniciarGuia = false}) async {
     if (_modalAberto || !mounted) return;
     _modalAberto = true;
     await Future<void>.delayed(Duration.zero);
@@ -1746,7 +1968,8 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final prefs = await SharedPreferences.getInstance();
       final guiaModalVisto = prefs.getBool(_prefsGuiaModalPassageiroKey) ?? false;
       final statusAtual = _normalizarStatus(_statusCorrida);
-      final deveMostrarGuiaModal = guia || (!guiaModalVisto && statusAtual == 'aguardando');
+      final deveIniciarGuia = iniciarGuia || (!guiaModalVisto && statusAtual == 'aguardando');
+      final modoGuia = iniciarGuia;
       var guiaIniciado = false;
       await showDialog<void>(
         context: context,
@@ -1766,22 +1989,20 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                   child: StatefulBuilder(
                     builder: (context, setModalState) {
                       _modalSetState = setModalState;
-                      if (deveMostrarGuiaModal && !guiaIniciado) {
+                      if (deveIniciarGuia && !guiaIniciado) {
                         guiaIniciado = true;
                         WidgetsBinding.instance.addPostFrameCallback((_) async {
                           if (!mounted) return;
-                          final concluido = await showCoachMarks(dialogContext, _buildGuiaModalPassageiroSteps());
-                          if (concluido) {
-                            await prefs.setBool(_prefsGuiaModalPassageiroKey, true);
-                          }
-                          if (guia && mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
+                          await prefs.setBool(_prefsGuiaModalPassageiroKey, true);
+                          await showCoachMarks(dialogContext, _buildGuiaModalPassageiroSteps());
+                          if (modoGuia && mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
                             Navigator.of(dialogContext, rootNavigator: true).pop();
                           }
                         });
                       }
-                                                final origem = _origemLatLng;
-                                                final destino = _destinoLatLng;
-                                                final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
+                                              final origem = _origemLatLng;
+                                              final destino = _destinoLatLng;
+                                              final motorista = _mostrarMotoristaNoMapa() ? _motoristaLatLng : null;
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                         child: SingleChildScrollView(
@@ -1803,9 +2024,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                               _buildRideInfoCard(
                                 context,
                                 margin: EdgeInsets.zero,
-                                statusKey: _guiaModalStatusKey,
-                                motoristaKey: _guiaModalMotoristaKey,
-                                rotaKey: _guiaModalRotaKey,
                               ),
                               const SizedBox(height: 12),
                               if (origem != null || destino != null || motorista != null)
@@ -1867,6 +2085,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                                                       maxNativeZoom: _effectiveMaxNativeZoom(),
                                                                                       tileBounds: bounds,
                                                                                     ),
+                                            if (_rotaGps.length >= 2)
+                                              PolylineLayer(
+                                                polylines: [
+                                                  Polyline(
+                                                    points: _rotaGps,
+                                                    strokeWidth: 2.0,
+                                                    color: Colors.lightBlueAccent.withOpacity(0.8),
+                                                  ),
+                                                ],
+                                              ),
                                             if (_rota.length >= 2)
                                               PolylineLayer(
                                                 polylines: [
@@ -1885,6 +2113,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                               ),
                                             MarkerLayer(
                                               markers: [
+                                                if (_gpsLatLng != null)
+                                                  Marker(
+                                                    point: _gpsLatLng!,
+                                                    width: 28,
+                                                    height: 28,
+                                                    child: _buildGpsMarker(),
+                                                  ),
                                                 if (origem != null)
                                                   Marker(
                                                     point: origem,
@@ -1929,13 +2164,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                     children: [
                                       if (_podeCancelarCorrida)
                                         OutlinedButton.icon(
-                                          onPressed: guia || _loading ? null : _pedirCorrida,
+                                          onPressed: modoGuia || _loading ? null : _pedirCorrida,
                                           icon: const Icon(Icons.cancel),
                                           label: const Text('Cancelar'),
                                         ),
                                       if (_podeFinalizarCorrida)
                                         ElevatedButton.icon(
-                                          onPressed: guia || _loading ? null : _finalizarCorrida,
+                                          onPressed: modoGuia || _loading ? null : _finalizarCorrida,
                                           icon: const Icon(Icons.flag),
                                           label: const Text('Finalizar'),
                                         ),
@@ -2042,6 +2277,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
 
+      final gpsLatLng = LatLng(pos.latitude, pos.longitude);
       final isOriginOk = await _geo.isInsideServiceArea(pos.latitude, pos.longitude);
       if (!isOriginOk) {
         if (!silencioso) {
@@ -2049,12 +2285,15 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         }
         setState(() {
           _origemLatLng = null;
+          _gpsLatLng = gpsLatLng;
         });
+        _limparRotaGps();
         return;
       }
 
       setState(() {
-        _origemLatLng = LatLng(pos.latitude, pos.longitude);
+        _gpsLatLng = gpsLatLng;
+        _origemLatLng = gpsLatLng;
         _posCarregada = true;
       });
       _avaliarTilesPara(_origemLatLng);
@@ -2063,6 +2302,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         if (!mounted) return;
         setState(() {
           _origemCtrl.text = res.endereco.isNotEmpty ? res.endereco : _origemCtrl.text;
+          _origemLatLng = LatLng(res.lat, res.lng);
         });
       } catch (_) {
         if (!silencioso) {
@@ -2290,6 +2530,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final media = MediaQuery.of(context);
+    final keyboardInset = media.viewInsets.bottom;
+    final baseMapHeight = math.min(420.0, media.size.height * 0.45).toDouble();
+    final reducedMapHeight = math.max(120.0, baseMapHeight - (keyboardInset * 0.75)).toDouble();
+    final mapHeight = keyboardInset > 0 ? reducedMapHeight : baseMapHeight;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -2320,11 +2565,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             icon: const Icon(Icons.settings),
             onPressed: () => context.goNamed('perfil'),
           ),
-          IconButton(
-            tooltip: 'Guia interativo',
-            icon: const Icon(Icons.help_outline),
-            onPressed: _mostrarGuiaPassageiroManual,
-          ),
+          _buildGuiaIconButton(onPressed: _mostrarGuiaPassageiroManual),
           if (_trocandoPerfil)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -2349,9 +2590,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
+              child: AnimatedContainer(
                 key: _guiaMapaKey,
-                height: math.min(420, MediaQuery.of(context).size.height * 0.45),
+                height: mapHeight,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
                 child: Builder(
                   builder: (context) {
                     final bounds = MapTileConfig.tilesBounds;
@@ -2413,6 +2656,16 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                             maxNativeZoom: _effectiveMaxNativeZoom(),
                             tileBounds: bounds,
                           ),
+                          if (_rotaGps.length >= 2)
+                            PolylineLayer(
+                              polylines: [
+                                Polyline(
+                                  points: _rotaGps,
+                                  strokeWidth: 2.2,
+                                  color: Colors.lightBlueAccent.withOpacity(0.8),
+                                ),
+                              ],
+                            ),
                           if (_rota.length >= 2)
                             PolylineLayer(
                               polylines: [
@@ -2455,6 +2708,17 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                     ),
                                   )
                                   .toList(),
+                            ),
+                          if (_gpsLatLng != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _gpsLatLng!,
+                                  width: 28,
+                                  height: 28,
+                                  child: _buildGpsMarker(),
+                                ),
+                              ],
                             ),
                           if (_origemLatLng != null)
                             MarkerLayer(
@@ -2501,7 +2765,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + keyboardInset),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -2552,6 +2816,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 });
                               }
                               _limparRotaCorrida();
+                              _limparRotaGps();
                             }
                             _origemCtrl.text = text;
                           },

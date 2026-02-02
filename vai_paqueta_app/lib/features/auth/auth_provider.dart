@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/auth_storage.dart';
+import '../../services/fcm_service.dart';
+import '../device/device_service.dart';
 import 'auth_service.dart';
 
 final authProvider = AsyncNotifierProvider<AuthNotifier, AuthUser?>(() {
@@ -15,7 +17,11 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     final token = await AuthStorage.getAccessToken();
     if (token == null) return null;
     try {
-      return await _service.me();
+      final user = await _service.me();
+      if (user != null) {
+        await _registrarDevice(user);
+      }
+      return user;
     } catch (_) {
       await AuthStorage.clearTokens();
       return null;
@@ -26,6 +32,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     state = const AsyncLoading();
     try {
       final user = await _service.login(email: email, password: password);
+      await _registrarDevice(user);
       state = AsyncData(user);
       return user;
     } catch (e, st) {
@@ -52,6 +59,7 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
         ddd: ddd,
         numero: numero,
       );
+      await _registrarDevice(user);
       state = AsyncData(user);
       return user;
     } catch (e, st) {
@@ -107,6 +115,18 @@ class AuthNotifier extends AsyncNotifier<AuthUser?> {
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
+    }
+  }
+
+  Future<void> _registrarDevice(AuthUser user) async {
+    try {
+      await DeviceService().registrarDispositivo(
+        tipo: user.perfilTipo,
+        nome: user.nome,
+      );
+      await FcmService.syncTokenWithBackend();
+    } catch (_) {
+      // Não bloqueia login se falhar o registro do device.
     }
   }
 }

@@ -2,13 +2,13 @@ class DriverSettings {
   const DriverSettings._();
 
   /// Intervalo de envio de ping (WS) quando o WebSocket está conectado.
-  static const Duration pingIntervalWs = Duration(seconds: 5);
+  static const Duration pingIntervalWs = Duration(seconds: 3);
   /// Intervalo de envio de ping (HTTP) quando não há WS.
-  static const Duration pingIntervalHttp = Duration(seconds: 10);
+  static const Duration pingIntervalHttp = Duration(seconds: 3);
   /// Intervalo de ping (HTTP) no serviço de segundo plano.
-  static const Duration backgroundPingInterval = Duration(seconds: 10);
+  static const Duration backgroundPingInterval = Duration(seconds: 3);
   /// Intervalo de polling de corrida (HTTP) no modo ecotaxista.
-  static const Duration corridaPollingInterval = Duration(seconds: 10);
+  static const Duration corridaPollingInterval = Duration(seconds: 3);
 
   /// Limite de velocidade (km/h) para disparar aviso.
   static const double speedWarningThresholdKmh = 25.0;
@@ -22,11 +22,13 @@ class PassengerSettings {
   const PassengerSettings._();
 
   /// Intervalo base do polling de corrida (HTTP) no modo passageiro.
-  static const Duration corridaPollIntervalBase = Duration(seconds: 4);
+  static const Duration corridaPollIntervalBase = Duration(seconds: 3);
   /// Intervalo mínimo do polling (HTTP) quando há backoff.
-  static const Duration corridaPollIntervalMin = Duration(seconds: 4);
+  static const Duration corridaPollIntervalMin = Duration(seconds: 3);
   /// Intervalo máximo do polling (HTTP) quando há backoff.
-  static const Duration corridaPollIntervalMax = Duration(seconds: 20);
+  static const Duration corridaPollIntervalMax = Duration(seconds: 10);
+  /// Intervalo do polling de motoristas online no mapa.
+  static const Duration motoristasOnlinePollingInterval = Duration(seconds: 3);
   /// Tempo mínimo para liberar cancelamento após corrida aceita.
   static const Duration tempoMinimoCancelamentoAposAceite = Duration(minutes: 2);
   /// Tempo mínimo para liberar finalização após corrida iniciada.
