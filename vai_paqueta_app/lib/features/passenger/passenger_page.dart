@@ -20,8 +20,7 @@ import '../../core/map_viewport.dart';
 import '../../widgets/coach_mark.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/geo_service.dart';
-import '../../services/fcm_service.dart';
-import '../../services/notification_service.dart';
+import '../../services/notification_permission_prompt_service.dart';
 import '../../services/route_service.dart';
 import '../../services/realtime_service.dart';
 import '../rides/rides_service.dart';
@@ -39,8 +38,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   static const _prefsGuiaPassageiroKey = 'passageiro_guia_visto';
   static const _prefsGuiaPassageiroPromptKey = 'passageiro_guia_prompt_visto';
   static const _prefsGuiaModalPassageiroKey = 'passageiro_guia_modal_visto';
-  static const _prefsConsentimentoNotificacaoKey = 'app_notificacao_consentimento';
-  static const _prefsConsentimentoNotificacaoLegacyKey = 'driver_notificacao_consentimento';
   final GlobalKey _guiaMapaKey = GlobalKey();
   final GlobalKey _guiaOrigemKey = GlobalKey();
   final GlobalKey _guiaGpsKey = GlobalKey();
@@ -98,8 +95,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   bool _carregandoMotoristasOnline = false;
   final GeoService _geo = GeoService();
   final RouteService _routeService = RouteService();
-  List<GeoResult> _sugestoesOrigem = [];
-  List<GeoResult> _sugestoesDestino = [];
   String? _rotaKey;
   String? _rotaMotoristaKey;
   String? _rotaGpsKey;
@@ -127,6 +122,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
   ProviderSubscription<AsyncValue<dynamic>>? _authSub;
   Duration _serverTimeOffset = Duration.zero;
   double _motoristaBearing = 0.0;
+
+  Future<void> _solicitarPermissaoNotificacaoQuandoPronto() async {
+    if (!mounted) return;
+    if (_modalAberto || _paymentWarningOpen) return;
+    await NotificationPermissionPromptService.maybePrompt(context);
+  }
   bool get _podeCancelarCorrida {
     if (!_corridaAtiva || _corridaIdAtual == null) return false;
     final status = _normalizarStatus(_statusCorrida);
@@ -154,12 +155,12 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         color: Colors.blueAccent,
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.99),
+            color: Colors.blueAccent.withValues(alpha: 0.99),
             blurRadius: 3,
             spreadRadius: 1,
           ),
           BoxShadow(
-            color: Colors.lightBlueAccent.withOpacity(0.50),
+            color: Colors.lightBlueAccent.withValues(alpha: 0.50),
             blurRadius: 5,
             spreadRadius: 2,
           ),
@@ -523,7 +524,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _origemLatLng = LatLng(res.lat, res.lng);
         _origemCtrl.text = res.endereco;
         _origemCtrl.selection = TextSelection.collapsed(offset: _origemCtrl.text.length); // Add this line
-        _sugestoesOrigem = [];
       });
       _origemTextoConfirmado = _origemCtrl.text.trim();
       await _avaliarTilesPara(_origemLatLng);
@@ -571,7 +571,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         _destinoLatLng = LatLng(res.lat, res.lng);
         _destinoCtrl.text = res.endereco;
         _destinoCtrl.selection = TextSelection.collapsed(offset: _destinoCtrl.text.length); // Add this line
-        _sugestoesDestino = [];
       });
       _destinoTextoConfirmado = _destinoCtrl.text.trim();
       await _avaliarTilesPara(_destinoLatLng);
@@ -631,8 +630,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       _destinoTextoConfirmado = '';
       _origemLatLng = null;
       _destinoLatLng = null;
-      _sugestoesOrigem = [];
-      _sugestoesDestino = [];
     }
     _salvarCorridaLocal(null);
     _corridaTimer?.cancel();
@@ -948,7 +945,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.amberAccent.withOpacity(0.7 * glow),
+                  color: Colors.amberAccent.withValues(alpha: 0.7 * glow),
                   blurRadius: 4 + 4 * glow,
                   spreadRadius: 0.2 + 0.6 * glow,
                 ),
@@ -959,82 +956,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         );
       },
     );
-  }
-
-  Future<bool> _mostrarConsentimentoNotificacao() async {
-    if (!mounted) return false;
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Permitir notificações'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Precisamos da permissão de notificação para avisar sobre o andamento da sua corrida.',
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.notifications_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Avisos quando a corrida é aceita ou atualizada.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.info_outline, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Você pode mudar isso depois nas configurações do Android.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Agora não'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Concordo e continuar'),
-            ),
-          ],
-        );
-      },
-    );
-    return result ?? false;
-  }
-
-  Future<void> _solicitarPermissaoNotificacao() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ??
-        prefs.getBool(_prefsConsentimentoNotificacaoLegacyKey) ??
-        false;
-    if (jaPediu) return;
-    if (_modalAberto || _paymentWarningOpen) return;
-    final aceitou = await _mostrarConsentimentoNotificacao();
-    await prefs.setBool(_prefsConsentimentoNotificacaoKey, true);
-    await prefs.setBool(_prefsConsentimentoNotificacaoLegacyKey, true);
-    if (!aceitou) return;
-    await NotificationService.requestPermissions();
-    await FcmService.requestPermissions();
   }
 
   Future<void> _mostrarGuiaPassageiro() async {
@@ -1193,8 +1114,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _solicitarPermissaoNotificacao();
-      _mostrarGuiaPassageiroSeNecessario();
+      unawaited(() async {
+        await _mostrarGuiaPassageiroSeNecessario();
+        if (!mounted) return;
+        await _solicitarPermissaoNotificacaoQuandoPronto();
+      }());
     });
   }
 
@@ -1241,6 +1165,9 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
       }
       _gerenciarTimerCancelamento();
       _sincronizarMotoristasOnline();
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 400), () async {
+        await _solicitarPermissaoNotificacaoQuandoPronto();
+      }));
     }
   }
 
@@ -1964,8 +1891,13 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
     if (_modalAberto || !mounted) return;
     _modalAberto = true;
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      _modalAberto = false;
+      return;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
       final guiaModalVisto = prefs.getBool(_prefsGuiaModalPassageiroKey) ?? false;
       final statusAtual = _normalizarStatus(_statusCorrida);
       final deveIniciarGuia = iniciarGuia || (!guiaModalVisto && statusAtual == 'aguardando');
@@ -1983,7 +1915,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Dialog(
                   key: _guiaModalContainerKey,
-                  backgroundColor: Theme.of(context).dialogTheme.backgroundColor,
+                  backgroundColor: Theme.of(dialogContext).dialogTheme.backgroundColor,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                   child: StatefulBuilder(
@@ -1992,10 +1924,11 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                       if (deveIniciarGuia && !guiaIniciado) {
                         guiaIniciado = true;
                         WidgetsBinding.instance.addPostFrameCallback((_) async {
-                          if (!mounted) return;
-                          await prefs.setBool(_prefsGuiaModalPassageiroKey, true);
+                          if (!dialogContext.mounted) return;
                           await showCoachMarks(dialogContext, _buildGuiaModalPassageiroSteps());
-                          if (modoGuia && mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
+                          if (!dialogContext.mounted) return;
+                          unawaited(prefs.setBool(_prefsGuiaModalPassageiroKey, true));
+                          if (modoGuia && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
                             Navigator.of(dialogContext, rootNavigator: true).pop();
                           }
                         });
@@ -2091,7 +2024,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                                   Polyline(
                                                     points: _rotaGps,
                                                     strokeWidth: 2.0,
-                                                    color: Colors.lightBlueAccent.withOpacity(0.8),
+                                                    color: Colors.lightBlueAccent.withValues(alpha: 0.8),
                                                   ),
                                                 ],
                                               ),
@@ -2434,7 +2367,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         final res = await _geo.forward(_origemCtrl.text);
         _origemLatLng = LatLng(res.lat, res.lng);
         _origemCtrl.text = res.endereco;
-        _sugestoesOrigem = [];
         _origemTextoConfirmado = _origemCtrl.text.trim();
         await _avaliarTilesPara(_origemLatLng);
       }
@@ -2442,7 +2374,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
         final res = await _geo.forward(_destinoCtrl.text);
         _destinoLatLng = LatLng(res.lat, res.lng);
         _destinoCtrl.text = res.endereco;
-        _sugestoesDestino = [];
         _destinoTextoConfirmado = _destinoCtrl.text.trim();
         await _avaliarTilesPara(_destinoLatLng);
       }
@@ -2662,7 +2593,7 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                                 Polyline(
                                   points: _rotaGps,
                                   strokeWidth: 2.2,
-                                  color: Colors.lightBlueAccent.withOpacity(0.8),
+                                  color: Colors.lightBlueAccent.withValues(alpha: 0.8),
                                 ),
                               ],
                             ),
@@ -2787,7 +2718,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                         setState(() {
                           _origemCtrl.text = selection.endereco;
                           _origemLatLng = LatLng(selection.lat, selection.lng);
-                          _sugestoesOrigem = [];
                         });
                         _origemTextoConfirmado = _origemCtrl.text.trim();
                         _avaliarTilesPara(_origemLatLng);
@@ -2855,7 +2785,6 @@ class _PassengerPageState extends ConsumerState<PassengerPage> with WidgetsBindi
                         setState(() {
                           _destinoCtrl.text = selection.endereco;
                           _destinoLatLng = LatLng(selection.lat, selection.lng);
-                          _sugestoesDestino = [];
                         });
                         _destinoTextoConfirmado = _destinoCtrl.text.trim();
                         _avaliarTilesPara(_destinoLatLng);

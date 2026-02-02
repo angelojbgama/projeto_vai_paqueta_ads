@@ -33,6 +33,18 @@ class FcmService {
     await FirebaseMessaging.instance.requestPermission(alert: true, badge: true, sound: true);
   }
 
+  static Future<bool> areNotificationsAuthorized() async {
+    if (!_firebaseReady) return true;
+    try {
+      final settings = await FirebaseMessaging.instance.getNotificationSettings();
+      return settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional;
+    } catch (e) {
+      debugPrint('[FCM] Falha ao consultar permissao de notificacao: $e');
+      return true;
+    }
+  }
+
   static Future<String?> getToken() async {
     if (!_firebaseReady) return null;
     try {

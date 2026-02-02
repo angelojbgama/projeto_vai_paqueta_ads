@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutter/widgets.dart';
 
 import 'features/auth/auth_page.dart';
 import 'features/driver/driver_page.dart';
@@ -8,8 +9,9 @@ import 'features/passenger/passenger_page.dart';
 import 'features/profile/profile_edit_page.dart';
 import 'features/splash/splash_page.dart';
 
-GoRouter buildRouter() {
+GoRouter buildRouter({GlobalKey<NavigatorState>? navigatorKey}) {
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/splash',
     routes: [
       GoRoute(

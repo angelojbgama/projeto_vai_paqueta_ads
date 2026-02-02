@@ -6,7 +6,6 @@ import 'services/driver_background_service.dart';
 import 'services/fcm_service.dart';
 import 'services/map_tile_cache_service.dart';
 import 'services/notification_service.dart';
-
 final _router = buildRouter();
 
 Future<void> main() async {

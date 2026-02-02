@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -77,6 +76,18 @@ class NotificationService {
     await android?.requestNotificationsPermission();
     final ios = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     await ios?.requestPermissions(alert: true, badge: true, sound: true);
+  }
+
+  static Future<bool> areNotificationsEnabled() async {
+    if (kIsWeb) return true;
+    await initialize();
+    final android = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return false;
+    try {
+      return await android.areNotificationsEnabled() ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   static Future<void> showRideAvailable({

@@ -18,9 +18,9 @@ import '../../core/driver_settings.dart';
 import '../../core/map_config.dart';
 import '../../core/map_viewport.dart';
 import '../../services/driver_background_service.dart';
-import '../../services/fcm_service.dart';
 import '../../services/map_tile_cache_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/notification_permission_prompt_service.dart';
 import '../../services/route_service.dart';
 import '../../services/realtime_service.dart';
 import '../../widgets/coach_mark.dart';
@@ -39,14 +39,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   static const _prefsLocalizacaoBgKey = 'driver_localizacao_bg';
   static const _prefsConsentimentoBgKey = 'driver_localizacao_bg_consentimento';
   static const _prefsRecebimentoModalKey = 'driver_recebimento_modal_visto';
-  static const _prefsConsentimentoNotificacaoKey = 'app_notificacao_consentimento';
-  static const _prefsConsentimentoNotificacaoLegacyKey = 'driver_notificacao_consentimento';
   static const _prefsGuiaMotoristaKey = 'motorista_guia_visto';
   static const _prefsGuiaMotoristaPromptKey = 'motorista_guia_prompt_visto';
   static const _prefsVibrarCorridaKey = 'driver_vibrar_corrida';
   static const _prefsSomCorridaKey = 'driver_som_corrida';
   static const String _somSistemaValue = '__system__';
-  static const double _bearingSmoothFactor = 0.2;
   static const double _compassSmoothFactor = 0.15;
   final GlobalKey _guiaConfigKey = GlobalKey();
   final GlobalKey _guiaTrocarKey = GlobalKey();
@@ -128,6 +125,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   late final Animation<double> _guiaPulseAnim;
   late final AnimationController _configPulseController;
   late final Animation<double> _configPulseAnim;
+
+  Future<void> _solicitarPermissaoNotificacaoQuandoPronto() async {
+    if (!mounted) return;
+    if (_modalAberto || _configModalAberto || _guiaAtivo) return;
+    await NotificationPermissionPromptService.maybePrompt(context);
+  }
 
   Future<void> _carregarPreferencias() async {
     final prefs = await SharedPreferences.getInstance();
@@ -321,7 +324,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
           animation: _configPulseAnim,
           builder: (context, child) {
             final t = _configPulseAnim.value;
-            final bg = Color.lerp(Colors.transparent, Colors.red.withOpacity(0.14), t)!;
+            final bg = Color.lerp(Colors.transparent, Colors.red.withValues(alpha: 0.14), t)!;
             final border = Color.lerp(Colors.red.shade300, Colors.red.shade700, t)!;
             return OutlinedButton.icon(
               key: _guiaConfigCorridaKey,
@@ -366,7 +369,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.amberAccent.withOpacity(0.7 * glow),
+                  color: Colors.amberAccent.withValues(alpha: 0.7 * glow),
                   blurRadius: 4 + 4 * glow,
                   spreadRadius: 0.2 + 0.6 * glow,
                 ),
@@ -664,126 +667,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     return result ?? false;
   }
 
-  Future<bool> _mostrarConsentimentoLocalizacaoForeground() async {
-    if (!mounted) return false;
-    return _mostrarConsentimentoLocalizacaoBg();
-  }
-
-  Future<bool> _mostrarConsentimentoNotificacao() async {
-    if (!mounted) return false;
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Permitir notificações'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Precisamos da permissão de notificação para avisar quando surgir uma corrida e enviar atualizações importantes.',
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.notifications_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Alertas de novas corridas mesmo com o app fechado.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.volume_up_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Som/vibração para você não perder corridas importantes.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.settings_outlined, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Você pode mudar isso depois nas configurações do Android.',
-                      style: Theme.of(dialogContext).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Agora não'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Concordo e continuar'),
-            ),
-          ],
-        );
-      },
-    );
-    return result ?? false;
-  }
-
-  Future<void> _solicitarPermissaoNotificacao() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jaPediu = prefs.getBool(_prefsConsentimentoNotificacaoKey) ??
-        prefs.getBool(_prefsConsentimentoNotificacaoLegacyKey) ??
-        false;
-    if (jaPediu) return;
-    final aceitou = await _mostrarConsentimentoNotificacao();
-    await prefs.setBool(_prefsConsentimentoNotificacaoKey, true);
-    await prefs.setBool(_prefsConsentimentoNotificacaoLegacyKey, true);
-    if (!aceitou) return;
-    await NotificationService.requestPermissions();
-    await FcmService.requestPermissions();
-  }
-
-  Future<bool> _garantirConsentimentoLocalizacaoBg() async {
-    if (_consentimentoLocalizacaoBg) return true;
-    final aceitou = await _mostrarConsentimentoLocalizacaoBg();
-    if (!aceitou) return false;
-    if (!mounted) return false;
-    setState(() => _consentimentoLocalizacaoBg = true);
-    await _salvarPreferencias(consentimentoLocalizacaoBg: true);
-    return true;
-  }
-
   Future<bool> _garantirPermissaoLocalizacao() async {
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      return false;
-    }
-    return true;
-  }
-
-  Future<bool> _garantirPermissaoLocalizacaoForeground() async {
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      final aceitou = await _mostrarConsentimentoLocalizacaoForeground();
-      if (!aceitou) return false;
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
@@ -880,11 +766,13 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     setState(() {
       _rotaMotorista = [];
       _rotaCorrida = [];
-                          _rotaMotoristaKey = null;
-                          _rotaCorridaKey = null;    });
-                  if (_modalAberto) {
-                    _modalSetState?.call(() {});
-                  }  }
+      _rotaMotoristaKey = null;
+      _rotaCorridaKey = null;
+    });
+    if (_modalAberto) {
+      _modalSetState?.call(() {});
+    }
+  }
 
   void _atualizarRotas(Map<String, dynamic> corrida) {
     final origem = _latLngFromMap(corrida, 'origem_lat', 'origem_lng');
@@ -1063,7 +951,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
   }
 
   double? _extrairVelocidadeMps(Position pos) {
-    final now = pos.timestamp ?? DateTime.now();
+    final now = pos.timestamp;
     double? speedMps;
     if (pos.speed.isFinite && pos.speed > 0) {
       speedMps = pos.speed;
@@ -1440,8 +1328,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _solicitarPermissaoNotificacao();
-      if (!mounted) return;
       await _mostrarGuiaMotoristaSeNecessario();
       if (!mounted) return;
       if (_prefsFuture != null) {
@@ -1449,6 +1335,8 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       }
       if (!mounted) return;
       await _mostrarModalReceberCorridasSeNecessario();
+      if (!mounted) return;
+      await _solicitarPermissaoNotificacaoQuandoPronto();
     });
   }
 
@@ -1516,6 +1404,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       if (_corridaAtual != null && !_modalAberto) {
         _mostrarModalCorrida(_corridaAtual!);
       }
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 400), () async {
+        await _solicitarPermissaoNotificacaoQuandoPronto();
+      }));
     }
   }
 
@@ -1788,6 +1679,11 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
       return;
     }
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      _modalAberto = false;
+      _corridaAtual = corridaAnterior;
+      return;
+    }
     var guiaIniciado = false;
     try {
       await showGeneralDialog<void>(
@@ -1803,16 +1699,17 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                 constraints: const BoxConstraints(maxWidth: 640),
                 child: Material(
                   key: _guiaModalContainerKey,
-                  color: Theme.of(context).dialogTheme.backgroundColor,
+                  color: Theme.of(ctx).dialogTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(16),
                   child: StatefulBuilder(builder: (dialogContext, setModalState) {
                     _modalSetState = setModalState;
                     if (guia && !guiaIniciado) {
                       guiaIniciado = true;
                       WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (!mounted) return;
+                        if (!dialogContext.mounted) return;
                         await showCoachMarks(dialogContext, _buildGuiaCorridaSteps());
-                        if (mounted && Navigator.of(dialogContext, rootNavigator: true).canPop()) {
+                        if (!dialogContext.mounted) return;
+                        if (Navigator.of(dialogContext, rootNavigator: true).canPop()) {
                           Navigator.of(dialogContext, rootNavigator: true).pop();
                         }
                       });
@@ -2139,7 +2036,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
             opacity: anim,
             child: ScaleTransition(
               scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-              child: child ?? const SizedBox.shrink(),
+              child: child,
             ),
           );
         },
@@ -2228,22 +2125,12 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _verificarCorrida(force: true);
   }
 
-  void _showErrorSnackbar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
-  }
-
-  void _onToggleRecebimentoCorridas(bool ativo) {
+  Future<void> _onToggleRecebimentoCorridas(bool ativo) async {
     if (!ativo) {
       _setRecebimentoCorridas(false);
       return;
     }
-    unawaited(_habilitarRecebimentoCorridas());
+    await _habilitarRecebimentoCorridas();
   }
 
   Future<void> _habilitarRecebimentoCorridas() async {
@@ -2307,32 +2194,6 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     _atualizarConfigPulse();
   }
 
-  void _onToggleLocalizacaoSegundoPlano(bool ativo) {
-    if (!ativo) {
-      _setLocalizacaoSegundoPlano(false);
-      return;
-    }
-    if (!_recebendoCorridas) {
-      _showErrorSnackbar('Ative "Receber Corridas" para habilitar o segundo plano.');
-      return;
-    }
-    unawaited(_habilitarLocalizacaoSegundoPlano());
-  }
-
-  Future<void> _habilitarLocalizacaoSegundoPlano() async {
-    final consentimentoOk = await _garantirConsentimentoLocalizacaoBg();
-    if (!consentimentoOk) {
-      _setLocalizacaoSegundoPlano(false, forceRebuild: true);
-      return;
-    }
-    final permissaoOk = await _garantirPermissaoLocalizacao();
-    if (!permissaoOk) {
-      _setLocalizacaoSegundoPlano(false, forceRebuild: true);
-      return;
-    }
-    _setLocalizacaoSegundoPlano(true);
-  }
-
   void _setLocalizacaoSegundoPlano(
     bool ativo, {
     bool salvarPreferencias = true,
@@ -2377,6 +2238,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
     if (_configModalAberto) return;
     _configModalAberto = true;
     await Future<void>.delayed(Duration.zero);
+    if (!mounted) {
+      _configModalAberto = false;
+      return;
+    }
     var guiaIniciado = false;
     try {
       await showDialog<void>(
@@ -2388,9 +2253,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
               if (guia && !guiaIniciado) {
                 guiaIniciado = true;
                 WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  if (!mounted) return;
+                  if (!dialogContext.mounted) return;
                   await showCoachMarks(dialogContext, _buildGuiaConfiguracoesSteps());
-                  if (mounted && Navigator.of(dialogContext).canPop()) {
+                  if (!dialogContext.mounted) return;
+                  if (Navigator.of(dialogContext).canPop()) {
                     Navigator.of(dialogContext).pop();
                   }
                 });
@@ -2435,8 +2301,9 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                               value: _recebendoCorridas,
                               onChanged: guia
                                   ? null
-                                  : (value) {
-                                      _onToggleRecebimentoCorridas(value);
+                                  : (value) async {
+                                      await _onToggleRecebimentoCorridas(value);
+                                      if (!mounted) return;
                                       setModalState(() {});
                                     },
                               title: const Text('Receber corridas'),
@@ -2467,7 +2334,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                 Expanded(
                                   child: DropdownButtonFormField<String>(
                                     key: _guiaSomKey,
-                                    value: selected,
+                                    initialValue: selected,
                                     isExpanded: true,
                                     items: options
                                         .map(
@@ -2693,10 +2560,10 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                               } else {
                                 mapChild = Container(
                                   color: Colors.grey.shade100,
-                                  child: Center(
+                                  child: const Center(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
-                                      children: const [
+                                      children: [
                                         Text(
                                           'Você está offline para corridas.',
                                           textAlign: TextAlign.center,
@@ -2712,15 +2579,15 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                         Text.rich(
                                           TextSpan(
                                             children: [
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: 'Ative "Receber corridas" ',
                                                 style: TextStyle(color: Colors.grey, fontSize: 14),
                                               ),
-                                              const WidgetSpan(
+                                              WidgetSpan(
                                                 alignment: PlaceholderAlignment.middle,
                                                 child: Icon(Icons.toggle_on, color: Colors.grey, size: 20),
                                               ),
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: ' para ficar disponível, inclusive em segundo plano.',
                                                 style: TextStyle(color: Colors.grey, fontSize: 14),
                                               ),
@@ -2745,7 +2612,7 @@ class _DriverPageState extends ConsumerState<DriverPage> with WidgetsBindingObse
                                       speedKmh: _velocidadeKmh,
                                       warningKmh: DriverSettings.speedWarningThresholdKmh,
                                       compact: true,
-                                      backgroundColor: Colors.black.withOpacity(0.2),
+                                      backgroundColor: Colors.black.withValues(alpha: 0.2),
                                       borderColor: Colors.transparent,
                                       textColor: Colors.white,
                                     ),
@@ -2811,12 +2678,12 @@ class _SpeedometerCard extends StatelessWidget {
     final displaySpeed = speedKmh == null ? '--' : speedKmh!.toStringAsFixed(0);
     final displayTitle = compact ? 'Veloc.' : 'Velocímetro';
     final primaryTextColor = textColor ?? theme.colorScheme.onSurface;
-    final secondaryTextColor = textColor != null ? textColor!.withOpacity(0.7) : Colors.grey.shade600;
+    final secondaryTextColor = textColor != null ? textColor!.withValues(alpha: 0.7) : Colors.grey.shade600;
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        color: backgroundColor ?? Colors.white.withOpacity(0.85),
+        color: backgroundColor ?? Colors.white.withValues(alpha: 0.85),
         border: Border.all(color: borderColor ?? Colors.grey.shade200),
       ),
       child: Padding(
